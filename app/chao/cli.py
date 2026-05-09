@@ -9,6 +9,7 @@ from rich.console import Console
 
 from app.chao.graph.main_graph import build_graph
 from app.chao.services.store import save_task_result, list_tasks, get_task_detail
+from app.chao.services.markdown_records import save_task_markdown
 
 app = typer.Typer()
 console = Console()
@@ -30,6 +31,9 @@ def new(title: str, request: str):
     })
 
     save_task_result(result)
+    markdown_path = save_task_markdown(result)
+
+    result["markdown_record"] = str(markdown_path)
 
     print_json(data=result)
 
