@@ -27,6 +27,14 @@ REQUIRED_EXTENSIONS = [
     "vector",
 ]
 
+REQUIRED_STORAGE_POLICIES = [
+    "D0_PUBLIC_KNOWLEDGE",
+    "D1_INTERNAL_ENGINEERING_KNOWLEDGE",
+    "D2_SENSITIVE_ENGINEERING_DATA",
+    "D3_STRICT_SECRET_DATA",
+    "D4_TEMP_EXECUTION_DATA",
+]
+
 
 def main() -> int:
     load_dotenv()
@@ -72,6 +80,13 @@ def main() -> int:
             for extension in REQUIRED_EXTENSIONS:
                 if extension not in existing_extensions:
                     errors.append(f"missing extension: {extension}")
+
+            cur.execute("select policy_name from storage_policies")
+            existing_policies = {row[0] for row in cur.fetchall()}
+
+            for policy in REQUIRED_STORAGE_POLICIES:
+                if policy not in existing_policies:
+                    errors.append(f"missing storage policy: {policy}")
 
     if errors:
         print("schema check failed:")
