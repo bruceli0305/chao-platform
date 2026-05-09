@@ -68,6 +68,9 @@ jobs:
       - name: Pytest
         run: uv run pytest -q
 
+      - name: Data boundary check
+        run: uv run python scripts/data_boundary_check.py
+
       - name: Compile Python files
         run: uv run python -m compileall app tests main.py
 
