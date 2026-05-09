@@ -123,6 +123,13 @@ jobs:
           echo "CONFIRMATION_COUNT=$CONFIRMATION_COUNT"
           test "$CONFIRMATION_COUNT" -ge 1
 
+      - name: Verify task events persisted
+        run: |
+          psql "$DATABASE_URL" -c "select event_type, from_status, to_status, summary, created_by from task_events order by created_at desc limit 10;"
+          EVENT_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from task_events;" | tr -d ' ')
+          echo "EVENT_COUNT=$EVENT_COUNT"
+          test "$EVENT_COUNT" -ge 4
+
       - name: Verify markdown records generated
         run: |
           ls -la .ai-agents/records/tasks
