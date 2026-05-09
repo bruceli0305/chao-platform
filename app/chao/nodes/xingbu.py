@@ -1,5 +1,6 @@
 from app.chao.state import ChaoState
 
+
 def xingbu_validate(state: ChaoState) -> ChaoState:
     return {
         **state,

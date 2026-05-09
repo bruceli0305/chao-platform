@@ -1,5 +1,6 @@
 from app.chao.state import ChaoState
 
+
 def gongbu_execute(state: ChaoState) -> ChaoState:
     return {
         **state,

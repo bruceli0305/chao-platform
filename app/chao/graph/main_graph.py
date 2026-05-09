@@ -1,21 +1,24 @@
-from langgraph.graph import StateGraph, START, END
+from langgraph.graph import END, START, StateGraph
 
-from app.chao.state import ChaoState
+from app.chao.nodes.gongbu import gongbu_execute
 from app.chao.nodes.historian import historian_record_raw, historian_record_result
 from app.chao.nodes.router import task_router
-from app.chao.nodes.gongbu import gongbu_execute
 from app.chao.nodes.xingbu import xingbu_validate
+from app.chao.state import ChaoState
+
 
 def route_by_level(state: ChaoState) -> str:
     if state["task_level"] in ["L3", "L4"]:
         return "need_confirmation"
     return "gongbu_execute"
 
+
 def need_confirmation(state: ChaoState) -> ChaoState:
     return {
         **state,
         "status": "NEED_CONFIRMATION",
     }
+
 
 def build_graph():
     builder = StateGraph(ChaoState)

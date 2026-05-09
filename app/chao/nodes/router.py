@@ -1,17 +1,37 @@
 from app.chao.state import ChaoState
 
+
 def task_router(state: ChaoState) -> ChaoState:
     raw = state["raw_request"]
 
     l3_keywords = [
-        "数据库", "迁移", "权限", "登录", "认证", "鉴权",
-        "部署", "生产", "第三方", "Secret", "密钥",
-        "架构", "技术栈", "回滚"
+        "数据库",
+        "迁移",
+        "权限",
+        "登录",
+        "认证",
+        "鉴权",
+        "部署",
+        "生产",
+        "第三方",
+        "Secret",
+        "密钥",
+        "架构",
+        "技术栈",
+        "回滚",
     ]
 
     l2_keywords = [
-        "新增页面", "新增接口", "接口", "API", "前后端",
-        "表单", "列表", "模块", "字段", "状态"
+        "新增页面",
+        "新增接口",
+        "接口",
+        "API",
+        "前后端",
+        "表单",
+        "列表",
+        "模块",
+        "字段",
+        "状态",
     ]
 
     if any(k in raw for k in l3_keywords):

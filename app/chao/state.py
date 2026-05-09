@@ -1,6 +1,7 @@
-from typing import Literal, TypedDict, Any
+from typing import Any, Literal, TypedDict
 
 TaskLevel = Literal["L1", "L2", "L3", "L4"]
+
 
 class ChaoState(TypedDict, total=False):
     task_id: str

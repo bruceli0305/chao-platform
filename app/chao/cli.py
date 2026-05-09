@@ -2,14 +2,13 @@ import uuid
 from datetime import datetime
 
 import typer
-from rich import print
-from rich import print_json
-from rich.table import Table
+from rich import print, print_json
 from rich.console import Console
+from rich.table import Table
 
 from app.chao.graph.main_graph import build_graph
-from app.chao.services.store import save_task_result, list_tasks, get_task_detail
 from app.chao.services.markdown_records import save_task_markdown
+from app.chao.services.store import get_task_detail, list_tasks, save_task_result
 
 app = typer.Typer()
 console = Console()
@@ -22,13 +21,15 @@ def new(title: str, request: str):
 
     graph = build_graph()
 
-    result = graph.invoke({
-        "task_id": task_id,
-        "task_code": task_code,
-        "title": title,
-        "raw_request": request,
-        "status": "RAW",
-    })
+    result = graph.invoke(
+        {
+            "task_id": task_id,
+            "task_code": task_code,
+            "title": title,
+            "raw_request": request,
+            "status": "RAW",
+        }
+    )
 
     save_task_result(result)
     markdown_path = save_task_markdown(result)

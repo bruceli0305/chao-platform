@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 TASK_RECORDS_DIR = Path(".ai-agents/records/tasks")
 
 
@@ -106,7 +105,10 @@ def save_task_markdown(result: dict[str, Any]) -> Path:
         "",
         f"- 状态：{result.get('status', '')}",
         f"- 是否可继续：{can_continue}",
-        "- 说明：当前 MVP 阶段暂不自动修改真实代码，只验证任务路由、状态流转、记录落库和 Markdown 双写。",
+        (
+            "- 说明：当前 MVP 阶段暂不自动修改真实代码，"
+            "只验证任务路由、状态流转、记录落库和 Markdown 双写。"
+        ),
         "",
     ]
 
