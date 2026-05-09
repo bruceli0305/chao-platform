@@ -6,6 +6,7 @@ from psycopg.types.json import Jsonb
 
 from app.chao.config import DATABASE_URL
 from app.chao.services.events import list_task_events, record_task_event
+from app.chao.services.tool_calls import list_tool_calls, record_tool_call
 
 
 def save_task_result(result: dict[str, Any]) -> None:
@@ -120,6 +121,19 @@ def save_task_result(result: dict[str, Any]) -> None:
         created_by="shangshu",
     )
 
+    record_tool_call(
+        task_id=task_id,
+        agent_name="shangshu",
+        tool_name="cli.new",
+        arguments_summary=f"title={result.get('title', '')}; level={result.get('task_level', '')}",
+        permission_policy="local-cli-task-create",
+        result_status="success",
+        output_summary=(
+            f"task_code={result.get('task_code', '')}; status={result.get('status', '')}"
+        ),
+        risk_flag=None,
+    )
+
 
 def list_tasks(limit: int = 10) -> list[dict[str, Any]]:
     with psycopg.connect(DATABASE_URL) as conn:
@@ -216,6 +230,7 @@ def get_task_detail(task_code: str) -> dict[str, Any] | None:
         "created_at": task[7],
         "updated_at": task[8],
         "events": list_task_events(task[0]),
+        "tool_calls": list_tool_calls(task[0]),
         "historian_records": [
             {
                 "record_type": r[0],
@@ -326,6 +341,17 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
         to_status="APPROVED",
         summary=f"A 级事项已由 {confirmed_by} 确认。",
         created_by=confirmed_by,
+    )
+
+    record_tool_call(
+        task_id=task_id,
+        agent_name="emperor",
+        tool_name="cli.approve",
+        arguments_summary=f"task_code={task_code}; confirmed_by={confirmed_by}",
+        permission_policy="human-approval-required",
+        result_status="success",
+        output_summary=f"task_code={task_code}; status=APPROVED",
+        risk_flag="A_CONFIRMATION",
     )
 
     detail = get_task_detail(task_code)

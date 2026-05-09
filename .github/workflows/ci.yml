@@ -130,6 +130,13 @@ jobs:
           echo "EVENT_COUNT=$EVENT_COUNT"
           test "$EVENT_COUNT" -ge 4
 
+      - name: Verify tool calls persisted
+        run: |
+          psql "$DATABASE_URL" -c "select agent_name, tool_name, permission_policy, result_status, risk_flag from tool_calls order by started_at desc limit 10;"
+          TOOL_CALL_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from tool_calls;" | tr -d ' ')
+          echo "TOOL_CALL_COUNT=$TOOL_CALL_COUNT"
+          test "$TOOL_CALL_COUNT" -ge 4
+
       - name: Verify markdown records generated
         run: |
           ls -la .ai-agents/records/tasks
