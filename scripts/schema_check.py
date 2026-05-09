@@ -15,6 +15,12 @@ REQUIRED_TABLES = [
     "task_events",
     "tool_calls",
     "artifacts",
+    "data_assets",
+    "storage_policies",
+]
+
+REQUIRED_VIEWS = [
+    "artifact_records",
 ]
 
 REQUIRED_EXTENSIONS = [
@@ -46,6 +52,19 @@ def main() -> int:
             for table in REQUIRED_TABLES:
                 if table not in existing_tables:
                     errors.append(f"missing table: {table}")
+
+            cur.execute(
+                """
+                select viewname
+                from pg_views
+                where schemaname = 'public'
+                """
+            )
+            existing_views = {row[0] for row in cur.fetchall()}
+
+            for view in REQUIRED_VIEWS:
+                if view not in existing_views:
+                    errors.append(f"missing view: {view}")
 
             cur.execute("select extname from pg_extension")
             existing_extensions = {row[0] for row in cur.fetchall()}
