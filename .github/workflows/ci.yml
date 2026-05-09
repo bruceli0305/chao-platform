@@ -1,0 +1,101 @@
+name: Chao Local MVP CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  ci:
+    name: Run Chao MVP gates
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: chao
+          POSTGRES_PASSWORD: chao_dev_password
+          POSTGRES_DB: chao
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chao -d chao"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://chao:chao_dev_password@localhost:5432/chao
+      PGPASSWORD: chao_dev_password
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Initialize database schema
+        run: |
+          psql "$DATABASE_URL" -f db/init/001_init.sql
+
+      - name: Verify pgvector extension
+        run: |
+          psql "$DATABASE_URL" -c "select extname from pg_extension;"
+          psql "$DATABASE_URL" -c "select extname from pg_extension;" | grep vector
+
+      - name: Compile Python files
+        run: |
+          uv run python -m compileall app main.py
+
+      - name: Smoke test CLI status
+        run: |
+          uv run python main.py status
+
+      - name: Smoke test L1 task
+        run: |
+          uv run python main.py new "CI-L1-修复文案" "把首页标题从系统管理改成项目管理"
+
+      - name: Smoke test L2 task
+        run: |
+          uv run python main.py new "CI-L2-新增页面" "新增后台应用管理页面，包含列表、搜索和新增弹窗"
+
+      - name: Smoke test L3 task
+        run: |
+          uv run python main.py new "CI-L3-数据库迁移" "给用户表新增 status 字段，并迁移历史数据"
+
+      - name: Verify tasks persisted
+        run: |
+          psql "$DATABASE_URL" -c "select task_code, title, task_level, status from tasks order by created_at desc limit 10;"
+          TASK_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from tasks;" | tr -d ' ')
+          echo "TASK_COUNT=$TASK_COUNT"
+          test "$TASK_COUNT" -ge 3
+
+      - name: Verify historian records persisted
+        run: |
+          psql "$DATABASE_URL" -c "select record_type, content, created_by from historian_records order by created_at desc limit 10;"
+          RECORD_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from historian_records;" | tr -d ' ')
+          echo "RECORD_COUNT=$RECORD_COUNT"
+          test "$RECORD_COUNT" -ge 3
+
+      - name: Verify markdown records generated
+        run: |
+          ls -la .ai-agents/records/tasks
+          MARKDOWN_COUNT=$(find .ai-agents/records/tasks -name 'TASK-*.md' | wc -l)
+          echo "MARKDOWN_COUNT=$MARKDOWN_COUNT"
+          test "$MARKDOWN_COUNT" -ge 3
