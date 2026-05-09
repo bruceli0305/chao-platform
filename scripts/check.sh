@@ -10,6 +10,9 @@ uv run ruff format --check app tests main.py
 echo "== Pytest =="
 uv run pytest -q
 
+echo "== Data boundary check =="
+uv run python scripts/data_boundary_check.py
+
 echo "== Compile =="
 uv run python -m compileall app tests main.py
 
