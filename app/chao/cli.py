@@ -17,7 +17,7 @@ console = Console()
 @app.command()
 def new(title: str, request: str):
     task_id = str(uuid.uuid4())
-    task_code = "TASK-" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    task_code = "TASK-" + datetime.now().strftime("%Y%m%d-%H%M%S-%f")
 
     graph = build_graph()
 
