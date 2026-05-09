@@ -144,6 +144,13 @@ jobs:
           echo "MARKDOWN_COUNT=$MARKDOWN_COUNT"
           test "$MARKDOWN_COUNT" -ge 3
 
+      - name: Verify artifacts persisted
+        run: |
+          psql "$DATABASE_URL" -c "select artifact_type, artifact_uri, artifact_hash, access_level, retention_days, summary from artifacts order by created_at desc limit 10;"
+          ARTIFACT_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from artifacts;" | tr -d ' ')
+          echo "ARTIFACT_COUNT=$ARTIFACT_COUNT"
+          test "$ARTIFACT_COUNT" -ge 3
+
   secret-scan:
     name: Secret scan
     runs-on: ubuntu-latest

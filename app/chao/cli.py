@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.table import Table
 
 from app.chao.graph.main_graph import build_graph
+from app.chao.services.artifacts import record_artifact
 from app.chao.services.markdown_records import save_task_markdown
 from app.chao.services.store import approve_task, get_task_detail, list_tasks, save_task_result
 
@@ -33,6 +34,15 @@ def new(title: str, request: str):
 
     save_task_result(result)
     markdown_path = save_task_markdown(result)
+
+    record_artifact(
+        task_id=task_id,
+        artifact_type="markdown_record",
+        artifact_uri=str(markdown_path),
+        access_level="internal",
+        retention_days=365,
+        summary="任务级 Markdown 史官记录",
+    )
 
     result["markdown_record"] = str(markdown_path)
 
