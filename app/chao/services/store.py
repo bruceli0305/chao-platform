@@ -226,3 +226,90 @@ def get_task_detail(task_code: str) -> dict[str, Any] | None:
             for g in gates
         ],
     }
+
+
+def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str, Any]:
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                select id::text, task_code, title, task_level, status
+                from tasks
+                where task_code = %s
+                """,
+                (task_code,),
+            )
+            task = cur.fetchone()
+
+            if not task:
+                raise ValueError(f"Task not found: {task_code}")
+
+            task_id = task[0]
+            current_status = task[4]
+
+            if current_status != "NEED_CONFIRMATION":
+                raise ValueError(
+                    f"Task {task_code} is not waiting for confirmation. "
+                    f"Current status: {current_status}"
+                )
+
+            cur.execute(
+                """
+                insert into confirmations (
+                    id,
+                    task_id,
+                    confirmation_level,
+                    status,
+                    confirmed_by,
+                    note
+                )
+                values (%s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    str(uuid.uuid4()),
+                    task_id,
+                    "A",
+                    "APPROVED",
+                    confirmed_by,
+                    note,
+                ),
+            )
+
+            cur.execute(
+                """
+                update tasks
+                set status = %s, updated_at = now()
+                where id = %s
+                """,
+                ("APPROVED", task_id),
+            )
+
+            cur.execute(
+                """
+                insert into historian_records (
+                    id,
+                    task_id,
+                    record_type,
+                    content,
+                    source,
+                    created_by
+                )
+                values (%s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    str(uuid.uuid4()),
+                    task_id,
+                    "confirmation",
+                    f"A 级事项已由 {confirmed_by} 确认。说明：{note or '无'}",
+                    "cli-approve",
+                    "historian",
+                ),
+            )
+
+        conn.commit()
+
+    detail = get_task_detail(task_code)
+    if detail is None:
+        raise ValueError(f"Task not found after approval: {task_code}")
+
+    return detail

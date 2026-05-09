@@ -8,7 +8,7 @@ from rich.table import Table
 
 from app.chao.graph.main_graph import build_graph
 from app.chao.services.markdown_records import save_task_markdown
-from app.chao.services.store import get_task_detail, list_tasks, save_task_result
+from app.chao.services.store import approve_task, get_task_detail, list_tasks, save_task_result
 
 app = typer.Typer()
 console = Console()
@@ -71,6 +71,21 @@ def show(task_code: str):
     if not task:
         print(f"[red]Task not found:[/red] {task_code}")
         raise typer.Exit(code=1)
+
+    print_json(data=task)
+
+
+@app.command()
+def approve(
+    task_code: str,
+    by: str = typer.Option("emperor", "--by", help="确认人"),
+    note: str = typer.Option("", "--note", help="确认说明"),
+):
+    try:
+        task = approve_task(task_code=task_code, confirmed_by=by, note=note)
+    except ValueError as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
 
     print_json(data=task)
 
