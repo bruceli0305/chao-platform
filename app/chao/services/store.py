@@ -5,6 +5,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from app.chao.config import DATABASE_URL
+from app.chao.services.events import list_task_events, record_task_event
 
 
 def save_task_result(result: dict[str, Any]) -> None:
@@ -110,6 +111,15 @@ def save_task_result(result: dict[str, Any]) -> None:
 
         conn.commit()
 
+    record_task_event(
+        task_id=task_id,
+        event_type="task_created",
+        from_status="RAW",
+        to_status=result.get("status", "UNKNOWN"),
+        summary=f"任务已创建并完成路由，当前状态：{result.get('status', 'UNKNOWN')}",
+        created_by="shangshu",
+    )
+
 
 def list_tasks(limit: int = 10) -> list[dict[str, Any]]:
     with psycopg.connect(DATABASE_URL) as conn:
@@ -205,6 +215,7 @@ def get_task_detail(task_code: str) -> dict[str, Any] | None:
         "owner": task[6],
         "created_at": task[7],
         "updated_at": task[8],
+        "events": list_task_events(task[0]),
         "historian_records": [
             {
                 "record_type": r[0],
@@ -307,6 +318,15 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
             )
 
         conn.commit()
+
+    record_task_event(
+        task_id=task_id,
+        event_type="task_approved",
+        from_status="NEED_CONFIRMATION",
+        to_status="APPROVED",
+        summary=f"A 级事项已由 {confirmed_by} 确认。",
+        created_by=confirmed_by,
+    )
 
     detail = get_task_detail(task_code)
     if detail is None:
