@@ -151,6 +151,13 @@ jobs:
           echo "ARTIFACT_COUNT=$ARTIFACT_COUNT"
           test "$ARTIFACT_COUNT" -ge 3
 
+      - name: Verify data assets persisted
+        run: |
+          psql "$DATABASE_URL" -c "select asset_name, asset_type, classification, primary_storage, allow_vectorization, desensitized, owner from data_assets order by created_at desc limit 10;"
+          DATA_ASSET_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from data_assets where asset_type = 'markdown_record' and classification = 'D1';" | tr -d ' ')
+          echo "DATA_ASSET_COUNT=$DATA_ASSET_COUNT"
+          test "$DATA_ASSET_COUNT" -ge 3
+
   secret-scan:
     name: Secret scan
     runs-on: ubuntu-latest

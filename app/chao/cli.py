@@ -8,6 +8,7 @@ from rich.table import Table
 
 from app.chao.graph.main_graph import build_graph
 from app.chao.services.artifacts import record_artifact
+from app.chao.services.data_assets import record_data_asset
 from app.chao.services.markdown_records import save_task_markdown
 from app.chao.services.store import approve_task, get_task_detail, list_tasks, save_task_result
 
@@ -42,6 +43,20 @@ def new(title: str, request: str):
         access_level="internal",
         retention_days=365,
         summary="任务级 Markdown 史官记录",
+    )
+
+    record_data_asset(
+        asset_name=str(markdown_path),
+        asset_type="markdown_record",
+        classification="D1",
+        primary_storage="Git / Markdown",
+        owner="historian",
+        allowed_copies=["PostgreSQL", "pgvector"],
+        forbidden_storages=["Secret Manager"],
+        allow_vectorization=True,
+        desensitized=True,
+        retention_days=365,
+        notes="任务级 Markdown 史官记录，可作为脱敏工程知识进入检索索引。",
     )
 
     result["markdown_record"] = str(markdown_path)
