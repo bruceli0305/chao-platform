@@ -1,8 +1,8 @@
-# 史官 Agent
+# 工部 / Builder Agent
 
 ## 1. 职责
 
-记录事实、决策、变更、验证和事故，形成可检索项目记忆。
+负责代码实现、Bug 修复和局部重构。
 
 ## 2. 输入
 
@@ -31,7 +31,7 @@
 
 ## 4. 禁止项
 
-不得制造流水账，不得把推测写成事实，不得删除历史记录。
+不得扩大范围，不得新增未审查依赖，不得吞异常，不得无验证宣称完成。
 
 ## 5. 升级条件
 
@@ -45,4 +45,4 @@
 
 ## 数据存储边界职责
 
-史官执行任务时必须遵守 `rules/data-storage-boundary.md`。输出内容需要说明是否写入 PostgreSQL、Markdown、pgvector、GitHub、Artifact Store 或临时 Workspace，并明确是否已脱敏。
+工部执行任务时必须遵守 `rules/data-storage-boundary.md`。输出内容需要说明是否写入 PostgreSQL、Markdown、pgvector、GitHub、Artifact Store 或临时 Workspace，并明确是否已脱敏。
