@@ -148,15 +148,23 @@ jobs:
         run: |
           psql "$DATABASE_URL" -c "select artifact_type, artifact_uri, artifact_hash, access_level, retention_days, summary from artifacts order by created_at desc limit 10;"
           ARTIFACT_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from artifacts;" | tr -d ' ')
+          MARKDOWN_ARTIFACT_URIS=$(psql "$DATABASE_URL" -t -A -c "select artifact_uri from artifacts where artifact_type = 'markdown_record';")
           echo "ARTIFACT_COUNT=$ARTIFACT_COUNT"
           test "$ARTIFACT_COUNT" -ge 3
+          test -n "$MARKDOWN_ARTIFACT_URIS"
+          while IFS= read -r artifact_uri; do
+            test -f "$artifact_uri"
+          done <<< "$MARKDOWN_ARTIFACT_URIS"
 
       - name: Verify data assets persisted
         run: |
-          psql "$DATABASE_URL" -c "select asset_name, asset_type, classification, primary_storage, allow_vectorization, desensitized, owner from data_assets order by created_at desc limit 10;"
-          DATA_ASSET_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from data_assets where asset_type = 'markdown_record' and classification = 'D1';" | tr -d ' ')
+          psql "$DATABASE_URL" -c "select task_id, asset_name, asset_type, classification, primary_storage, allow_vectorization, desensitized, owner from data_assets order by created_at desc limit 10;"
+          DATA_ASSET_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from data_assets where task_id is not null and asset_type = 'markdown_record' and classification = 'D1';" | tr -d ' ')
+          DATA_ASSET_ORPHAN_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from data_assets where task_id is null and asset_type = 'markdown_record' and classification = 'D1';" | tr -d ' ')
           echo "DATA_ASSET_COUNT=$DATA_ASSET_COUNT"
+          echo "DATA_ASSET_ORPHAN_COUNT=$DATA_ASSET_ORPHAN_COUNT"
           test "$DATA_ASSET_COUNT" -ge 3
+          test "$DATA_ASSET_ORPHAN_COUNT" = "0"
 
   secret-scan:
     name: Secret scan

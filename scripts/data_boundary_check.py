@@ -5,6 +5,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+TASK_RECORDS_DIR = ROOT / ".ai-agents" / "records" / "tasks"
 
 
 FORBIDDEN_TRACKED_PATHS = [
@@ -106,10 +107,26 @@ def should_scan(path: Path) -> bool:
     if any(part in IGNORED_DIRS for part in relative_parts):
         return False
 
+    if is_task_markdown_record(path):
+        return False
+
     if path.suffix not in SCAN_SUFFIXES:
         return False
 
     return path.is_file()
+
+
+def is_task_markdown_record(path: Path) -> bool:
+    try:
+        path.relative_to(TASK_RECORDS_DIR)
+    except ValueError:
+        return False
+
+    return path.is_file() and path.name.startswith("TASK-") and path.suffix == ".md"
+
+
+def contains_secret_pattern(content: str) -> bool:
+    return any(pattern.search(content) for pattern in SECRET_PATTERNS)
 
 
 def check_secret_patterns() -> list[str]:
@@ -124,9 +141,26 @@ def check_secret_patterns() -> list[str]:
         except UnicodeDecodeError:
             continue
 
-        for pattern in SECRET_PATTERNS:
-            if pattern.search(content):
-                errors.append(f"疑似敏感信息：{path.relative_to(ROOT)}")
+        if contains_secret_pattern(content):
+            errors.append(f"疑似敏感信息：{path.relative_to(ROOT)}")
+
+    return errors
+
+
+def check_task_markdown_records() -> list[str]:
+    errors = []
+
+    if not TASK_RECORDS_DIR.exists():
+        return errors
+
+    for path in TASK_RECORDS_DIR.glob("TASK-*.md"):
+        try:
+            content = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+
+        if contains_secret_pattern(content):
+            errors.append(f"史官任务记录疑似敏感信息：{path.relative_to(ROOT)}")
 
     return errors
 
@@ -139,6 +173,7 @@ def main() -> int:
     errors.extend(check_forbidden_tracked_paths(tracked_files))
     errors.extend(check_gitignore())
     errors.extend(check_secret_patterns())
+    errors.extend(check_task_markdown_records())
 
     if errors:
         print("data-boundary check failed:")
