@@ -51,6 +51,7 @@ def new(title: str, request: str):
         classification="D1",
         primary_storage="Git / Markdown",
         owner="historian",
+        task_id=task_id,
         allowed_copies=["PostgreSQL", "pgvector"],
         forbidden_storages=["Secret Manager"],
         allow_vectorization=True,
