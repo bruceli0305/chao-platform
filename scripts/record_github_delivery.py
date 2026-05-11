@@ -4,6 +4,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[1]
+
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from app.chao.services.events import record_task_event
 from app.chao.services.github_links import record_github_link
 from app.chao.services.historian_records import record_historian_record
