@@ -81,6 +81,14 @@ C6. 将 ingest 结果登记到 data_assets；
 C7. 增加 schema_check 和 data_boundary_check 对 ingest 的校验。
 ```
 
+当前状态：
+
+```text
+C1 / C2 已进入策略设计：docs/15-pgvector-ingest-policy-v3.md。
+C3 context_chunks 元数据字段已落地：db/migrations/007_context_chunks_metadata.sql。
+后续实现 ingest 前，必须先完成 data_boundary_check 对 ingest 白名单 / 禁止路径的校验。
+```
+
 验收：
 
 ```text

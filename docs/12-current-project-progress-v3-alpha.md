@@ -49,6 +49,18 @@ data_assets
 storage_policies
 ```
 
+`context_chunks` 已补充第一版 ingest 审计元数据：
+
+```text
+source_type
+source_hash
+data_classification
+redacted
+ingest_allowed
+retention_policy
+created_by
+```
+
 已建视图：
 
 ```text
@@ -147,6 +159,8 @@ artifacts：交付证据元数据。
 scripts/data_boundary_check.py：检查 .env、Secret、私钥、Token、data/postgres、logs、.venv 等边界；
 scripts/schema_check.py：检查表、视图、vector 扩展、默认 storage_policies；
 GitHub Actions 中已接入 data-boundary check 与 schema check。
+data-boundary report 输出模板已落地：.ai-agents/templates/data-boundary-report.md。
+pgvector ingest 白名单 / 禁止范围策略已落地：docs/15-pgvector-ingest-policy-v3.md。
 ```
 
 ### 2.9 工程质量门禁

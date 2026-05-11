@@ -35,6 +35,18 @@ REQUIRED_STORAGE_POLICIES = [
     "D4_TEMP_EXECUTION_DATA",
 ]
 
+REQUIRED_COLUMNS = {
+    "context_chunks": [
+        "source_type",
+        "source_hash",
+        "data_classification",
+        "redacted",
+        "ingest_allowed",
+        "retention_policy",
+        "created_by",
+    ],
+}
+
 
 def main() -> int:
     load_dotenv()
@@ -60,6 +72,22 @@ def main() -> int:
             for table in REQUIRED_TABLES:
                 if table not in existing_tables:
                     errors.append(f"missing table: {table}")
+
+            for table, columns in REQUIRED_COLUMNS.items():
+                cur.execute(
+                    """
+                    select column_name
+                    from information_schema.columns
+                    where table_schema = 'public'
+                      and table_name = %s
+                    """,
+                    (table,),
+                )
+                existing_columns = {row[0] for row in cur.fetchall()}
+
+                for column in columns:
+                    if column not in existing_columns:
+                        errors.append(f"missing column: {table}.{column}")
 
             cur.execute(
                 """

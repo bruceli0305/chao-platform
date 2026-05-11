@@ -25,6 +25,7 @@ This package uses English filenames to avoid ZIP encoding issues on Windows / Gi
 - `docs/12-current-project-progress-v3-alpha.md`
 - `docs/13-next-development-plan-v3.md`
 - `docs/14-codex-handoff-guide.md`
+- `docs/15-pgvector-ingest-policy-v3.md`
 
 ## Agent Rules
 

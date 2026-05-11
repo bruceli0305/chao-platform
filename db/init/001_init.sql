@@ -42,6 +42,13 @@ create table if not exists gate_results (
 create table if not exists context_chunks (
   id uuid primary key,
   source_path text not null,
+  source_type text not null default 'markdown',
+  source_hash text,
+  data_classification text not null default 'D1',
+  redacted boolean not null default false,
+  ingest_allowed boolean not null default false,
+  retention_policy text not null default 'project_default',
+  created_by text not null default 'system',
   content text not null,
   embedding vector(1536),
   created_at timestamptz not null default now()
@@ -221,3 +228,9 @@ add column if not exists task_id uuid references tasks(id);
 
 create index if not exists idx_data_assets_task_id
 on data_assets(task_id);
+
+create index if not exists idx_context_chunks_source_hash
+on context_chunks(source_hash);
+
+create index if not exists idx_context_chunks_ingest_allowed
+on context_chunks(ingest_allowed);

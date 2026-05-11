@@ -56,6 +56,21 @@ create table gate_results (
   created_at timestamptz not null default now()
 );
 
+create table context_chunks (
+  id uuid primary key,
+  source_path text not null,
+  source_type text not null default 'markdown',
+  source_hash text,
+  data_classification text not null default 'D1',
+  redacted boolean not null default false,
+  ingest_allowed boolean not null default false,
+  retention_policy text not null default 'project_default',
+  created_by text not null default 'system',
+  content text not null,
+  embedding vector(1536),
+  created_at timestamptz not null default now()
+);
+
 create table tool_calls (
   id uuid primary key,
   task_id uuid references tasks(id),

@@ -30,6 +30,22 @@ Markdown 和 PostgreSQL 双写；
 CI / PR / Issue 可关联。
 ```
 
+## context_chunks 元数据
+
+第一版 pgvector ingest 前，`context_chunks` 必须具备以下审计字段：
+
+```text
+source_type
+source_hash
+data_classification
+redacted
+ingest_allowed
+retention_policy
+created_by
+```
+
+原则：向量块必须可追溯、可审计、可删除；不得只保存向量而丢失来源和数据边界元数据。
+
 ## 数据边界扩展表
 
 新增三类表：
