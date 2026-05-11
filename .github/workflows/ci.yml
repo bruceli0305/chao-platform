@@ -71,6 +71,9 @@ jobs:
       - name: Data boundary check
         run: uv run python scripts/data_boundary_check.py
 
+      - name: pgvector ingest dry run
+        run: uv run python scripts/ingest_markdown.py --pretty
+
       - name: Schema check
         run: uv run python scripts/schema_check.py
 
