@@ -1,4 +1,10 @@
-from scripts.ingest_markdown import build_dry_run_report, classify_source
+from scripts.ingest_markdown import (
+    build_dry_run_report,
+    build_report,
+    classify_source,
+    collect_candidates,
+    summarize_candidate,
+)
 
 
 def test_classify_source():
@@ -52,3 +58,44 @@ def test_build_dry_run_report_filters_and_hashes_candidates(tmp_path):
         ".ai-agents/router/task-router.md",
     ]
     assert all(candidate["source_hash"] for candidate in report["candidates"])
+    assert all("content" not in candidate for candidate in report["candidates"])
+
+
+def test_collect_candidates_keeps_content_for_write(tmp_path):
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "policy.md").write_text("Policy", encoding="utf-8")
+
+    candidates, rejected = collect_candidates(tmp_path, ["docs/policy.md"])
+
+    assert rejected == []
+    assert candidates[0]["source_uri"] == "docs/policy.md"
+    assert candidates[0]["content"] == "Policy"
+
+
+def test_summarize_candidate_removes_content():
+    candidate = {
+        "source_uri": "README.md",
+        "content": "full content",
+        "source_hash": "abc123",
+    }
+
+    assert summarize_candidate(candidate) == {
+        "source_uri": "README.md",
+        "source_hash": "abc123",
+    }
+
+
+def test_build_report_omits_candidate_content():
+    report = build_report(
+        "dry_run",
+        [{"source_uri": "README.md", "content": "full content"}],
+        [],
+    )
+
+    assert report == {
+        "mode": "dry_run",
+        "candidate_count": 1,
+        "rejected_count": 0,
+        "candidates": [{"source_uri": "README.md"}],
+        "rejected": [],
+    }
