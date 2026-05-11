@@ -84,6 +84,15 @@ output_hash；
 risk_flag。
 ```
 
+当前最小实现：
+
+```text
+app/chao/permissions.py 定义 TOOL_REGISTRY、ROLE_ALLOWED_TOOLS、LEVEL_ALLOWED_RISKS；
+evaluate_tool_permission 负责输出 allowed、permission_policy、requires_confirmation 和 risk_flag；
+第一批登记工具：cli.new、cli.approve、schema_check、data_boundary_check；
+当前仍复用 tool_calls.permission_policy 字段记录策略名，尚未新增 permission_decision 字段。
+```
+
 ## 7. 升级触发
 
 以下情况必须暂停并升级：

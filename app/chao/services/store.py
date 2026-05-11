@@ -5,6 +5,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from app.chao.config import DATABASE_URL
+from app.chao.permissions import evaluate_tool_permission
 from app.chao.services.artifacts import list_artifacts
 from app.chao.services.data_assets import list_task_data_assets
 from app.chao.services.events import list_task_events, record_task_event
@@ -128,7 +129,13 @@ def save_task_result(result: dict[str, Any]) -> None:
         agent_name="shangshu",
         tool_name="cli.new",
         arguments_summary=f"title={result.get('title', '')}; level={result.get('task_level', '')}",
-        permission_policy="local-cli-task-create",
+        permission_policy=evaluate_tool_permission(
+            agent_name="shangshu",
+            tool_name="cli.new",
+            task_level=result.get("task_level", "L1"),
+            required_confirmation=result.get("required_confirmation", "none"),
+            current_status=result.get("status", "UNKNOWN"),
+        )["permission_policy"],
         result_status="success",
         output_summary=(
             f"task_code={result.get('task_code', '')}; status={result.get('status', '')}"
@@ -369,7 +376,13 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
         agent_name="emperor",
         tool_name="cli.approve",
         arguments_summary=f"task_code={task_code}; confirmed_by={confirmed_by}",
-        permission_policy="human-approval-required",
+        permission_policy=evaluate_tool_permission(
+            agent_name="emperor",
+            tool_name="cli.approve",
+            task_level="L3",
+            required_confirmation="A",
+            current_status=current_status,
+        )["permission_policy"],
         result_status="success",
         output_summary=f"task_code={task_code}; status=APPROVED",
         risk_flag="A_CONFIRMATION",
