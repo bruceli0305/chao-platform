@@ -179,7 +179,12 @@ def check_secret_patterns() -> list[str]:
 
 
 def normalize_repo_path(path: str | Path) -> str:
-    return str(path).replace("\\", "/").lstrip("./")
+    normalized = str(path).replace("\\", "/")
+
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+
+    return normalized
 
 
 def is_forbidden_ingest_path(path: str | Path) -> bool:

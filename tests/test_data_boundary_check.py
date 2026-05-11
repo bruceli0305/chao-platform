@@ -1,6 +1,16 @@
 from scripts import data_boundary_check
 
 
+def test_normalize_repo_path_preserves_dotfiles_and_dotdirs():
+    assert data_boundary_check.normalize_repo_path("./.ai-agents/router/task-router.md") == (
+        ".ai-agents/router/task-router.md"
+    )
+    assert data_boundary_check.normalize_repo_path(".env.local") == ".env.local"
+    assert data_boundary_check.normalize_repo_path(r"docs\11-data-storage-boundary-v3.md") == (
+        "docs/11-data-storage-boundary-v3.md"
+    )
+
+
 def test_ingest_policy_allows_only_whitelisted_sources():
     assert data_boundary_check.is_allowed_ingest_source("AGENTS.md") is True
     assert data_boundary_check.is_allowed_ingest_source("README.md") is True
