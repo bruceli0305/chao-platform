@@ -106,8 +106,8 @@ jobs:
           test -n "$L3_TASK_CODE"
           uv run python main.py approve "$L3_TASK_CODE" --by ci --note "CI approval smoke test"
           psql "$DATABASE_URL" -c "select task_code, status from tasks where task_code = '$L3_TASK_CODE';"
-          APPROVED_STATUS=$(psql "$DATABASE_URL" -t -A -c "select status from tasks where task_code = '$L3_TASK_CODE';")
-          test "$APPROVED_STATUS" = "APPROVED"
+          DESIGNING_STATUS=$(psql "$DATABASE_URL" -t -A -c "select status from tasks where task_code = '$L3_TASK_CODE';")
+          test "$DESIGNING_STATUS" = "DESIGNING"
 
       - name: Record GitHub delivery context
         run: uv run python scripts/record_github_delivery.py

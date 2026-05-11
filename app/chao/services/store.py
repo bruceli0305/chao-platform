@@ -339,7 +339,7 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
                 set status = %s, updated_at = now()
                 where id = %s
                 """,
-                ("APPROVED", task_id),
+                ("DESIGNING", task_id),
             )
 
             cur.execute(
@@ -370,8 +370,8 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
         task_id=task_id,
         event_type="task_approved",
         from_status="NEED_CONFIRMATION",
-        to_status="APPROVED",
-        summary=f"A 级事项已由 {confirmed_by} 确认。",
+        to_status="DESIGNING",
+        summary=f"A 级事项已由 {confirmed_by} 确认，任务进入 DESIGNING。",
         created_by=confirmed_by,
     )
 
@@ -390,7 +390,7 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
         permission_policy=permission_decision["permission_policy"],
         result_status="success",
         permission_decision=permission_decision,
-        output_summary=f"task_code={task_code}; status=APPROVED",
+        output_summary=f"task_code={task_code}; status=DESIGNING",
         risk_flag=permission_decision["risk_flag"],
     )
 

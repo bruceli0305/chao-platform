@@ -103,14 +103,14 @@ uv run python main.py status
 L1：低风险单点任务，最终 DELIVERED；
 L2：普通功能 / 页面 / 接口类任务，最终 DELIVERED；
 L3：数据库、迁移、权限、部署、Secret、架构等高风险任务，进入 NEED_CONFIRMATION；
-approve 后：L3 从 NEED_CONFIRMATION 进入 APPROVED。
+approve 后：L3 从 NEED_CONFIRMATION 进入 DESIGNING，confirmations.status 记录 APPROVED。
 ```
 
 当前状态机为 MVP 状态机，已支持：
 
 ```text
 RAW → ROUTING → CLASSIFIED → IMPLEMENTING → VALIDATING → DELIVERED
-RAW → ROUTING → CLASSIFIED → NEED_CONFIRMATION → APPROVED
+RAW → ROUTING → CLASSIFIED → NEED_CONFIRMATION → DESIGNING
 ```
 
 ### 2.5 史官记录与 Markdown 双写
@@ -132,7 +132,7 @@ Markdown 史官记录登记为 D1 data_asset；
 ```text
 L3 自动生成 NEED_CONFIRMATION；
 confirmations 表记录审批数据；
-approve 命令执行后任务状态变为 APPROVED；
+approve 命令执行后任务状态变为 DESIGNING；
 historian_records 记录确认事实；
 task_events 记录 task_approved；
 tool_calls 记录 cli.approve；
@@ -225,7 +225,7 @@ Web Console。
 1. 当前工具调用审计还是 CLI 层模拟，不是真实 MCP 工具拦截；
 2. 当前 data_assets 只登记 Markdown 史官记录，尚未登记所有数据来源；
 3. pgvector 只启用扩展，尚未实现 ingest；
-4. L3 approve 后仅进入 APPROVED，尚未继续进入完整执行链；
+4. L3 approve 后已进入 DESIGNING，后续 REVIEWING / SCHEDULING 仍待完善；
 5. 当前状态机尚未启用 LangGraph checkpoint 持久化；
 6. Codex 接管前必须确保完整 docs 和 .ai-agents 文件已入仓。
 ```

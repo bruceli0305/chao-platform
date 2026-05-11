@@ -233,6 +233,13 @@ G5. 兵部审查部署 / CI / rollback；
 G6. L4 只生成里程碑，不直接执行。
 ```
 
+当前状态：
+
+```text
+G1 approve_task 已将 L3 审批后任务状态从 NEED_CONFIRMATION 推进到 DESIGNING。
+G2 / G3 / G4 / G5 / G6 尚未实现。
+```
+
 验收：
 
 ```text
