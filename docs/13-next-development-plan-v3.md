@@ -266,6 +266,14 @@ H5. 生成 patch artifact；
 H6. 失败回流到工部。
 ```
 
+当前状态：
+
+```text
+H1 Agent Runner / Sandbox 边界已定义：docs/16-agent-runner-sandbox-boundary-v3.md。
+H1 最小策略运行时已接入 app/chao/runner_policy.py，覆盖 allowed scope、forbidden scope、分支前缀、沙箱根和 L4 禁执行规则。
+H2 / H3 / H4 / H5 / H6 尚未实现。
+```
+
 验收：
 
 ```text
