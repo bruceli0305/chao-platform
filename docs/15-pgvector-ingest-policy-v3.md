@@ -162,7 +162,7 @@ C2：明确禁止 ingest 范围，已由本文定义。
 C3：设计 context_chunks 元数据字段，已落地到 db/migrations/007_context_chunks_metadata.sql。
 C4：实现 scripts/ingest_markdown.py，dry-run 已接入，不写数据库、不生成 embedding。
 C5：实现 scripts/search_context.py，只读搜索骨架已接入。
-C6：将 ingest 结果写入 context_chunks，data_assets 登记待补充。
+C6：将 ingest 结果写入 context_chunks，并同步登记 data_assets。
 C7：增加 schema_check 和 data_boundary_check 对 ingest 的校验，白名单 / 禁止路径基础校验已接入。
 ```
 

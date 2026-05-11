@@ -90,8 +90,8 @@ C7 的 ingest 白名单 / 禁止路径基础校验已接入 scripts/data_boundar
 C4 dry-run 已接入 scripts/ingest_markdown.py，不写数据库、不生成 embedding。
 C4 dry-run 已接入 GitHub Actions。
 C5 只读搜索骨架已接入 scripts/search_context.py。
-C6 显式 --write 写入 context_chunks 已接入 scripts/ingest_markdown.py，不生成 embedding。
-后续需要补充 data_assets 登记和 GitHub Actions 写入 smoke test。
+C6 显式 --write 写入 context_chunks 与 data_assets 已接入 scripts/ingest_markdown.py。
+后续需要补充 GitHub Actions 写入 smoke test。
 ```
 
 验收：

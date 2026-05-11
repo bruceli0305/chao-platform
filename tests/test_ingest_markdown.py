@@ -1,8 +1,10 @@
 from scripts.ingest_markdown import (
+    build_data_asset_record,
     build_dry_run_report,
     build_report,
     classify_source,
     collect_candidates,
+    extract_task_code,
     summarize_candidate,
 )
 
@@ -70,6 +72,40 @@ def test_collect_candidates_keeps_content_for_write(tmp_path):
     assert rejected == []
     assert candidates[0]["source_uri"] == "docs/policy.md"
     assert candidates[0]["content"] == "Policy"
+
+
+def test_extract_task_code_from_task_record_path():
+    assert (
+        extract_task_code(".ai-agents/records/tasks/TASK-20260510-110040-840984.md")
+        == "TASK-20260510-110040-840984"
+    )
+    assert extract_task_code("docs/TASK-20260510-110040-840984.md") is None
+
+
+def test_build_data_asset_record():
+    candidate = {
+        "source_path": "docs/11-data-storage-boundary-v3.md",
+        "source_hash": "abc123",
+        "source_type": "documentation",
+        "data_classification": "D1",
+        "ingest_allowed": True,
+        "redacted": True,
+    }
+
+    assert build_data_asset_record(candidate, task_id=None) == {
+        "task_id": None,
+        "asset_name": "docs/11-data-storage-boundary-v3.md",
+        "asset_type": "context_chunk_source",
+        "classification": "D1",
+        "primary_storage": "Git / Markdown",
+        "allowed_copies": ["PostgreSQL", "pgvector"],
+        "forbidden_storages": ["Secret Manager", "logs", "unapproved artifact"],
+        "allow_vectorization": True,
+        "desensitized": True,
+        "retention_days": 3650,
+        "owner": "historian",
+        "notes": "source_hash=abc123; source_type=documentation",
+    }
 
 
 def test_summarize_candidate_removes_content():

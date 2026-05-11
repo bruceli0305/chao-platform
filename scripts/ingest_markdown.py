@@ -72,6 +72,38 @@ def build_candidate(root: Path, repo_path: str) -> dict[str, Any]:
     }
 
 
+def extract_task_code(source_path: str) -> str | None:
+    normalized = data_boundary_check.normalize_repo_path(source_path)
+    prefix = ".ai-agents/records/tasks/"
+
+    if not normalized.startswith(prefix):
+        return None
+
+    filename = Path(normalized).name
+
+    if not filename.startswith("TASK-") or not filename.endswith(".md"):
+        return None
+
+    return filename.removesuffix(".md")
+
+
+def build_data_asset_record(candidate: dict[str, Any], task_id: str | None) -> dict[str, Any]:
+    return {
+        "task_id": task_id,
+        "asset_name": candidate["source_path"],
+        "asset_type": "context_chunk_source",
+        "classification": candidate["data_classification"],
+        "primary_storage": "Git / Markdown",
+        "allowed_copies": ["PostgreSQL", "pgvector"],
+        "forbidden_storages": ["Secret Manager", "logs", "unapproved artifact"],
+        "allow_vectorization": candidate["ingest_allowed"],
+        "desensitized": candidate["redacted"],
+        "retention_days": 3650,
+        "owner": "historian",
+        "notes": f"source_hash={candidate['source_hash']}; source_type={candidate['source_type']}",
+    }
+
+
 def collect_candidates(
     root: Path,
     tracked_files: list[str],
@@ -153,7 +185,29 @@ def build_report(
     }
 
 
-def write_context_chunks(candidates: list[dict[str, Any]]) -> int:
+def find_task_id(cur: Any, source_path: str) -> str | None:
+    task_code = extract_task_code(source_path)
+
+    if task_code is None:
+        return None
+
+    cur.execute(
+        """
+        select id::text
+        from tasks
+        where task_code = %s
+        """,
+        (task_code,),
+    )
+    row = cur.fetchone()
+
+    if row is None:
+        return None
+
+    return row[0]
+
+
+def write_ingest_results(candidates: list[dict[str, Any]]) -> tuple[int, int]:
     with psycopg.connect(get_database_url()) as conn:
         with conn.cursor() as cur:
             for candidate in candidates:
@@ -204,9 +258,68 @@ def write_context_chunks(candidates: list[dict[str, Any]]) -> int:
                     ),
                 )
 
+                task_id = find_task_id(cur, candidate["source_path"])
+                data_asset = build_data_asset_record(candidate, task_id)
+                cur.execute(
+                    """
+                    delete from data_assets
+                    where asset_name = %s
+                      and asset_type = %s
+                    """,
+                    (data_asset["asset_name"], data_asset["asset_type"]),
+                )
+                cur.execute(
+                    """
+                    insert into data_assets (
+                        id,
+                        task_id,
+                        asset_name,
+                        asset_type,
+                        classification,
+                        primary_storage,
+                        allowed_copies,
+                        forbidden_storages,
+                        allow_vectorization,
+                        desensitized,
+                        retention_days,
+                        owner,
+                        notes
+                    )
+                    values (
+                        gen_random_uuid(),
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s
+                    )
+                    """,
+                    (
+                        data_asset["task_id"],
+                        data_asset["asset_name"],
+                        data_asset["asset_type"],
+                        data_asset["classification"],
+                        data_asset["primary_storage"],
+                        data_asset["allowed_copies"],
+                        data_asset["forbidden_storages"],
+                        data_asset["allow_vectorization"],
+                        data_asset["desensitized"],
+                        data_asset["retention_days"],
+                        data_asset["owner"],
+                        data_asset["notes"],
+                    ),
+                )
+
         conn.commit()
 
-    return len(candidates)
+    return len(candidates), len(candidates)
 
 
 def parse_args() -> argparse.Namespace:
@@ -231,11 +344,12 @@ def main() -> int:
     report = build_report("dry_run", candidates, rejected)
 
     if args.write:
-        written_count = write_context_chunks(candidates)
+        written_count, data_asset_count = write_ingest_results(candidates)
         report = {
             **build_report("write", candidates, rejected),
             "mode": "write",
             "written_count": written_count,
+            "data_asset_count": data_asset_count,
         }
 
     print(json.dumps(report, ensure_ascii=False, indent=2 if args.pretty else None))
