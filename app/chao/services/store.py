@@ -7,6 +7,7 @@ from psycopg.types.json import Jsonb
 from app.chao.config import DATABASE_URL
 from app.chao.permissions import require_tool_permission
 from app.chao.services.artifacts import list_artifacts, record_artifact
+from app.chao.services.bingbu_artifacts import save_bingbu_artifact
 from app.chao.services.data_assets import list_task_data_assets, record_data_asset
 from app.chao.services.design_artifacts import save_design_artifact
 from app.chao.services.events import list_task_events, record_task_event
@@ -456,6 +457,34 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
         desensitized=True,
         retention_days=365,
         notes="L3 户部审查记录，仅允许保存脱敏工程知识。",
+    )
+    bingbu_artifact_path = save_bingbu_artifact(
+        task=design_task,
+        design_artifact_uri=str(design_artifact_path),
+        review_artifact_uri=str(review_artifact_path),
+        hubu_artifact_uri=str(hubu_artifact_path),
+    )
+    record_artifact(
+        task_id=task_id,
+        artifact_type="l3_bingbu_review",
+        artifact_uri=str(bingbu_artifact_path),
+        access_level="internal",
+        retention_days=365,
+        summary="L3 兵部部署 CI 与 rollback 审查 artifact",
+    )
+    record_data_asset(
+        asset_name=str(bingbu_artifact_path),
+        asset_type="l3_bingbu_review",
+        classification="D1",
+        primary_storage="Git / Markdown",
+        owner="bingbu",
+        task_id=task_id,
+        allowed_copies=["PostgreSQL", "pgvector"],
+        forbidden_storages=["Secret Manager"],
+        allow_vectorization=True,
+        desensitized=True,
+        retention_days=365,
+        notes="L3 兵部审查记录，仅允许保存脱敏工程知识。",
     )
 
     record_task_event(
