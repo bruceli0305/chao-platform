@@ -17,6 +17,8 @@ def test_router_classifies_l1():
     assert result["required_confirmation"] == "none"
     assert "gongbu" in result["required_agents"]
     assert "xingbu" in result["required_agents"]
+    assert result["required_skills"] == ["bugfix"]
+    assert result["route_result"]["required_skills"] == ["bugfix"]
 
 
 def test_router_classifies_l2():
@@ -34,6 +36,7 @@ def test_router_classifies_l2():
     assert result["required_confirmation"] == "B"
     assert "zhongshu" in result["required_agents"]
     assert "build" in result["required_gates"]
+    assert "frontend-feature" in result["required_skills"]
 
 
 def test_router_classifies_l3():
@@ -51,3 +54,4 @@ def test_router_classifies_l3():
     assert result["required_confirmation"] == "A"
     assert "menxia" in result["required_agents"]
     assert "secret_scan" in result["required_gates"]
+    assert "database-migration" in result["required_skills"]

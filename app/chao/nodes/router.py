@@ -1,3 +1,4 @@
+from app.chao.skills import select_required_skills
 from app.chao.state import ChaoState
 
 
@@ -53,6 +54,8 @@ def task_router(state: ChaoState) -> ChaoState:
         required_agents = ["historian", "shangshu", "gongbu", "xingbu"]
         required_gates = ["manual_validation"]
 
+    required_skills = select_required_skills(raw, task_level)
+
     return {
         **state,
         "task_level": task_level,
@@ -61,6 +64,7 @@ def task_router(state: ChaoState) -> ChaoState:
         "required_confirmation": required_confirmation,
         "required_agents": required_agents,
         "required_gates": required_gates,
+        "required_skills": required_skills,
         "status": "CLASSIFIED",
         "route_result": {
             "task_level": task_level,
@@ -69,5 +73,6 @@ def task_router(state: ChaoState) -> ChaoState:
             "required_confirmation": required_confirmation,
             "required_agents": required_agents,
             "required_gates": required_gates,
+            "required_skills": required_skills,
         },
     }

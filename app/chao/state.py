@@ -15,6 +15,7 @@ class ChaoState(TypedDict, total=False):
     required_confirmation: str
     required_agents: list[str]
     required_gates: list[str]
+    required_skills: list[str]
 
     status: str
     route_result: dict[str, Any]

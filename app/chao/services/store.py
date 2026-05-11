@@ -221,6 +221,19 @@ def get_task_detail(task_code: str) -> dict[str, Any] | None:
             )
             gates = cur.fetchall()
 
+            cur.execute(
+                """
+                select route_json
+                from task_routes
+                where task_id = %s
+                order by created_at desc
+                limit 1
+                """,
+                (task_id,),
+            )
+            route = cur.fetchone()
+            route_result = route[0] if route else {}
+
     return {
         "id": task[0],
         "task_code": task[1],
@@ -231,6 +244,8 @@ def get_task_detail(task_code: str) -> dict[str, Any] | None:
         "owner": task[6],
         "created_at": task[7],
         "updated_at": task[8],
+        "route_result": route_result,
+        "required_skills": route_result.get("required_skills", []),
         "events": list_task_events(task[0]),
         "tool_calls": list_tool_calls(task[0]),
         "artifacts": list_artifacts(task[0]),
