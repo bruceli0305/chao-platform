@@ -18,7 +18,11 @@ def test_router_classifies_l1():
     assert "gongbu" in result["required_agents"]
     assert "xingbu" in result["required_agents"]
     assert result["required_skills"] == ["bugfix"]
+    assert result["required_skill_paths"] == [".ai-agents/skills/bugfix/SKILL.md"]
     assert result["route_result"]["required_skills"] == ["bugfix"]
+    assert result["route_result"]["required_skill_paths"] == [
+        ".ai-agents/skills/bugfix/SKILL.md"
+    ]
 
 
 def test_router_classifies_l2():
@@ -37,6 +41,7 @@ def test_router_classifies_l2():
     assert "zhongshu" in result["required_agents"]
     assert "build" in result["required_gates"]
     assert "frontend-feature" in result["required_skills"]
+    assert ".ai-agents/skills/frontend-feature/SKILL.md" in result["required_skill_paths"]
 
 
 def test_router_classifies_l3():
@@ -55,3 +60,4 @@ def test_router_classifies_l3():
     assert "menxia" in result["required_agents"]
     assert "secret_scan" in result["required_gates"]
     assert "database-migration" in result["required_skills"]
+    assert ".ai-agents/skills/database-migration/SKILL.md" in result["required_skill_paths"]

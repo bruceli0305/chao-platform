@@ -11,6 +11,13 @@
 - [ ] L3
 - [ ] L4
 
+## Skills
+
+- Required skills：
+- Required SKILL.md paths：
+- [ ] 已阅读所有 required_skill_paths 对应的 SKILL.md
+- [ ] PR 说明中列出的 Skill 与任务路由结果一致
+
 ## 风险类型
 
 - [ ] requirement

@@ -84,6 +84,9 @@ Skills：.ai-agents/skills/*/SKILL.md
 后续计划：docs/13-next-development-plan-v3.md
 ```
 
+如果任务路由结果包含 `required_skill_paths`，执行前必须逐一阅读对应
+`SKILL.md`，并在交付说明或 PR 中列出实际使用的 Skill。
+
 ## 4. 修改约束
 
 ### 4.1 数据库变更

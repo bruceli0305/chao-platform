@@ -134,10 +134,11 @@ D6. GitHub PR 模板增加 Skill 字段。
 
 ```text
 D1 skills registry 已接入 app/chao/skills.py，登记第一批 7 个 Skill 与 SKILL.md 路径。
-D2 路由器已输出 required_skills，并写入 route_result。
-D3 CLI show 已从 task_routes.route_json 返回 required_skills。
+D2 路由器已输出 required_skills / required_skill_paths，并写入 route_result。
+D3 CLI show 已从 task_routes.route_json 返回 required_skills / required_skill_paths。
 D4 tests/test_skills.py 已覆盖 registry、匹配规则和 L1 / L2 / L3 / L4 限制。
-D5 / D6 尚未实现。
+D5 AGENTS.md 已要求执行前读取 required_skill_paths 对应的 SKILL.md。
+D6 GitHub PR 模板已增加 Skill 字段和 SKILL.md 阅读确认项。
 ```
 
 验收：

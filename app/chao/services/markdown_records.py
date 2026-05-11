@@ -15,6 +15,12 @@ def _format_json(data: Any) -> str:
     return json.dumps(data or {}, ensure_ascii=False, indent=2)
 
 
+def _format_skill_details(skills: list[dict[str, Any]]) -> str:
+    if not skills:
+        return "- 无"
+    return "\n".join(f"- {skill['name']}：{skill['path']}" for skill in skills)
+
+
 def save_task_markdown(result: dict[str, Any]) -> Path:
     TASK_RECORDS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -81,7 +87,7 @@ def save_task_markdown(result: dict[str, Any]) -> Path:
         "",
         "## Skills",
         "",
-        _format_list(result.get("required_skills", [])),
+        _format_skill_details(result.get("required_skill_details", [])),
         "",
         "## 路由结果",
         "",

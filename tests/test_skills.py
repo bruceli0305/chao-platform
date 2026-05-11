@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from app.chao.skills import SKILL_REGISTRY, get_skill, list_skills, select_required_skills
+from app.chao.skills import (
+    SKILL_REGISTRY,
+    describe_required_skills,
+    get_skill,
+    list_skills,
+    select_required_skills,
+)
 
 
 def test_skill_registry_contains_first_batch_and_skill_files():
@@ -25,6 +31,15 @@ def test_get_skill_returns_definition():
 
     assert skill["name"] == "database-migration"
     assert skill["path"] == ".ai-agents/skills/database-migration/SKILL.md"
+
+
+def test_describe_required_skills_returns_paths():
+    details = describe_required_skills(["bugfix", "frontend-feature"])
+
+    assert [detail["path"] for detail in details] == [
+        ".ai-agents/skills/bugfix/SKILL.md",
+        ".ai-agents/skills/frontend-feature/SKILL.md",
+    ]
 
 
 def test_select_required_skills_for_frontend_l2():

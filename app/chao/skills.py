@@ -100,6 +100,10 @@ def list_skills() -> list[SkillDefinition]:
     return list(SKILL_REGISTRY.values())
 
 
+def describe_required_skills(skill_names: list[str]) -> list[SkillDefinition]:
+    return [SKILL_REGISTRY[name] for name in skill_names if name in SKILL_REGISTRY]
+
+
 def select_required_skills(raw_request: str, task_level: TaskLevel) -> list[SkillName]:
     if task_level == "L4":
         return []
