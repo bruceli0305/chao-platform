@@ -1,6 +1,23 @@
 from psycopg.types.json import Jsonb
 
 from app.chao.services import github_links
+from app.chao.services.github_links import normalize_github_link_type
+
+
+def test_normalize_github_link_type_accepts_aliases():
+    assert normalize_github_link_type("issue") == "issue"
+    assert normalize_github_link_type("pr") == "pull_request"
+    assert normalize_github_link_type("pull-request") == "pull_request"
+    assert normalize_github_link_type("ci") == "ci_run"
+
+
+def test_normalize_github_link_type_rejects_unknown_type():
+    try:
+        normalize_github_link_type("release")
+    except ValueError as exc:
+        assert "Unsupported GitHub link type" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
 
 
 def test_record_github_link_upserts_metadata(monkeypatch):

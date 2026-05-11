@@ -6,6 +6,27 @@ from psycopg.types.json import Jsonb
 
 from app.chao.config import DATABASE_URL
 
+GITHUB_LINK_TYPE_ALIASES = {
+    "issue": "issue",
+    "issues": "issue",
+    "pr": "pull_request",
+    "pull_request": "pull_request",
+    "pull-request": "pull_request",
+    "commit": "commit",
+    "ci": "ci_run",
+    "ci_run": "ci_run",
+    "ci-run": "ci_run",
+}
+
+
+def normalize_github_link_type(link_type: str) -> str:
+    normalized = GITHUB_LINK_TYPE_ALIASES.get(link_type.strip().lower())
+
+    if normalized is None:
+        raise ValueError(f"Unsupported GitHub link type: {link_type}")
+
+    return normalized
+
 
 def record_github_link(
     *,
@@ -18,6 +39,8 @@ def record_github_link(
     metadata: dict[str, Any] | None = None,
     created_by: str = "system",
 ) -> None:
+    normalized_link_type = normalize_github_link_type(link_type)
+
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -45,7 +68,7 @@ def record_github_link(
                 (
                     str(uuid.uuid4()),
                     task_id,
-                    link_type,
+                    normalized_link_type,
                     external_id,
                     url,
                     title,

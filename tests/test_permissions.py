@@ -11,6 +11,7 @@ def test_tool_registry_contains_first_batch():
     assert set(TOOL_REGISTRY) == {
         "cli.new",
         "cli.approve",
+        "cli.bind_github",
         "schema_check",
         "data_boundary_check",
     }
@@ -36,6 +37,19 @@ def test_shangshu_can_create_task():
     assert decision["allowed"] is True
     assert decision["permission_policy"] == "local-cli-task-create"
     assert decision["risk_flag"] is None
+
+
+def test_shangshu_can_bind_github_link():
+    decision = evaluate_tool_permission(
+        agent_name="shangshu",
+        tool_name="cli.bind_github",
+        task_level="L2",
+        required_confirmation="B",
+        current_status="DELIVERED",
+    )
+
+    assert decision["allowed"] is True
+    assert decision["permission_policy"] == "local-cli-github-link-bind"
 
 
 def test_emperor_can_approve_l3_waiting_task():

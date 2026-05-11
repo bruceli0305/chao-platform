@@ -36,6 +36,13 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         "description": "记录 A 级确认并推进任务状态。",
         "permission_policy": "human-approval-required",
     },
+    "cli.bind_github": {
+        "name": "cli.bind_github",
+        "category": "postgres.write",
+        "risk": "medium",
+        "description": "将 GitHub issue / PR / commit / CI run 绑定到任务。",
+        "permission_policy": "local-cli-github-link-bind",
+    },
     "schema_check": {
         "name": "schema_check",
         "category": "postgres.read",
@@ -53,7 +60,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
 }
 
 ROLE_ALLOWED_TOOLS: dict[str, set[str]] = {
-    "shangshu": {"cli.new"},
+    "shangshu": {"cli.new", "cli.bind_github"},
     "emperor": {"cli.approve"},
     "xingbu": {"schema_check", "data_boundary_check"},
     "hubu": {"data_boundary_check"},
