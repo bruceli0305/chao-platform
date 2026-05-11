@@ -1,3 +1,4 @@
+import re
 from pathlib import PurePosixPath
 from typing import TypedDict
 
@@ -15,6 +16,14 @@ class RunnerBoundaryPolicy(TypedDict):
     can_execute: bool
 
 
+class RunnerBranchPlan(TypedDict):
+    branch_required: bool
+    branch_name: str | None
+    base_ref: str
+    create_command: list[str] | None
+    reason: str
+
+
 DEFAULT_ALLOWED_CHANGE_ROOTS = [
     ".ai-agents/records/",
     ".ai-agents/templates/",
@@ -27,6 +36,8 @@ DEFAULT_ALLOWED_CHANGE_ROOTS = [
     "scripts/",
     "tests/",
 ]
+
+RESERVED_BRANCH_NAMES = {"main", "master", "trunk"}
 
 DEFAULT_FORBIDDEN_CHANGE_ROOTS = [
     ".env",
@@ -119,3 +130,71 @@ def check_change_paths(
             errors.append(f"路径不在 Agent Runner 允许修改范围内：{path}")
 
     return errors
+
+
+def normalize_branch_slug(value: str, fallback: str = "task") -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return slug or fallback
+
+
+def build_runner_branch_name(
+    *,
+    task_code: str,
+    title: str,
+    branch_prefix: str = "codex/",
+) -> str:
+    normalized_task_code = normalize_branch_slug(task_code)
+    normalized_title = normalize_branch_slug(title)[:40]
+    return f"{branch_prefix}{normalized_task_code}-{normalized_title}"
+
+
+def is_valid_runner_branch_name(
+    branch_name: str,
+    branch_prefix: str = "codex/",
+) -> bool:
+    if not branch_name.startswith(branch_prefix):
+        return False
+
+    if branch_name in RESERVED_BRANCH_NAMES:
+        return False
+
+    if branch_name.endswith("/") or branch_name.endswith("."):
+        return False
+
+    if any(token in branch_name for token in ["..", " ", "\\", "@{"]):
+        return False
+
+    return True
+
+
+def build_runner_branch_plan(
+    *,
+    task_code: str,
+    title: str,
+    task_level: TaskLevel,
+    base_ref: str = "HEAD",
+) -> RunnerBranchPlan:
+    policy = build_runner_boundary_policy(task_level)
+
+    if not policy["can_execute"]:
+        return {
+            "branch_required": False,
+            "branch_name": None,
+            "base_ref": base_ref,
+            "create_command": None,
+            "reason": f"{task_level} 任务只生成规划，不创建执行分支。",
+        }
+
+    branch_name = build_runner_branch_name(
+        task_code=task_code,
+        title=title,
+        branch_prefix=policy["required_branch_prefix"],
+    )
+
+    return {
+        "branch_required": True,
+        "branch_name": branch_name,
+        "base_ref": base_ref,
+        "create_command": ["git", "checkout", "-b", branch_name, base_ref],
+        "reason": "执行型任务必须在 codex/ 前缀分支中运行。",
+    }

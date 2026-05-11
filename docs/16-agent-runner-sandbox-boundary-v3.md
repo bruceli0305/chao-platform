@@ -53,5 +53,17 @@ L4 任务必须拆解为多个 L2 / L3 子任务后分别执行。
 ```text
 app/chao/runner_policy.py 提供最小策略运行时；
 tests/test_runner_policy.py 覆盖允许路径、禁止路径、路径穿越和 L4 禁执行规则；
-后续 H2 / H3 将基于该策略实现分支创建和 allowed scope 阻断。
+H2 分支创建策略已接入：执行型任务生成 codex/ 前缀分支计划；
+L4 任务不生成执行分支；
+后续 H3 将基于该策略实现 allowed scope 阻断。
+```
+
+## 6. 分支创建策略
+
+```text
+执行型任务必须使用 codex/ 前缀分支；
+分支名格式为 codex/<task-code-slug>-<title-slug>；
+默认 base_ref 为 HEAD，可由调用方指定为 main 或其他安全基线；
+策略层只生成 create_command，不直接执行 git 命令；
+main / master / trunk、路径穿越、空格、反斜杠和异常 ref 语法必须拒绝。
 ```
