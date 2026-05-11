@@ -35,6 +35,4 @@ def test_save_review_artifact_writes_expected_path(tmp_path, monkeypatch):
     )
 
     assert path == tmp_path / "TASK-TEST-REVIEW-review.md"
-    assert path.read_text(encoding="utf-8").startswith(
-        "# TASK-TEST-REVIEW - 门下省审核"
-    )
+    assert path.read_text(encoding="utf-8").startswith("# TASK-TEST-REVIEW - 门下省审核")

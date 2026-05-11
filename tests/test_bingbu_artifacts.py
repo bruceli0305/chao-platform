@@ -40,6 +40,4 @@ def test_save_bingbu_artifact_writes_expected_path(tmp_path, monkeypatch):
     )
 
     assert path == tmp_path / "TASK-TEST-BINGBU-bingbu.md"
-    assert path.read_text(encoding="utf-8").startswith(
-        "# TASK-TEST-BINGBU - 兵部审查"
-    )
+    assert path.read_text(encoding="utf-8").startswith("# TASK-TEST-BINGBU - 兵部审查")

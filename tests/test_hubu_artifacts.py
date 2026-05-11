@@ -38,6 +38,4 @@ def test_save_hubu_artifact_writes_expected_path(tmp_path, monkeypatch):
     )
 
     assert path == tmp_path / "TASK-TEST-HUBU-hubu.md"
-    assert path.read_text(encoding="utf-8").startswith(
-        "# TASK-TEST-HUBU - 户部审查"
-    )
+    assert path.read_text(encoding="utf-8").startswith("# TASK-TEST-HUBU - 户部审查")

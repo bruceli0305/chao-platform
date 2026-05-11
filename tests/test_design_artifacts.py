@@ -37,6 +37,4 @@ def test_save_design_artifact_writes_expected_path(tmp_path, monkeypatch):
     )
 
     assert path == tmp_path / "TASK-TEST-DESIGN-design.md"
-    assert path.read_text(encoding="utf-8").startswith(
-        "# TASK-TEST-DESIGN - 中书省方案"
-    )
+    assert path.read_text(encoding="utf-8").startswith("# TASK-TEST-DESIGN - 中书省方案")
