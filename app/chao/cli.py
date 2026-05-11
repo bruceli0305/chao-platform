@@ -142,7 +142,10 @@ def bind_github(
             agent_name="shangshu",
             tool_name="cli.bind_github",
             task_level=task["task_level"],
-            required_confirmation=task.get("route_result", {}).get("required_confirmation", "none"),
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
             current_status=task["status"],
         )
         record_github_link(
