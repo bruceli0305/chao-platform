@@ -1,9 +1,9 @@
 import pytest
 
 from app.chao.runner_policy import (
+    build_runner_boundary_policy,
     build_runner_branch_name,
     build_runner_branch_plan,
-    build_runner_boundary_policy,
     check_change_paths,
     is_change_path_allowed,
     is_valid_runner_branch_name,
