@@ -20,9 +20,7 @@ def test_router_classifies_l1():
     assert result["required_skills"] == ["bugfix"]
     assert result["required_skill_paths"] == [".ai-agents/skills/bugfix/SKILL.md"]
     assert result["route_result"]["required_skills"] == ["bugfix"]
-    assert result["route_result"]["required_skill_paths"] == [
-        ".ai-agents/skills/bugfix/SKILL.md"
-    ]
+    assert result["route_result"]["required_skill_paths"] == [".ai-agents/skills/bugfix/SKILL.md"]
 
 
 def test_router_classifies_l2():
