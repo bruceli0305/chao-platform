@@ -174,6 +174,13 @@ jobs:
           echo "REVIEW_RECORD_COUNT=$REVIEW_RECORD_COUNT"
           test "$REVIEW_RECORD_COUNT" -ge 1
 
+      - name: Verify L3 hubu records generated
+        run: |
+          ls -la .ai-agents/records/hubu
+          HUBU_RECORD_COUNT=$(find .ai-agents/records/hubu -name 'TASK-*-hubu.md' | wc -l)
+          echo "HUBU_RECORD_COUNT=$HUBU_RECORD_COUNT"
+          test "$HUBU_RECORD_COUNT" -ge 1
+
       - name: Verify artifacts persisted
         run: |
           psql "$DATABASE_URL" -c "select artifact_type, artifact_uri, artifact_hash, access_level, retention_days, summary from artifacts order by created_at desc limit 10;"
@@ -181,11 +188,13 @@ jobs:
           MARKDOWN_ARTIFACT_URIS=$(psql "$DATABASE_URL" -t -A -c "select artifact_uri from artifacts where artifact_type = 'markdown_record';")
           DESIGN_ARTIFACT_URIS=$(psql "$DATABASE_URL" -t -A -c "select artifact_uri from artifacts where artifact_type = 'l3_design_plan';")
           REVIEW_ARTIFACT_URIS=$(psql "$DATABASE_URL" -t -A -c "select artifact_uri from artifacts where artifact_type = 'l3_menxia_review';")
+          HUBU_ARTIFACT_URIS=$(psql "$DATABASE_URL" -t -A -c "select artifact_uri from artifacts where artifact_type = 'l3_hubu_review';")
           echo "ARTIFACT_COUNT=$ARTIFACT_COUNT"
           test "$ARTIFACT_COUNT" -ge 3
           test -n "$MARKDOWN_ARTIFACT_URIS"
           test -n "$DESIGN_ARTIFACT_URIS"
           test -n "$REVIEW_ARTIFACT_URIS"
+          test -n "$HUBU_ARTIFACT_URIS"
           while IFS= read -r artifact_uri; do
             test -f "$artifact_uri"
           done <<< "$MARKDOWN_ARTIFACT_URIS"
@@ -195,6 +204,9 @@ jobs:
           while IFS= read -r artifact_uri; do
             test -f "$artifact_uri"
           done <<< "$REVIEW_ARTIFACT_URIS"
+          while IFS= read -r artifact_uri; do
+            test -f "$artifact_uri"
+          done <<< "$HUBU_ARTIFACT_URIS"
 
       - name: Verify data assets persisted
         run: |
@@ -203,14 +215,17 @@ jobs:
           DATA_ASSET_ORPHAN_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from data_assets where task_id is null and asset_type = 'markdown_record' and classification = 'D1';" | tr -d ' ')
           DESIGN_DATA_ASSET_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from data_assets where task_id is not null and asset_type = 'l3_design_plan' and classification = 'D1';" | tr -d ' ')
           REVIEW_DATA_ASSET_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from data_assets where task_id is not null and asset_type = 'l3_menxia_review' and classification = 'D1';" | tr -d ' ')
+          HUBU_DATA_ASSET_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from data_assets where task_id is not null and asset_type = 'l3_hubu_review' and classification = 'D1';" | tr -d ' ')
           echo "DATA_ASSET_COUNT=$DATA_ASSET_COUNT"
           echo "DATA_ASSET_ORPHAN_COUNT=$DATA_ASSET_ORPHAN_COUNT"
           echo "DESIGN_DATA_ASSET_COUNT=$DESIGN_DATA_ASSET_COUNT"
           echo "REVIEW_DATA_ASSET_COUNT=$REVIEW_DATA_ASSET_COUNT"
+          echo "HUBU_DATA_ASSET_COUNT=$HUBU_DATA_ASSET_COUNT"
           test "$DATA_ASSET_COUNT" -ge 3
           test "$DATA_ASSET_ORPHAN_COUNT" = "0"
           test "$DESIGN_DATA_ASSET_COUNT" -ge 1
           test "$REVIEW_DATA_ASSET_COUNT" -ge 1
+          test "$HUBU_DATA_ASSET_COUNT" -ge 1
 
       - name: pgvector ingest write smoke
         run: |

@@ -239,7 +239,8 @@ G6. L4 只生成里程碑，不直接执行。
 G1 approve_task 已将 L3 审批后任务状态从 NEED_CONFIRMATION 推进到 DESIGNING。
 G2 approve_task 已在进入 DESIGNING 后生成中书省方案 Markdown artifact，并登记 D1 data_asset。
 G3 approve_task 已在生成方案后生成门下省审核 Markdown artifact，并登记 D1 data_asset。
-G4 / G5 / G6 尚未实现。
+G4 approve_task 已在生成门下省审核后生成户部数据 / 依赖 / Secret 审查 Markdown artifact，并登记 D1 data_asset。
+G5 / G6 尚未实现。
 ```
 
 验收：
