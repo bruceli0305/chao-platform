@@ -58,10 +58,7 @@ def test_router_classifies_l3():
     assert "menxia" in result["required_agents"]
     assert "secret_scan" in result["required_gates"]
     assert "database-migration" in result["required_skills"]
-    assert (
-        ".ai-agents/skills/database-migration/SKILL.md"
-        in result["required_skill_paths"]
-    )
+    assert ".ai-agents/skills/database-migration/SKILL.md" in result["required_skill_paths"]
 
 
 def test_router_classifies_l4_as_milestone_only():

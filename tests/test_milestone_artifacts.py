@@ -32,6 +32,4 @@ def test_save_milestone_artifact_writes_expected_path(tmp_path, monkeypatch):
     )
 
     assert path == tmp_path / "TASK-TEST-L4-milestones.md"
-    assert path.read_text(encoding="utf-8").startswith(
-        "# TASK-TEST-L4 - L4 里程碑规划"
-    )
+    assert path.read_text(encoding="utf-8").startswith("# TASK-TEST-L4 - L4 里程碑规划")
