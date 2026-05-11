@@ -175,9 +175,7 @@ def bind_github(
         agent_name="shangshu",
         tool_name="cli.bind_github",
         arguments_summary=(
-            f"task_code={task_code}; "
-            f"link_type={normalized_link_type}; "
-            f"external_id={external_id}"
+            f"task_code={task_code}; link_type={normalized_link_type}; external_id={external_id}"
         ),
         permission_policy=permission_decision["permission_policy"],
         result_status="success",
