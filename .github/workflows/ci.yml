@@ -109,6 +109,9 @@ jobs:
           APPROVED_STATUS=$(psql "$DATABASE_URL" -t -A -c "select status from tasks where task_code = '$L3_TASK_CODE';")
           test "$APPROVED_STATUS" = "APPROVED"
 
+      - name: Record GitHub delivery context
+        run: uv run python scripts/record_github_delivery.py
+
       - name: Verify tasks persisted
         run: |
           psql "$DATABASE_URL" -c "select task_code, title, task_level, status from tasks order by created_at desc limit 10;"

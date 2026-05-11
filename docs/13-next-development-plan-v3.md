@@ -206,7 +206,8 @@ F1 最小数据层 app/chao/services/github_links.py 已接入，CLI show 已输
 F2 CLI bind-github 已接入，可绑定 issue / pull_request / commit / ci_run。
 F3 PR 模板已要求填写 Task Code。
 F4 CI 已通过 scripts/check_pr_task_binding.py 检查 PR body 是否包含 Task Code。
-F5 / F6 尚未实现。
+F5 scripts/record_github_delivery.py 已可向 historian_records 写入 GitHub 交付记录。
+F6 scripts/record_github_delivery.py 已可记录 PR URL、commit hash、CI run URL 到 github_links。
 ```
 
 验收：
