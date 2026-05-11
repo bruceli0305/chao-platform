@@ -19,6 +19,17 @@ def test_tool_calls_permission_decision_column_is_required():
     ]
 
 
+def test_github_links_columns_are_required():
+    assert REQUIRED_COLUMNS["github_links"] == [
+        "task_id",
+        "link_type",
+        "external_id",
+        "url",
+        "metadata",
+        "created_by",
+    ]
+
+
 def test_storage_policy_check_requires_storage_policies_table():
     assert should_check_storage_policies({"tasks", "context_chunks"}) is False
     assert should_check_storage_policies({"tasks", "context_chunks", "storage_policies"}) is True

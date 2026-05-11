@@ -198,6 +198,14 @@ F5. 合并后写入 historian_records；
 F6. 记录 commit hash、CI run id、PR URL。
 ```
 
+当前状态：
+
+```text
+F1 github_links 表已通过 db/migrations/009_github_links.sql 落地。
+F1 最小数据层 app/chao/services/github_links.py 已接入，CLI show 已输出 github_links。
+F2 / F3 / F4 / F5 / F6 尚未实现。
+```
+
 验收：
 
 ```text

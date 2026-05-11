@@ -9,6 +9,7 @@ from app.chao.permissions import require_tool_permission
 from app.chao.services.artifacts import list_artifacts
 from app.chao.services.data_assets import list_task_data_assets
 from app.chao.services.events import list_task_events, record_task_event
+from app.chao.services.github_links import list_task_github_links
 from app.chao.services.tool_calls import list_tool_calls, record_tool_call
 
 
@@ -261,6 +262,7 @@ def get_task_detail(task_code: str) -> dict[str, Any] | None:
         "tool_calls": list_tool_calls(task[0]),
         "artifacts": list_artifacts(task[0]),
         "data_assets": list_task_data_assets(task[0]),
+        "github_links": list_task_github_links(task[0]),
         "historian_records": [
             {
                 "record_type": r[0],

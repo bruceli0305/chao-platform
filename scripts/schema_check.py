@@ -16,6 +16,7 @@ REQUIRED_TABLES = [
     "tool_calls",
     "artifacts",
     "data_assets",
+    "github_links",
     "storage_policies",
 ]
 
@@ -47,6 +48,14 @@ REQUIRED_COLUMNS = {
     ],
     "tool_calls": [
         "permission_decision",
+    ],
+    "github_links": [
+        "task_id",
+        "link_type",
+        "external_id",
+        "url",
+        "metadata",
+        "created_by",
     ],
 }
 
