@@ -79,6 +79,15 @@ def path_matches_scope(path: str, scope: str) -> bool:
     return path == scope or path.startswith(f"{scope}/")
 
 
+def path_contains_scope(path: str, scope: str) -> bool:
+    scope_name = scope.rstrip("/")
+
+    if "/" in scope_name:
+        return path_matches_scope(path, scope)
+
+    return scope_name in PurePosixPath(path).parts
+
+
 def is_change_path_allowed(
     path: str,
     policy: RunnerBoundaryPolicy | None = None,
@@ -86,7 +95,7 @@ def is_change_path_allowed(
     policy = policy or build_runner_boundary_policy("L2")
     repo_path = normalize_repo_path(path)
 
-    if any(path_matches_scope(repo_path, root) for root in policy["forbidden_change_roots"]):
+    if any(path_contains_scope(repo_path, root) for root in policy["forbidden_change_roots"]):
         return False
 
     return any(path_matches_scope(repo_path, root) for root in policy["allowed_change_roots"])
