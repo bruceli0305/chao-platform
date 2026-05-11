@@ -136,13 +136,19 @@ pytest 覆盖白名单、禁止路径、Secret 阻断、任务摘要 ingest；
 CI 执行 ingest dry-run 或最小 smoke test；
 ```
 
+当前 dry-run 命令：
+
+```bash
+uv run python scripts/ingest_markdown.py --pretty
+```
+
 ## 9. 阶段拆分
 
 ```text
 C1：设计 ingest 白名单，已由本文定义。
 C2：明确禁止 ingest 范围，已由本文定义。
 C3：设计 context_chunks 元数据字段，已落地到 db/migrations/007_context_chunks_metadata.sql。
-C4：实现 scripts/ingest_markdown.py。
+C4：实现 scripts/ingest_markdown.py，dry-run 已接入，不写数据库、不生成 embedding。
 C5：实现 scripts/search_context.py。
 C6：将 ingest 结果登记到 data_assets。
 C7：增加 schema_check 和 data_boundary_check 对 ingest 的校验，白名单 / 禁止路径基础校验已接入。

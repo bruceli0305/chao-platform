@@ -87,7 +87,8 @@ C7. 增加 schema_check 和 data_boundary_check 对 ingest 的校验。
 C1 / C2 已进入策略设计：docs/15-pgvector-ingest-policy-v3.md。
 C3 context_chunks 元数据字段已落地：db/migrations/007_context_chunks_metadata.sql。
 C7 的 ingest 白名单 / 禁止路径基础校验已接入 scripts/data_boundary_check.py。
-后续实现 ingest 前，必须补充 ingest dry-run 和 context_chunks 写入验证。
+C4 dry-run 已接入 scripts/ingest_markdown.py，不写数据库、不生成 embedding。
+后续实现 ingest 前，必须补充 context_chunks 写入验证。
 ```
 
 验收：
