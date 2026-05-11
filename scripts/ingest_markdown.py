@@ -207,10 +207,36 @@ def find_task_id(cur: Any, source_path: str) -> str | None:
     return row[0]
 
 
-def write_ingest_results(candidates: list[dict[str, Any]]) -> tuple[int, int]:
+def write_ingest_results(candidates: list[dict[str, Any]]) -> tuple[int, int, int]:
+    written_count = 0
+    data_asset_count = 0
+    skipped_count = 0
+
     with psycopg.connect(get_database_url()) as conn:
         with conn.cursor() as cur:
             for candidate in candidates:
+                task_code = extract_task_code(candidate["source_path"])
+                task_id = find_task_id(cur, candidate["source_path"])
+
+                if task_code is not None and task_id is None:
+                    cur.execute(
+                        """
+                        delete from context_chunks
+                        where source_path = %s
+                        """,
+                        (candidate["source_path"],),
+                    )
+                    cur.execute(
+                        """
+                        delete from data_assets
+                        where asset_name = %s
+                          and asset_type = %s
+                        """,
+                        (candidate["source_path"], "context_chunk_source"),
+                    )
+                    skipped_count += 1
+                    continue
+
                 cur.execute(
                     """
                     delete from context_chunks
@@ -257,8 +283,8 @@ def write_ingest_results(candidates: list[dict[str, Any]]) -> tuple[int, int]:
                         candidate["content"],
                     ),
                 )
+                written_count += 1
 
-                task_id = find_task_id(cur, candidate["source_path"])
                 data_asset = build_data_asset_record(candidate, task_id)
                 cur.execute(
                     """
@@ -316,10 +342,11 @@ def write_ingest_results(candidates: list[dict[str, Any]]) -> tuple[int, int]:
                         data_asset["notes"],
                     ),
                 )
+                data_asset_count += 1
 
         conn.commit()
 
-    return len(candidates), len(candidates)
+    return written_count, data_asset_count, skipped_count
 
 
 def parse_args() -> argparse.Namespace:
@@ -344,12 +371,13 @@ def main() -> int:
     report = build_report("dry_run", candidates, rejected)
 
     if args.write:
-        written_count, data_asset_count = write_ingest_results(candidates)
+        written_count, data_asset_count, skipped_count = write_ingest_results(candidates)
         report = {
             **build_report("write", candidates, rejected),
             "mode": "write",
             "written_count": written_count,
             "data_asset_count": data_asset_count,
+            "skipped_count": skipped_count,
         }
 
     print(json.dumps(report, ensure_ascii=False, indent=2 if args.pretty else None))

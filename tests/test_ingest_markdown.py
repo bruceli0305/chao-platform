@@ -1,3 +1,4 @@
+from scripts import ingest_markdown
 from scripts.ingest_markdown import (
     build_data_asset_record,
     build_dry_run_report,
@@ -6,6 +7,7 @@ from scripts.ingest_markdown import (
     collect_candidates,
     extract_task_code,
     summarize_candidate,
+    write_ingest_results,
 )
 
 
@@ -106,6 +108,62 @@ def test_build_data_asset_record():
         "owner": "historian",
         "notes": "source_hash=abc123; source_type=documentation",
     }
+
+
+def test_write_ingest_results_skips_task_record_without_task(monkeypatch):
+    executed = []
+
+    class FakeCursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def execute(self, query, params=None):
+            executed.append((query, params))
+
+        def fetchone(self):
+            return None
+
+    class FakeConnection:
+        committed = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def cursor(self):
+            return FakeCursor()
+
+        def commit(self):
+            self.committed = True
+
+    connection = FakeConnection()
+    monkeypatch.setattr(ingest_markdown, "get_database_url", lambda: "postgresql://test")
+    monkeypatch.setattr(ingest_markdown.psycopg, "connect", lambda _url: connection)
+
+    result = write_ingest_results(
+        [
+            {
+                "source_path": ".ai-agents/records/tasks/TASK-20260510-110040-840984.md",
+                "source_hash": "abc123",
+                "source_type": "historian_summary",
+                "data_classification": "D1",
+                "redacted": True,
+                "ingest_allowed": True,
+                "retention_policy": "project_default",
+                "created_by": "ingest_markdown",
+                "content": "summary",
+            }
+        ]
+    )
+
+    assert result == (0, 0, 1)
+    assert connection.committed is True
+    assert not any("insert into context_chunks" in query for query, _params in executed)
 
 
 def test_summarize_candidate_removes_content():

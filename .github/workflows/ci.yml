@@ -169,6 +169,21 @@ jobs:
           test "$DATA_ASSET_COUNT" -ge 3
           test "$DATA_ASSET_ORPHAN_COUNT" = "0"
 
+      - name: pgvector ingest write smoke
+        run: |
+          uv run python scripts/ingest_markdown.py --write --pretty
+          psql "$DATABASE_URL" -c "select source_path, source_type, data_classification, redacted, ingest_allowed from context_chunks order by created_at desc limit 10;"
+          psql "$DATABASE_URL" -c "select task_id, asset_name, asset_type, classification, primary_storage, allow_vectorization, desensitized, owner from data_assets where asset_type = 'context_chunk_source' order by created_at desc limit 10;"
+          CONTEXT_CHUNK_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from context_chunks;" | tr -d ' ')
+          INGEST_ASSET_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from data_assets where asset_type = 'context_chunk_source' and primary_storage = 'Git / Markdown' and allow_vectorization is true;" | tr -d ' ')
+          INGEST_ORPHAN_TASK_RECORD_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from data_assets where asset_type = 'context_chunk_source' and asset_name like '.ai-agents/records/tasks/TASK-%.md' and task_id is null;" | tr -d ' ')
+          echo "CONTEXT_CHUNK_COUNT=$CONTEXT_CHUNK_COUNT"
+          echo "INGEST_ASSET_COUNT=$INGEST_ASSET_COUNT"
+          echo "INGEST_ORPHAN_TASK_RECORD_COUNT=$INGEST_ORPHAN_TASK_RECORD_COUNT"
+          test "$CONTEXT_CHUNK_COUNT" -ge 1
+          test "$INGEST_ASSET_COUNT" -ge 1
+          test "$INGEST_ORPHAN_TASK_RECORD_COUNT" = "0"
+
   secret-scan:
     name: Secret scan
     runs-on: ubuntu-latest

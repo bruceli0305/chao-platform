@@ -133,7 +133,7 @@ notes：说明来源、脱敏策略和保留策略。
 scripts/data_boundary_check.py 检查禁止路径不会被 ingest；
 scripts/schema_check.py 检查 context_chunks 必要元数据字段；
 pytest 覆盖白名单、禁止路径、Secret 阻断、任务摘要 ingest；
-CI 执行 ingest dry-run 或最小 smoke test；
+CI 执行 ingest dry-run 和最小写入 smoke test；
 ```
 
 当前 dry-run 命令：
@@ -163,7 +163,7 @@ C3：设计 context_chunks 元数据字段，已落地到 db/migrations/007_cont
 C4：实现 scripts/ingest_markdown.py，dry-run 已接入，不写数据库、不生成 embedding。
 C5：实现 scripts/search_context.py，只读搜索骨架已接入。
 C6：将 ingest 结果写入 context_chunks，并同步登记 data_assets。
-C7：增加 schema_check 和 data_boundary_check 对 ingest 的校验，白名单 / 禁止路径基础校验已接入。
+C7：增加 schema_check 和 data_boundary_check 对 ingest 的校验，白名单 / 禁止路径基础校验与 CI 写入 smoke test 已接入。
 ```
 
 ## 10. 结论
