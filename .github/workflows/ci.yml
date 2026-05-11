@@ -45,6 +45,10 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
 
+      - name: PR task binding check
+        if: github.event_name == 'pull_request'
+        run: uv run python scripts/check_pr_task_binding.py
+
       - name: Install PostgreSQL client
         run: |
           sudo apt-get update

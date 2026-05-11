@@ -204,7 +204,9 @@ F6. 记录 commit hash、CI run id、PR URL。
 F1 github_links 表已通过 db/migrations/009_github_links.sql 落地。
 F1 最小数据层 app/chao/services/github_links.py 已接入，CLI show 已输出 github_links。
 F2 CLI bind-github 已接入，可绑定 issue / pull_request / commit / ci_run。
-F3 / F4 / F5 / F6 尚未实现。
+F3 PR 模板已要求填写 Task Code。
+F4 CI 已通过 scripts/check_pr_task_binding.py 检查 PR body 是否包含 Task Code。
+F5 / F6 尚未实现。
 ```
 
 验收：

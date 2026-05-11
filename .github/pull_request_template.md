@@ -2,7 +2,8 @@
 
 ## 关联任务
 
-- Task ID：
+- Task Code：TASK-YYYYMMDD-HHMMSS-ffffff
+- [ ] 已通过 `uv run python main.py show TASK-...` 确认任务存在
 
 ## 任务等级
 
