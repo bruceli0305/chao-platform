@@ -71,7 +71,7 @@ LEVEL_ALLOWED_RISKS: dict[TaskLevel, set[ToolRisk]] = {
     "L1": {"low", "medium"},
     "L2": {"low", "medium"},
     "L3": {"low", "medium", "high"},
-    "L4": {"low"},
+    "L4": {"low", "medium", "high"},
 }
 
 

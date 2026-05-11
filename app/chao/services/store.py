@@ -13,6 +13,7 @@ from app.chao.services.design_artifacts import save_design_artifact
 from app.chao.services.events import list_task_events, record_task_event
 from app.chao.services.github_links import list_task_github_links
 from app.chao.services.hubu_artifacts import save_hubu_artifact
+from app.chao.services.milestone_artifacts import save_milestone_artifact
 from app.chao.services.review_artifacts import save_review_artifact
 from app.chao.services.tool_calls import list_tool_calls, record_tool_call
 
@@ -119,6 +120,31 @@ def save_task_result(result: dict[str, Any]) -> None:
                     )
 
         conn.commit()
+
+    if result.get("task_level") == "L4":
+        milestone_path = save_milestone_artifact(result)
+        record_artifact(
+            task_id=task_id,
+            artifact_type="l4_milestone_plan",
+            artifact_uri=str(milestone_path),
+            access_level="internal",
+            retention_days=365,
+            summary="L4 里程碑规划 artifact",
+        )
+        record_data_asset(
+            asset_name=str(milestone_path),
+            asset_type="l4_milestone_plan",
+            classification="D1",
+            primary_storage="Git / Markdown",
+            owner="zhongshu",
+            task_id=task_id,
+            allowed_copies=["PostgreSQL", "pgvector"],
+            forbidden_storages=["Secret Manager"],
+            allow_vectorization=True,
+            desensitized=True,
+            retention_days=365,
+            notes="L4 里程碑规划记录，只保存脱敏工程规划知识。",
+        )
 
     record_task_event(
         task_id=task_id,
@@ -307,7 +333,9 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
                 raise ValueError(f"Task not found: {task_code}")
 
             task_id = task[0]
+            task_level = task[4]
             current_status = task[5]
+            next_status = "MILESTONE_PLANNING" if task_level == "L4" else "DESIGNING"
 
             if current_status != "NEED_CONFIRMATION":
                 raise ValueError(
@@ -343,7 +371,7 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
                 set status = %s, updated_at = now()
                 where id = %s
                 """,
-                ("DESIGNING", task_id),
+                (next_status, task_id),
             )
 
             cur.execute(
@@ -362,13 +390,51 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
                     str(uuid.uuid4()),
                     task_id,
                     "confirmation",
-                    f"A 级事项已由 {confirmed_by} 确认。说明：{note or '无'}",
+                    (
+                        f"A 级事项已由 {confirmed_by} 确认。"
+                        f"任务进入 {next_status}。说明：{note or '无'}"
+                    ),
                     "cli-approve",
                     "historian",
                 ),
             )
 
         conn.commit()
+
+    if task_level == "L4":
+        record_task_event(
+            task_id=task_id,
+            event_type="task_approved",
+            from_status="NEED_CONFIRMATION",
+            to_status="MILESTONE_PLANNING",
+            summary=f"A 级 L4 事项已由 {confirmed_by} 确认，仅进入里程碑规划。",
+            created_by=confirmed_by,
+        )
+
+        permission_decision = require_tool_permission(
+            agent_name="emperor",
+            tool_name="cli.approve",
+            task_level="L4",
+            required_confirmation="A",
+            current_status=current_status,
+        )
+        record_tool_call(
+            task_id=task_id,
+            agent_name="emperor",
+            tool_name="cli.approve",
+            arguments_summary=f"task_code={task_code}; confirmed_by={confirmed_by}",
+            permission_policy=permission_decision["permission_policy"],
+            result_status="success",
+            permission_decision=permission_decision,
+            output_summary=f"task_code={task_code}; status=MILESTONE_PLANNING",
+            risk_flag=permission_decision["risk_flag"],
+        )
+
+        detail = get_task_detail(task_code)
+        if detail is None:
+            raise ValueError(f"Task not found after approval: {task_code}")
+
+        return detail
 
     design_task = {
         "id": task_id,

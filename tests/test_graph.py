@@ -53,3 +53,23 @@ def test_graph_l3_needs_confirmation():
     assert result["task_level"] == "L3"
     assert result["status"] == "NEED_CONFIRMATION"
     assert result["required_confirmation"] == "A"
+
+
+def test_graph_l4_needs_confirmation_without_execution():
+    graph = build_graph()
+
+    result = graph.invoke(
+        {
+            "task_id": "test-l4",
+            "task_code": "TASK-TEST-L4",
+            "title": "平台级路线图",
+            "raw_request": "规划完整平台路线图，拆解成多个子任务",
+            "status": "RAW",
+        }
+    )
+
+    assert result["task_level"] == "L4"
+    assert result["status"] == "NEED_CONFIRMATION"
+    assert result["required_confirmation"] == "A"
+    assert "implementation_result" not in result
+    assert "validation_result" not in result

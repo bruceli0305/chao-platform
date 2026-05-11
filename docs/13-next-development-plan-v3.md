@@ -241,7 +241,7 @@ G2 approve_task 已在进入 DESIGNING 后生成中书省方案 Markdown artifac
 G3 approve_task 已在生成方案后生成门下省审核 Markdown artifact，并登记 D1 data_asset。
 G4 approve_task 已在生成门下省审核后生成户部数据 / 依赖 / Secret 审查 Markdown artifact，并登记 D1 data_asset。
 G5 approve_task 已在生成户部审查后生成兵部部署 / CI / rollback 审查 Markdown artifact，并登记 D1 data_asset。
-G6 尚未实现。
+G6 L4 已路由为里程碑规划任务，创建后只生成 l4_milestone_plan，不进入工部执行。
 ```
 
 验收：

@@ -130,6 +130,8 @@ L3 approve 后生成 .ai-agents/records/hubu/TASK-xxxx-hubu.md；
 L3 户部审查登记为 artifacts 和 D1 data_asset；
 L3 approve 后生成 .ai-agents/records/bingbu/TASK-xxxx-bingbu.md；
 L3 兵部审查登记为 artifacts 和 D1 data_asset；
+L4 创建后生成 .ai-agents/records/milestones/TASK-xxxx-milestones.md；
+L4 里程碑规划登记为 artifacts 和 D1 data_asset，且不进入工部执行；
 任务详情 show 已包含 events / tool_calls / artifacts / data_assets。
 ```
 
@@ -145,6 +147,7 @@ approve 命令执行后生成中书省方案 artifact；
 approve 命令执行后生成门下省审核 artifact；
 approve 命令执行后生成户部审查 artifact；
 approve 命令执行后生成兵部审查 artifact；
+L4 approve 后进入 MILESTONE_PLANNING，不生成 L3 执行审查链；
 historian_records 记录确认事实；
 task_events 记录 task_approved；
 tool_calls 记录 cli.approve；
@@ -226,8 +229,7 @@ pgvector ingest 白名单、chunk、脱敏和检索；
 GitHub Issue / PR / Commit / CI 结果与 task 绑定；
 Agent Runner / Sandbox；
 状态机持久化 checkpoint；
-L3 完整治理链：中书省方案、门下省审核、户部 / 兵部预审；
-L4 里程碑拆解；
+L3 / L4 治理 artifact 的人工审核命令与状态推进；
 Web Console。
 ```
 
@@ -235,7 +237,7 @@ Web Console。
 
 ```text
 1. 当前工具调用审计还是 CLI 层模拟，不是真实 MCP 工具拦截；
-2. 当前 data_assets 只登记 Markdown 史官记录，尚未登记所有数据来源；
+2. 当前 data_assets 已登记任务 Markdown、治理 artifact 和 ingest 来源，但尚未覆盖所有未来数据来源；
 3. pgvector 只启用扩展，尚未实现 ingest；
 4. L3 approve 后已进入 DESIGNING，后续 REVIEWING / SCHEDULING 仍待完善；
 5. 当前状态机尚未启用 LangGraph checkpoint 持久化；

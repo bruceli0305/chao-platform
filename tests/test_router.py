@@ -58,4 +58,27 @@ def test_router_classifies_l3():
     assert "menxia" in result["required_agents"]
     assert "secret_scan" in result["required_gates"]
     assert "database-migration" in result["required_skills"]
-    assert ".ai-agents/skills/database-migration/SKILL.md" in result["required_skill_paths"]
+    assert (
+        ".ai-agents/skills/database-migration/SKILL.md"
+        in result["required_skill_paths"]
+    )
+
+
+def test_router_classifies_l4_as_milestone_only():
+    result = task_router(
+        {
+            "task_id": "test-l4",
+            "task_code": "TASK-TEST-L4",
+            "title": "平台级路线图",
+            "raw_request": "规划完整平台路线图，拆解成多个子任务",
+            "status": "RAW",
+        }
+    )
+
+    assert result["task_level"] == "L4"
+    assert result["required_confirmation"] == "A"
+    assert result["risk_types"] == ["milestone_planning"]
+    assert "milestone_review" in result["required_gates"]
+    assert "gongbu" not in result["required_agents"]
+    assert result["required_skills"] == []
+    assert result["required_skill_paths"] == []

@@ -67,6 +67,21 @@ def test_emperor_can_approve_l3_waiting_task():
     assert decision["risk_flag"] == "A_CONFIRMATION"
 
 
+def test_emperor_can_approve_l4_waiting_task():
+    decision = evaluate_tool_permission(
+        agent_name="emperor",
+        tool_name="cli.approve",
+        task_level="L4",
+        required_confirmation="A",
+        current_status="NEED_CONFIRMATION",
+    )
+
+    assert decision["allowed"] is True
+    assert decision["permission_policy"] == "human-approval-required"
+    assert decision["requires_confirmation"] is True
+    assert decision["risk_flag"] == "A_CONFIRMATION"
+
+
 def test_high_risk_tool_requires_waiting_confirmation_state():
     decision = evaluate_tool_permission(
         agent_name="emperor",

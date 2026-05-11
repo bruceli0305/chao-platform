@@ -99,6 +99,17 @@ jobs:
         run: |
           uv run python main.py new "CI-L3-数据库迁移" "给用户表新增 status 字段，并迁移历史数据"
 
+      - name: Smoke test L4 task
+        run: |
+          uv run python main.py new "CI-L4-平台路线图" "规划完整平台路线图，拆解成多个子任务"
+          L4_TASK_CODE=$(psql "$DATABASE_URL" -t -A -c "select task_code from tasks where title = 'CI-L4-平台路线图' order by created_at desc limit 1;")
+          echo "L4_TASK_CODE=$L4_TASK_CODE"
+          test -n "$L4_TASK_CODE"
+          L4_STATUS=$(psql "$DATABASE_URL" -t -A -c "select status from tasks where task_code = '$L4_TASK_CODE';")
+          L4_LEVEL=$(psql "$DATABASE_URL" -t -A -c "select task_level from tasks where task_code = '$L4_TASK_CODE';")
+          test "$L4_STATUS" = "NEED_CONFIRMATION"
+          test "$L4_LEVEL" = "L4"
+
       - name: Approve L3 task
         run: |
           L3_TASK_CODE=$(psql "$DATABASE_URL" -t -A -c "select task_code from tasks where title = 'CI-L3-数据库迁移' order by created_at desc limit 1;")
@@ -108,6 +119,16 @@ jobs:
           psql "$DATABASE_URL" -c "select task_code, status from tasks where task_code = '$L3_TASK_CODE';"
           DESIGNING_STATUS=$(psql "$DATABASE_URL" -t -A -c "select status from tasks where task_code = '$L3_TASK_CODE';")
           test "$DESIGNING_STATUS" = "DESIGNING"
+
+      - name: Approve L4 task
+        run: |
+          L4_TASK_CODE=$(psql "$DATABASE_URL" -t -A -c "select task_code from tasks where title = 'CI-L4-平台路线图' order by created_at desc limit 1;")
+          echo "L4_TASK_CODE=$L4_TASK_CODE"
+          test -n "$L4_TASK_CODE"
+          uv run python main.py approve "$L4_TASK_CODE" --by ci --note "CI L4 milestone smoke test"
+          psql "$DATABASE_URL" -c "select task_code, task_level, status from tasks where task_code = '$L4_TASK_CODE';"
+          L4_APPROVED_STATUS=$(psql "$DATABASE_URL" -t -A -c "select status from tasks where task_code = '$L4_TASK_CODE';")
+          test "$L4_APPROVED_STATUS" = "MILESTONE_PLANNING"
 
       - name: Record GitHub delivery context
         run: uv run python scripts/record_github_delivery.py
@@ -188,6 +209,13 @@ jobs:
           echo "BINGBU_RECORD_COUNT=$BINGBU_RECORD_COUNT"
           test "$BINGBU_RECORD_COUNT" -ge 1
 
+      - name: Verify L4 milestone records generated
+        run: |
+          ls -la .ai-agents/records/milestones
+          MILESTONE_RECORD_COUNT=$(find .ai-agents/records/milestones -name 'TASK-*-milestones.md' | wc -l)
+          echo "MILESTONE_RECORD_COUNT=$MILESTONE_RECORD_COUNT"
+          test "$MILESTONE_RECORD_COUNT" -ge 1
+
       - name: Verify artifacts persisted
         run: |
           psql "$DATABASE_URL" -c "select artifact_type, artifact_uri, artifact_hash, access_level, retention_days, summary from artifacts order by created_at desc limit 10;"
@@ -197,6 +225,7 @@ jobs:
           REVIEW_ARTIFACT_URIS=$(psql "$DATABASE_URL" -t -A -c "select artifact_uri from artifacts where artifact_type = 'l3_menxia_review';")
           HUBU_ARTIFACT_URIS=$(psql "$DATABASE_URL" -t -A -c "select artifact_uri from artifacts where artifact_type = 'l3_hubu_review';")
           BINGBU_ARTIFACT_URIS=$(psql "$DATABASE_URL" -t -A -c "select artifact_uri from artifacts where artifact_type = 'l3_bingbu_review';")
+          MILESTONE_ARTIFACT_URIS=$(psql "$DATABASE_URL" -t -A -c "select artifact_uri from artifacts where artifact_type = 'l4_milestone_plan';")
           echo "ARTIFACT_COUNT=$ARTIFACT_COUNT"
           test "$ARTIFACT_COUNT" -ge 3
           test -n "$MARKDOWN_ARTIFACT_URIS"
@@ -204,6 +233,7 @@ jobs:
           test -n "$REVIEW_ARTIFACT_URIS"
           test -n "$HUBU_ARTIFACT_URIS"
           test -n "$BINGBU_ARTIFACT_URIS"
+          test -n "$MILESTONE_ARTIFACT_URIS"
           while IFS= read -r artifact_uri; do
             test -f "$artifact_uri"
           done <<< "$MARKDOWN_ARTIFACT_URIS"
@@ -219,6 +249,12 @@ jobs:
           while IFS= read -r artifact_uri; do
             test -f "$artifact_uri"
           done <<< "$BINGBU_ARTIFACT_URIS"
+          while IFS= read -r artifact_uri; do
+            test -f "$artifact_uri"
+          done <<< "$MILESTONE_ARTIFACT_URIS"
+          L4_L3_ARTIFACT_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from artifacts a join tasks t on t.id = a.task_id where t.task_level = 'L4' and a.artifact_type like 'l3_%';" | tr -d ' ')
+          echo "L4_L3_ARTIFACT_COUNT=$L4_L3_ARTIFACT_COUNT"
+          test "$L4_L3_ARTIFACT_COUNT" = "0"
 
       - name: Verify data assets persisted
         run: |
@@ -229,18 +265,21 @@ jobs:
           REVIEW_DATA_ASSET_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from data_assets where task_id is not null and asset_type = 'l3_menxia_review' and classification = 'D1';" | tr -d ' ')
           HUBU_DATA_ASSET_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from data_assets where task_id is not null and asset_type = 'l3_hubu_review' and classification = 'D1';" | tr -d ' ')
           BINGBU_DATA_ASSET_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from data_assets where task_id is not null and asset_type = 'l3_bingbu_review' and classification = 'D1';" | tr -d ' ')
+          MILESTONE_DATA_ASSET_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from data_assets where task_id is not null and asset_type = 'l4_milestone_plan' and classification = 'D1';" | tr -d ' ')
           echo "DATA_ASSET_COUNT=$DATA_ASSET_COUNT"
           echo "DATA_ASSET_ORPHAN_COUNT=$DATA_ASSET_ORPHAN_COUNT"
           echo "DESIGN_DATA_ASSET_COUNT=$DESIGN_DATA_ASSET_COUNT"
           echo "REVIEW_DATA_ASSET_COUNT=$REVIEW_DATA_ASSET_COUNT"
           echo "HUBU_DATA_ASSET_COUNT=$HUBU_DATA_ASSET_COUNT"
           echo "BINGBU_DATA_ASSET_COUNT=$BINGBU_DATA_ASSET_COUNT"
+          echo "MILESTONE_DATA_ASSET_COUNT=$MILESTONE_DATA_ASSET_COUNT"
           test "$DATA_ASSET_COUNT" -ge 3
           test "$DATA_ASSET_ORPHAN_COUNT" = "0"
           test "$DESIGN_DATA_ASSET_COUNT" -ge 1
           test "$REVIEW_DATA_ASSET_COUNT" -ge 1
           test "$HUBU_DATA_ASSET_COUNT" -ge 1
           test "$BINGBU_DATA_ASSET_COUNT" -ge 1
+          test "$MILESTONE_DATA_ASSET_COUNT" -ge 1
 
       - name: pgvector ingest write smoke
         run: |
