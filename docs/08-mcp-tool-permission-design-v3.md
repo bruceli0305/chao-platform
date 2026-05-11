@@ -89,6 +89,7 @@ risk_flag。
 ```text
 app/chao/permissions.py 定义 TOOL_REGISTRY、ROLE_ALLOWED_TOOLS、LEVEL_ALLOWED_RISKS；
 evaluate_tool_permission 负责输出 allowed、permission_policy、requires_confirmation 和 risk_flag；
+require_tool_permission 负责在调用前强制拒绝未授权工具；
 第一批登记工具：cli.new、cli.approve、schema_check、data_boundary_check；
 tool_calls.permission_policy 记录策略名，tool_calls.permission_decision 记录完整决策 JSON。
 ```

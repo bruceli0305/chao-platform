@@ -3,6 +3,7 @@ from app.chao.permissions import (
     evaluate_tool_permission,
     get_tool,
     list_tools,
+    require_tool_permission,
 )
 
 
@@ -92,3 +93,31 @@ def test_unknown_tool_is_denied():
     assert decision["allowed"] is False
     assert decision["permission_policy"] == "unknown-tool"
     assert decision["risk_flag"] == "UNKNOWN_TOOL"
+
+
+def test_require_tool_permission_returns_allowed_decision():
+    decision = require_tool_permission(
+        agent_name="shangshu",
+        tool_name="cli.new",
+        task_level="L1",
+        required_confirmation="none",
+        current_status="DELIVERED",
+    )
+
+    assert decision["allowed"] is True
+    assert decision["permission_policy"] == "local-cli-task-create"
+
+
+def test_require_tool_permission_raises_for_denied_decision():
+    try:
+        require_tool_permission(
+            agent_name="gongbu",
+            tool_name="cli.approve",
+            task_level="L3",
+            required_confirmation="A",
+            current_status="NEED_CONFIRMATION",
+        )
+    except PermissionError as exc:
+        assert "未授权调用" in str(exc)
+    else:
+        raise AssertionError("expected PermissionError")

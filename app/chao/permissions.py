@@ -133,3 +133,25 @@ def evaluate_tool_permission(
         "requires_confirmation": tool["risk"] in {"high", "critical"},
         "risk_flag": "A_CONFIRMATION" if tool["risk"] == "high" else None,
     }
+
+
+def require_tool_permission(
+    *,
+    agent_name: str,
+    tool_name: str,
+    task_level: TaskLevel,
+    required_confirmation: str,
+    current_status: str,
+) -> PermissionDecision:
+    decision = evaluate_tool_permission(
+        agent_name=agent_name,
+        tool_name=tool_name,
+        task_level=task_level,
+        required_confirmation=required_confirmation,
+        current_status=current_status,
+    )
+
+    if not decision["allowed"]:
+        raise PermissionError(decision["reason"])
+
+    return decision

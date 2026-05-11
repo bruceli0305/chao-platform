@@ -5,7 +5,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from app.chao.config import DATABASE_URL
-from app.chao.permissions import evaluate_tool_permission
+from app.chao.permissions import require_tool_permission
 from app.chao.services.artifacts import list_artifacts
 from app.chao.services.data_assets import list_task_data_assets
 from app.chao.services.events import list_task_events, record_task_event
@@ -124,7 +124,7 @@ def save_task_result(result: dict[str, Any]) -> None:
         created_by="shangshu",
     )
 
-    permission_decision = evaluate_tool_permission(
+    permission_decision = require_tool_permission(
         agent_name="shangshu",
         tool_name="cli.new",
         task_level=result.get("task_level", "L1"),
@@ -373,7 +373,7 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
         created_by=confirmed_by,
     )
 
-    permission_decision = evaluate_tool_permission(
+    permission_decision = require_tool_permission(
         agent_name="emperor",
         tool_name="cli.approve",
         task_level="L3",

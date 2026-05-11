@@ -135,10 +135,16 @@ jobs:
 
       - name: Verify tool calls persisted
         run: |
-          psql "$DATABASE_URL" -c "select agent_name, tool_name, permission_policy, result_status, risk_flag from tool_calls order by started_at desc limit 10;"
+          psql "$DATABASE_URL" -c "select agent_name, tool_name, permission_policy, permission_decision, result_status, risk_flag from tool_calls order by started_at desc limit 10;"
           TOOL_CALL_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from tool_calls;" | tr -d ' ')
+          TOOL_CALL_POLICY_EMPTY_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from tool_calls where permission_policy is null or permission_policy = '';" | tr -d ' ')
+          TOOL_CALL_DECISION_EMPTY_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from tool_calls where permission_decision = '{}'::jsonb;" | tr -d ' ')
           echo "TOOL_CALL_COUNT=$TOOL_CALL_COUNT"
+          echo "TOOL_CALL_POLICY_EMPTY_COUNT=$TOOL_CALL_POLICY_EMPTY_COUNT"
+          echo "TOOL_CALL_DECISION_EMPTY_COUNT=$TOOL_CALL_DECISION_EMPTY_COUNT"
           test "$TOOL_CALL_COUNT" -ge 4
+          test "$TOOL_CALL_POLICY_EMPTY_COUNT" = "0"
+          test "$TOOL_CALL_DECISION_EMPTY_COUNT" = "0"
 
       - name: Verify markdown records generated
         run: |
