@@ -124,6 +124,8 @@ Markdown 史官记录登记为 artifacts；
 Markdown 史官记录登记为 D1 data_asset；
 L3 approve 后生成 .ai-agents/records/designs/TASK-xxxx-design.md；
 L3 中书省方案登记为 artifacts 和 D1 data_asset；
+L3 approve 后生成 .ai-agents/records/reviews/TASK-xxxx-review.md；
+L3 门下省审核登记为 artifacts 和 D1 data_asset；
 任务详情 show 已包含 events / tool_calls / artifacts / data_assets。
 ```
 
@@ -136,6 +138,7 @@ L3 自动生成 NEED_CONFIRMATION；
 confirmations 表记录审批数据；
 approve 命令执行后任务状态变为 DESIGNING；
 approve 命令执行后生成中书省方案 artifact；
+approve 命令执行后生成门下省审核 artifact；
 historian_records 记录确认事实；
 task_events 记录 task_approved；
 tool_calls 记录 cli.approve；

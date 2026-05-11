@@ -11,6 +11,7 @@ from app.chao.services.data_assets import list_task_data_assets, record_data_ass
 from app.chao.services.design_artifacts import save_design_artifact
 from app.chao.services.events import list_task_events, record_task_event
 from app.chao.services.github_links import list_task_github_links
+from app.chao.services.review_artifacts import save_review_artifact
 from app.chao.services.tool_calls import list_tool_calls, record_tool_call
 
 
@@ -401,6 +402,32 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
         desensitized=True,
         retention_days=365,
         notes="L3 中书省方案记录，仅允许保存脱敏工程知识。",
+    )
+    review_artifact_path = save_review_artifact(
+        task=design_task,
+        design_artifact_uri=str(design_artifact_path),
+    )
+    record_artifact(
+        task_id=task_id,
+        artifact_type="l3_menxia_review",
+        artifact_uri=str(review_artifact_path),
+        access_level="internal",
+        retention_days=365,
+        summary="L3 门下省审核 artifact",
+    )
+    record_data_asset(
+        asset_name=str(review_artifact_path),
+        asset_type="l3_menxia_review",
+        classification="D1",
+        primary_storage="Git / Markdown",
+        owner="menxia",
+        task_id=task_id,
+        allowed_copies=["PostgreSQL", "pgvector"],
+        forbidden_storages=["Secret Manager"],
+        allow_vectorization=True,
+        desensitized=True,
+        retention_days=365,
+        notes="L3 门下省审核记录，仅允许保存脱敏工程知识。",
     )
 
     record_task_event(
