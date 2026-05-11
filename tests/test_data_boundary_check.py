@@ -1,6 +1,38 @@
 from scripts import data_boundary_check
 
 
+def test_ingest_policy_allows_only_whitelisted_sources():
+    assert data_boundary_check.is_allowed_ingest_source("AGENTS.md") is True
+    assert data_boundary_check.is_allowed_ingest_source("README.md") is True
+    assert data_boundary_check.is_allowed_ingest_source("CHANGELOG-v3.md") is True
+    assert data_boundary_check.is_allowed_ingest_source("docs/11-data-storage-boundary-v3.md")
+    assert data_boundary_check.is_allowed_ingest_source(".ai-agents/router/task-router.md")
+    assert data_boundary_check.is_allowed_ingest_source("app/chao/cli.py") is False
+    assert data_boundary_check.is_allowed_ingest_source("docs/diagram.png") is False
+
+
+def test_ingest_policy_blocks_forbidden_paths():
+    assert data_boundary_check.is_allowed_ingest_source(".env") is False
+    assert data_boundary_check.is_allowed_ingest_source(".env.example") is False
+    assert data_boundary_check.is_allowed_ingest_source(".env.local") is False
+    assert data_boundary_check.is_allowed_ingest_source("data/export.md") is False
+    assert data_boundary_check.is_allowed_ingest_source("logs/run.md") is False
+    assert data_boundary_check.is_allowed_ingest_source("node_modules/pkg/readme.md") is False
+    assert data_boundary_check.is_allowed_ingest_source("dist/report.md") is False
+    assert data_boundary_check.is_allowed_ingest_source("build/report.md") is False
+
+
+def test_ingest_forbidden_tracked_paths_are_reported():
+    errors = data_boundary_check.check_ingest_forbidden_tracked_paths(
+        ["docs/ok.md", ".env.example", "data/export.md", ".env.local"]
+    )
+
+    assert errors == [
+        "禁止被 ingest 的路径被 Git 跟踪：data/export.md",
+        "禁止被 ingest 的路径被 Git 跟踪：.env.local",
+    ]
+
+
 def test_task_markdown_records_reject_secret_pattern(tmp_path, monkeypatch):
     records_dir = tmp_path / ".ai-agents" / "records" / "tasks"
     records_dir.mkdir(parents=True)

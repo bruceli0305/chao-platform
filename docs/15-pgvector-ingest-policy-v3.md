@@ -145,9 +145,11 @@ C3：设计 context_chunks 元数据字段，已落地到 db/migrations/007_cont
 C4：实现 scripts/ingest_markdown.py。
 C5：实现 scripts/search_context.py。
 C6：将 ingest 结果登记到 data_assets。
-C7：增加 schema_check 和 data_boundary_check 对 ingest 的校验。
+C7：增加 schema_check 和 data_boundary_check 对 ingest 的校验，白名单 / 禁止路径基础校验已接入。
 ```
 
 ## 10. 结论
 
-第一版 pgvector ingest 必须以白名单为入口，以数据边界为硬门禁，以来源元数据为审计基础。任何新增 ingest 来源、放宽禁止路径、处理 D2 / D3 / D4 数据，必须重新路由为 L3 并完成 A 级确认。
+第一版 pgvector ingest 必须以白名单为入口，以数据边界为硬门禁，以来源元数据为审计基础。
+任何新增 ingest 来源、放宽禁止路径、处理 D2 / D3 / D4 数据，
+必须重新路由为 L3 并完成 A 级确认。

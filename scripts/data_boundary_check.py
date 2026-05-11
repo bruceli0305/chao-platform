@@ -7,6 +7,37 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TASK_RECORDS_DIR = ROOT / ".ai-agents" / "records" / "tasks"
 
+INGEST_ALLOWED_EXACT_PATHS = {
+    "AGENTS.md",
+    "README.md",
+    "CHANGELOG-v3.md",
+}
+
+INGEST_ALLOWED_PREFIXES = {
+    "docs/",
+    ".ai-agents/",
+}
+
+INGEST_FORBIDDEN_EXACT_PATHS = {
+    ".env",
+}
+
+INGEST_FORBIDDEN_PREFIXES = {
+    ".env.",
+    ".venv/",
+    "data/",
+    "logs/",
+    "node_modules/",
+    "dist/",
+    "build/",
+    "__pycache__/",
+    ".pytest_cache/",
+}
+
+INGEST_FORBIDDEN_TRACKED_EXCEPTIONS = {
+    ".env.example",
+}
+
 
 FORBIDDEN_TRACKED_PATHS = [
     ".env",
@@ -147,6 +178,50 @@ def check_secret_patterns() -> list[str]:
     return errors
 
 
+def normalize_repo_path(path: str | Path) -> str:
+    return str(path).replace("\\", "/").lstrip("./")
+
+
+def is_forbidden_ingest_path(path: str | Path) -> bool:
+    normalized = normalize_repo_path(path)
+
+    if normalized in INGEST_FORBIDDEN_EXACT_PATHS:
+        return True
+
+    return any(
+        normalized == prefix.rstrip("/") or normalized.startswith(prefix)
+        for prefix in INGEST_FORBIDDEN_PREFIXES
+    )
+
+
+def is_allowed_ingest_source(path: str | Path) -> bool:
+    normalized = normalize_repo_path(path)
+
+    if is_forbidden_ingest_path(normalized):
+        return False
+
+    if normalized in INGEST_ALLOWED_EXACT_PATHS:
+        return True
+
+    if not normalized.endswith(".md"):
+        return False
+
+    return any(normalized.startswith(prefix) for prefix in INGEST_ALLOWED_PREFIXES)
+
+
+def check_ingest_forbidden_tracked_paths(tracked_files: list[str]) -> list[str]:
+    errors = []
+
+    for tracked in tracked_files:
+        if tracked in INGEST_FORBIDDEN_TRACKED_EXCEPTIONS:
+            continue
+
+        if is_forbidden_ingest_path(tracked):
+            errors.append(f"禁止被 ingest 的路径被 Git 跟踪：{tracked}")
+
+    return errors
+
+
 def check_task_markdown_records() -> list[str]:
     errors = []
 
@@ -171,6 +246,7 @@ def main() -> int:
     tracked_files = get_tracked_files()
 
     errors.extend(check_forbidden_tracked_paths(tracked_files))
+    errors.extend(check_ingest_forbidden_tracked_paths(tracked_files))
     errors.extend(check_gitignore())
     errors.extend(check_secret_patterns())
     errors.extend(check_task_markdown_records())
