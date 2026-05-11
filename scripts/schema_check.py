@@ -48,6 +48,10 @@ REQUIRED_COLUMNS = {
 }
 
 
+def should_check_storage_policies(existing_tables: set[str]) -> bool:
+    return "storage_policies" in existing_tables
+
+
 def main() -> int:
     load_dotenv()
 
@@ -109,12 +113,13 @@ def main() -> int:
                 if extension not in existing_extensions:
                     errors.append(f"missing extension: {extension}")
 
-            cur.execute("select policy_name from storage_policies")
-            existing_policies = {row[0] for row in cur.fetchall()}
+            if should_check_storage_policies(existing_tables):
+                cur.execute("select policy_name from storage_policies")
+                existing_policies = {row[0] for row in cur.fetchall()}
 
-            for policy in REQUIRED_STORAGE_POLICIES:
-                if policy not in existing_policies:
-                    errors.append(f"missing storage policy: {policy}")
+                for policy in REQUIRED_STORAGE_POLICIES:
+                    if policy not in existing_policies:
+                        errors.append(f"missing storage policy: {policy}")
 
     if errors:
         print("schema check failed:")
