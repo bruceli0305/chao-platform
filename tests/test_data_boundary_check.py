@@ -47,7 +47,9 @@ def test_task_markdown_records_reject_secret_pattern(tmp_path, monkeypatch):
     records_dir = tmp_path / ".ai-agents" / "records" / "tasks"
     records_dir.mkdir(parents=True)
     task_record = records_dir / "TASK-20260510-TEST.md"
-    task_record.write_text("api" + '_key="1234567890abcdef"', encoding="utf-8")
+    key_name = "api" + "_key"
+    secret_like_value = "1234567890abcdef"
+    task_record.write_text(f'{key_name}="{secret_like_value}"', encoding="utf-8")
 
     monkeypatch.setattr(data_boundary_check, "ROOT", tmp_path)
     monkeypatch.setattr(data_boundary_check, "TASK_RECORDS_DIR", records_dir)

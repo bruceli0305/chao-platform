@@ -1,0 +1,12 @@
+title = "chao-platform gitleaks config"
+
+[allowlist]
+description = "Allow the synthetic API key fixture used by data boundary tests."
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''tests/test_data_boundary_check\.py''',
+]
+regexes = [
+  '''api["']?\s*\+\s*['_"]_key="?[A-Za-z0-9]*"?''',
+]
