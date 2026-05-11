@@ -6,8 +6,9 @@ from psycopg.types.json import Jsonb
 
 from app.chao.config import DATABASE_URL
 from app.chao.permissions import require_tool_permission
-from app.chao.services.artifacts import list_artifacts
-from app.chao.services.data_assets import list_task_data_assets
+from app.chao.services.artifacts import list_artifacts, record_artifact
+from app.chao.services.data_assets import list_task_data_assets, record_data_asset
+from app.chao.services.design_artifacts import save_design_artifact
 from app.chao.services.events import list_task_events, record_task_event
 from app.chao.services.github_links import list_task_github_links
 from app.chao.services.tool_calls import list_tool_calls, record_tool_call
@@ -291,7 +292,7 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
         with conn.cursor() as cur:
             cur.execute(
                 """
-                select id::text, task_code, title, task_level, status
+                select id::text, task_code, title, raw_request, task_level, status
                 from tasks
                 where task_code = %s
                 """,
@@ -303,7 +304,7 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
                 raise ValueError(f"Task not found: {task_code}")
 
             task_id = task[0]
-            current_status = task[4]
+            current_status = task[5]
 
             if current_status != "NEED_CONFIRMATION":
                 raise ValueError(
@@ -365,6 +366,42 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
             )
 
         conn.commit()
+
+    design_task = {
+        "id": task_id,
+        "task_code": task[1],
+        "title": task[2],
+        "raw_request": task[3],
+        "task_level": task[4],
+        "status": "DESIGNING",
+    }
+    design_artifact_path = save_design_artifact(
+        task=design_task,
+        confirmed_by=confirmed_by,
+        note=note,
+    )
+    record_artifact(
+        task_id=task_id,
+        artifact_type="l3_design_plan",
+        artifact_uri=str(design_artifact_path),
+        access_level="internal",
+        retention_days=365,
+        summary="L3 中书省方案 artifact",
+    )
+    record_data_asset(
+        asset_name=str(design_artifact_path),
+        asset_type="l3_design_plan",
+        classification="D1",
+        primary_storage="Git / Markdown",
+        owner="zhongshu",
+        task_id=task_id,
+        allowed_copies=["PostgreSQL", "pgvector"],
+        forbidden_storages=["Secret Manager"],
+        allow_vectorization=True,
+        desensitized=True,
+        retention_days=365,
+        notes="L3 中书省方案记录，仅允许保存脱敏工程知识。",
+    )
 
     record_task_event(
         task_id=task_id,
