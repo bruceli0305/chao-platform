@@ -45,6 +45,9 @@ REQUIRED_COLUMNS = {
         "retention_policy",
         "created_by",
     ],
+    "tool_calls": [
+        "permission_decision",
+    ],
 }
 
 

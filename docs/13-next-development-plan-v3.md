@@ -170,7 +170,8 @@ E6. CI 验证 tool_calls 中 permission_policy 不为空。
 E1 tool permission policy 数据结构已接入 app/chao/permissions.py。
 E2 role + level + tool risk 的允许/拒绝判断已接入 evaluate_tool_permission。
 E3 cli.new、cli.approve、schema_check、data_boundary_check 已进入第一批工具登记。
-E4 / E5 / E6 尚未实现；其中 E4 涉及数据库结构变更，需要单独 A 级确认。
+E4 tool_calls.permission_decision 已通过 db/migrations/008_tool_calls_permission_decision.sql 落地。
+E5 / E6 尚未实现。
 ```
 
 验收：

@@ -3,6 +3,7 @@ import uuid
 from typing import Any
 
 import psycopg
+from psycopg.types.json import Jsonb
 
 from app.chao.config import DATABASE_URL
 
@@ -21,6 +22,7 @@ def record_tool_call(
     arguments_summary: str | None,
     permission_policy: str | None,
     result_status: str,
+    permission_decision: dict[str, Any] | None = None,
     output_summary: str | None = None,
     risk_flag: str | None = None,
 ) -> None:
@@ -37,12 +39,13 @@ def record_tool_call(
                     tool_name,
                     arguments_summary,
                     permission_policy,
+                    permission_decision,
                     result_status,
                     output_hash,
                     risk_flag,
                     finished_at
                 )
-                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
                 """,
                 (
                     str(uuid.uuid4()),
@@ -51,6 +54,7 @@ def record_tool_call(
                     tool_name,
                     arguments_summary,
                     permission_policy,
+                    Jsonb(permission_decision or {}),
                     result_status,
                     output_hash,
                     risk_flag,
@@ -70,6 +74,7 @@ def list_tool_calls(task_id: str) -> list[dict[str, Any]]:
                     tool_name,
                     arguments_summary,
                     permission_policy,
+                    permission_decision,
                     result_status,
                     output_hash,
                     risk_flag,
@@ -89,11 +94,12 @@ def list_tool_calls(task_id: str) -> list[dict[str, Any]]:
             "tool_name": row[1],
             "arguments_summary": row[2],
             "permission_policy": row[3],
-            "result_status": row[4],
-            "output_hash": row[5],
-            "risk_flag": row[6],
-            "started_at": row[7],
-            "finished_at": row[8],
+            "permission_decision": row[4],
+            "result_status": row[5],
+            "output_hash": row[6],
+            "risk_flag": row[7],
+            "started_at": row[8],
+            "finished_at": row[9],
         }
         for row in rows
     ]

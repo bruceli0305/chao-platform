@@ -124,23 +124,25 @@ def save_task_result(result: dict[str, Any]) -> None:
         created_by="shangshu",
     )
 
+    permission_decision = evaluate_tool_permission(
+        agent_name="shangshu",
+        tool_name="cli.new",
+        task_level=result.get("task_level", "L1"),
+        required_confirmation=result.get("required_confirmation", "none"),
+        current_status=result.get("status", "UNKNOWN"),
+    )
     record_tool_call(
         task_id=task_id,
         agent_name="shangshu",
         tool_name="cli.new",
         arguments_summary=f"title={result.get('title', '')}; level={result.get('task_level', '')}",
-        permission_policy=evaluate_tool_permission(
-            agent_name="shangshu",
-            tool_name="cli.new",
-            task_level=result.get("task_level", "L1"),
-            required_confirmation=result.get("required_confirmation", "none"),
-            current_status=result.get("status", "UNKNOWN"),
-        )["permission_policy"],
+        permission_policy=permission_decision["permission_policy"],
         result_status="success",
+        permission_decision=permission_decision,
         output_summary=(
             f"task_code={result.get('task_code', '')}; status={result.get('status', '')}"
         ),
-        risk_flag=None,
+        risk_flag=permission_decision["risk_flag"],
     )
 
 
@@ -371,21 +373,23 @@ def approve_task(task_code: str, confirmed_by: str, note: str = "") -> dict[str,
         created_by=confirmed_by,
     )
 
+    permission_decision = evaluate_tool_permission(
+        agent_name="emperor",
+        tool_name="cli.approve",
+        task_level="L3",
+        required_confirmation="A",
+        current_status=current_status,
+    )
     record_tool_call(
         task_id=task_id,
         agent_name="emperor",
         tool_name="cli.approve",
         arguments_summary=f"task_code={task_code}; confirmed_by={confirmed_by}",
-        permission_policy=evaluate_tool_permission(
-            agent_name="emperor",
-            tool_name="cli.approve",
-            task_level="L3",
-            required_confirmation="A",
-            current_status=current_status,
-        )["permission_policy"],
+        permission_policy=permission_decision["permission_policy"],
         result_status="success",
+        permission_decision=permission_decision,
         output_summary=f"task_code={task_code}; status=APPROVED",
-        risk_flag="A_CONFIRMATION",
+        risk_flag=permission_decision["risk_flag"],
     )
 
     detail = get_task_detail(task_code)

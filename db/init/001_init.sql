@@ -81,6 +81,7 @@ create table if not exists tool_calls (
   tool_name text not null,
   arguments_summary text,
   permission_policy text,
+  permission_decision jsonb not null default '{}',
   result_status text not null,
   output_hash text,
   risk_flag text,
@@ -234,3 +235,6 @@ on context_chunks(source_hash);
 
 create index if not exists idx_context_chunks_ingest_allowed
 on context_chunks(ingest_allowed);
+
+alter table tool_calls
+add column if not exists permission_decision jsonb not null default '{}';
