@@ -64,11 +64,7 @@ def build_runner_validation_result(
         "plan": plan,
         "command_results": command_results,
         "deliverable": deliverable,
-        "note": (
-            "刑部验证通过，可进入交付。"
-            if deliverable
-            else "刑部验证失败，禁止进入交付。"
-        ),
+        "note": ("刑部验证通过，可进入交付。" if deliverable else "刑部验证失败，禁止进入交付。"),
     }
 
 
