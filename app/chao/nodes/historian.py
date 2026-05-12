@@ -18,6 +18,14 @@ def historian_record_raw(state: ChaoState) -> ChaoState:
 
 
 def historian_record_result(state: ChaoState) -> ChaoState:
+    validation_result = state.get("validation_result", {})
+
+    if validation_result and not validation_result.get("deliverable", False):
+        return {
+            **state,
+            "status": "VALIDATION_FAILED",
+        }
+
     records = state.get("historian_records", [])
     records.append(
         {

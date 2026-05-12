@@ -1,13 +1,18 @@
+from app.chao.runner_validation import (
+    build_runner_validation_result,
+    require_runner_validation_success,
+)
 from app.chao.state import ChaoState
 
 
 def xingbu_validate(state: ChaoState) -> ChaoState:
+    validation_result = build_runner_validation_result(
+        state.get("required_gates", []),
+    )
+    require_runner_validation_success(validation_result)
+
     return {
         **state,
         "status": "VALIDATING",
-        "validation_result": {
-            "quality": "有条件可交付",
-            "checks": state.get("required_gates", []),
-            "note": "MVP 阶段只完成流程 smoke test。",
-        },
+        "validation_result": validation_result,
     }

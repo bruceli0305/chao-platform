@@ -75,6 +75,9 @@ jobs:
       - name: Agent runner boundary smoke
         run: uv run pytest tests/test_runner_policy.py tests/test_gongbu_runner_scope.py -q
 
+      - name: Agent runner validation smoke
+        run: uv run pytest tests/test_runner_validation.py tests/test_xingbu_validation.py -q
+
       - name: Data boundary check
         run: uv run python scripts/data_boundary_check.py
 

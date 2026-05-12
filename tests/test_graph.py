@@ -35,6 +35,8 @@ def test_graph_l2_delivered():
     assert result["task_level"] == "L2"
     assert result["status"] == "DELIVERED"
     assert "validation_result" in result
+    assert result["validation_result"]["deliverable"] is True
+    assert result["validation_result"]["plan"]
 
 
 def test_graph_l3_needs_confirmation():

@@ -56,7 +56,8 @@ tests/test_runner_policy.py 覆盖允许路径、禁止路径、路径穿越和 
 H2 分支创建策略已接入：执行型任务生成 codex/ 前缀分支计划；
 L4 任务不生成执行分支；
 H3 allowed scope 阻断已接入策略运行时和工部节点；
-后续 H4 将基于该策略执行验证。
+H4 刑部验证计划和失败阻断已接入；
+后续 H5 将基于验证结果生成 patch artifact。
 ```
 
 ## 6. 分支创建策略
@@ -77,4 +78,13 @@ Runner 在执行前必须提供拟修改文件列表；
 任何 forbidden_change_roots 命中都会拒绝执行；
 任何未知路径都会拒绝执行；
 工部节点必须调用 require_change_scope_allowed 后才能返回 implementation_result。
+```
+
+## 8. 刑部验证
+
+```text
+刑部节点必须根据 required_gates 生成验证计划；
+每个 gate 必须映射到明确命令或人工验证要求；
+任何验证命令失败时 deliverable 必须为 false；
+验证失败必须抛出错误或保持 VALIDATION_FAILED，不能进入 DELIVERED。
 ```
