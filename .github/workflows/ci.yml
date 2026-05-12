@@ -73,7 +73,7 @@ jobs:
         run: uv run pytest -q
 
       - name: Agent runner boundary smoke
-        run: uv run pytest tests/test_runner_policy.py -q
+        run: uv run pytest tests/test_runner_policy.py tests/test_gongbu_runner_scope.py -q
 
       - name: Data boundary check
         run: uv run python scripts/data_boundary_check.py

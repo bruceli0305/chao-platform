@@ -24,6 +24,13 @@ class RunnerBranchPlan(TypedDict):
     reason: str
 
 
+class RunnerScopeDecision(TypedDict):
+    allowed: bool
+    checked_paths: list[str]
+    errors: list[str]
+    policy: RunnerBoundaryPolicy
+
+
 DEFAULT_ALLOWED_CHANGE_ROOTS = [
     ".ai-agents/records/",
     ".ai-agents/templates/",
@@ -130,6 +137,31 @@ def check_change_paths(
             errors.append(f"路径不在 Agent Runner 允许修改范围内：{path}")
 
     return errors
+
+
+def evaluate_change_scope(
+    paths: list[str],
+    policy: RunnerBoundaryPolicy | None = None,
+) -> RunnerScopeDecision:
+    policy = policy or build_runner_boundary_policy("L2")
+    return {
+        "allowed": not check_change_paths(paths, policy),
+        "checked_paths": paths,
+        "errors": check_change_paths(paths, policy),
+        "policy": policy,
+    }
+
+
+def require_change_scope_allowed(
+    paths: list[str],
+    policy: RunnerBoundaryPolicy | None = None,
+) -> RunnerScopeDecision:
+    decision = evaluate_change_scope(paths, policy)
+
+    if not decision["allowed"]:
+        raise PermissionError("; ".join(decision["errors"]))
+
+    return decision
 
 
 def normalize_branch_slug(value: str, fallback: str = "task") -> str:

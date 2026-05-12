@@ -5,9 +5,11 @@ from app.chao.runner_policy import (
     build_runner_branch_name,
     build_runner_branch_plan,
     check_change_paths,
+    evaluate_change_scope,
     is_change_path_allowed,
     is_valid_runner_branch_name,
     normalize_repo_path,
+    require_change_scope_allowed,
 )
 
 
@@ -33,6 +35,39 @@ def test_runner_policy_blocks_unknown_paths():
         "路径不在 Agent Runner 允许修改范围内：pyproject.toml",
         "路径不在 Agent Runner 允许修改范围内：README.md",
     ]
+
+
+def test_evaluate_change_scope_allows_only_allowed_paths():
+    decision = evaluate_change_scope(
+        [
+            "app/chao/runner_policy.py",
+            "tests/test_runner_policy.py",
+        ]
+    )
+
+    assert decision["allowed"] is True
+    assert decision["errors"] == []
+
+
+def test_evaluate_change_scope_denies_out_of_scope_paths():
+    decision = evaluate_change_scope(
+        [
+            "app/chao/runner_policy.py",
+            "README.md",
+            "data/postgres/pgdata",
+        ]
+    )
+
+    assert decision["allowed"] is False
+    assert decision["errors"] == [
+        "路径不在 Agent Runner 允许修改范围内：README.md",
+        "路径不在 Agent Runner 允许修改范围内：data/postgres/pgdata",
+    ]
+
+
+def test_require_change_scope_allowed_raises_for_out_of_scope_paths():
+    with pytest.raises(PermissionError, match="README.md"):
+        require_change_scope_allowed(["README.md"])
 
 
 def test_runner_policy_rejects_path_traversal():

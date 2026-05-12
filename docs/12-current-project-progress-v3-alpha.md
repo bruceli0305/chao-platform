@@ -134,6 +134,7 @@ L4 创建后生成 .ai-agents/records/milestones/TASK-xxxx-milestones.md；
 L4 里程碑规划登记为 artifacts 和 D1 data_asset，且不进入工部执行；
 Agent Runner / Sandbox 边界已定义，最小策略运行时可校验 allowed scope / forbidden scope；
 Agent Runner 分支创建策略已定义，执行型任务生成 codex/ 前缀 branch plan；
+Agent Runner allowed scope 阻断已定义，工部节点执行前会校验 changed_files；
 任务详情 show 已包含 events / tool_calls / artifacts / data_assets。
 ```
 
@@ -229,7 +230,7 @@ tool permission policy 的真实拦截；
 Skills 路由和执行机制；
 pgvector ingest 白名单、chunk、脱敏和检索；
 GitHub Issue / PR / Commit / CI 结果与 task 绑定；
-Agent Runner / Sandbox 的 scope 阻断、patch artifact 和失败回流；
+Agent Runner / Sandbox 的验证执行、patch artifact 和失败回流；
 状态机持久化 checkpoint；
 L3 / L4 治理 artifact 的人工审核命令与状态推进；
 Web Console。
