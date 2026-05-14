@@ -12,6 +12,7 @@ from app.chao.services.artifacts import record_artifact
 from app.chao.services.console import (
     get_console_approval_queue,
     get_console_audit,
+    get_console_gates,
     get_console_overview,
 )
 from app.chao.services.data_assets import record_data_asset
@@ -375,6 +376,53 @@ def console_audit_command(
             _display_value(link.get("status")),
         )
     console.print(github_links)
+
+
+@app.command("console-gates")
+def console_gates_command(
+    limit: int = typer.Option(20, "--limit", help="Gate record limit"),
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    gates = get_console_gates(limit=limit)
+
+    if as_json:
+        print_json(data=gates)
+        return
+
+    status_table = Table(title="Gate Status")
+    status_table.add_column("Status")
+    status_table.add_column("Count")
+    for status, count in gates["gate_status_counts"].items():
+        status_table.add_row(status, str(count))
+    console.print(status_table)
+
+    permission_table = Table(title="Tool Permission Audit")
+    permission_table.add_column("Metric")
+    permission_table.add_column("Count")
+    for metric, count in gates["tool_permission_audit"].items():
+        permission_table.add_row(metric, str(count))
+    console.print(permission_table)
+
+    boundary_table = Table(title="Data Boundary Audit")
+    boundary_table.add_column("Metric")
+    boundary_table.add_column("Count")
+    for metric, count in gates["data_boundary_audit"].items():
+        boundary_table.add_row(metric, str(count))
+    console.print(boundary_table)
+
+    recent = Table(title="Recent Gate Results")
+    recent.add_column("Task")
+    recent.add_column("Gate")
+    recent.add_column("Status")
+    recent.add_column("Command")
+    for gate in gates["recent_gate_results"]:
+        recent.add_row(
+            _display_value(gate.get("task_code")),
+            _display_value(gate.get("gate_name")),
+            _display_value(gate.get("status")),
+            _display_value(gate.get("command")),
+        )
+    console.print(recent)
 
 
 @app.command()

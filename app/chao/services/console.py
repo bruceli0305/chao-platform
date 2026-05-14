@@ -302,3 +302,118 @@ def get_console_audit(limit: int = 20) -> dict[str, list[dict[str, Any]]]:
             for row in github_link_rows
         ],
     }
+
+
+def get_console_gates(limit: int = 20) -> dict[str, Any]:
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                select status, count(*)
+                from gate_results
+                group by status
+                order by status asc
+                """
+            )
+            gate_status_rows = cur.fetchall()
+
+            cur.execute(
+                """
+                select
+                    t.task_code,
+                    g.gate_name,
+                    g.status,
+                    g.command,
+                    g.created_at::text
+                from gate_results g
+                join tasks t on t.id = g.task_id
+                order by g.created_at desc
+                limit %s
+                """,
+                (limit,),
+            )
+            recent_gate_rows = cur.fetchall()
+
+            cur.execute(
+                """
+                select count(*)
+                from tool_calls
+                where permission_policy is null or permission_policy = ''
+                """
+            )
+            missing_tool_policy_count = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                select count(*)
+                from tool_calls
+                where permission_decision = '{}'::jsonb
+                """
+            )
+            empty_tool_decision_count = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                select count(*)
+                from tool_calls
+                where result_status <> 'success'
+                """
+            )
+            failed_tool_call_count = cur.fetchone()[0]
+
+            cur.execute("select count(*) from storage_policies")
+            storage_policy_count = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                select count(*)
+                from data_assets
+                where classification is null
+                   or classification not in ('D0', 'D1', 'D2', 'D3')
+                """
+            )
+            invalid_data_asset_classification_count = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                select count(*)
+                from context_chunks
+                where data_classification is null
+                   or data_classification not in ('D0', 'D1', 'D2', 'D3')
+                """
+            )
+            invalid_context_classification_count = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                select count(*)
+                from context_chunks
+                where ingest_allowed is true and redacted is false
+                """
+            )
+            unredacted_ingest_allowed_count = cur.fetchone()[0]
+
+    return {
+        "gate_status_counts": _rows_to_counts(gate_status_rows),
+        "recent_gate_results": [
+            {
+                "task_code": row[0],
+                "gate_name": row[1],
+                "status": row[2],
+                "command": row[3],
+                "created_at": row[4],
+            }
+            for row in recent_gate_rows
+        ],
+        "tool_permission_audit": {
+            "missing_policy_count": missing_tool_policy_count,
+            "empty_decision_count": empty_tool_decision_count,
+            "failed_tool_call_count": failed_tool_call_count,
+        },
+        "data_boundary_audit": {
+            "storage_policy_count": storage_policy_count,
+            "invalid_data_asset_classification_count": invalid_data_asset_classification_count,
+            "invalid_context_classification_count": invalid_context_classification_count,
+            "unredacted_ingest_allowed_count": unredacted_ingest_allowed_count,
+        },
+    }

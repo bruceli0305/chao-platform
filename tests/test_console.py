@@ -239,6 +239,70 @@ def test_get_console_audit_returns_recent_records(monkeypatch):
     assert queries[-1][1] == (3,)
 
 
+def test_get_console_gates_returns_audit_summary(monkeypatch):
+    queries = []
+    rows = [
+        [("pass", 2), ("fail", 1)],
+        [("TASK-1", "pytest", "pass", "uv run pytest -q", "2026-05-14 00:00:00")],
+        [(0,)],
+        [(0,)],
+        [(1,)],
+        [(3,)],
+        [(0,)],
+        [(0,)],
+        [(0,)],
+    ]
+
+    class FakeCursor:
+        def __init__(self):
+            self.index = -1
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def execute(self, query, params=None):
+            queries.append((query, params))
+            self.index += 1
+
+        def fetchall(self):
+            return rows[self.index]
+
+        def fetchone(self):
+            return rows[self.index][0]
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def cursor(self):
+            return FakeCursor()
+
+    monkeypatch.setattr(console.psycopg, "connect", lambda _url: FakeConnection())
+
+    gates = console.get_console_gates(limit=7)
+
+    assert gates["gate_status_counts"] == {"pass": 2, "fail": 1}
+    assert gates["recent_gate_results"][0]["gate_name"] == "pytest"
+    assert gates["tool_permission_audit"] == {
+        "missing_policy_count": 0,
+        "empty_decision_count": 0,
+        "failed_tool_call_count": 1,
+    }
+    assert gates["data_boundary_audit"] == {
+        "storage_policy_count": 3,
+        "invalid_data_asset_classification_count": 0,
+        "invalid_context_classification_count": 0,
+        "unredacted_ingest_allowed_count": 0,
+    }
+    assert queries[1][1] == (7,)
+
+
 def test_console_task_renders_task_detail(monkeypatch):
     task = {
         "task_code": "TASK-TEST",
@@ -380,3 +444,38 @@ def test_console_audit_renders_recent_records(monkeypatch):
     assert "cli.new" in result.output
     assert "runner_patch" in result.output
     assert "pull_request" in result.output
+
+
+def test_console_gates_renders_gate_summary(monkeypatch):
+    gates = {
+        "gate_status_counts": {"pass": 2},
+        "recent_gate_results": [
+            {
+                "task_code": "TASK-1",
+                "gate_name": "pytest",
+                "status": "pass",
+                "command": "uv run pytest -q",
+            }
+        ],
+        "tool_permission_audit": {
+            "missing_policy_count": 0,
+            "empty_decision_count": 0,
+            "failed_tool_call_count": 1,
+        },
+        "data_boundary_audit": {
+            "storage_policy_count": 3,
+            "invalid_data_asset_classification_count": 0,
+            "invalid_context_classification_count": 0,
+            "unredacted_ingest_allowed_count": 0,
+        },
+    }
+
+    monkeypatch.setattr(cli, "get_console_gates", lambda limit=20: gates)
+
+    result = CliRunner().invoke(cli.app, ["console-gates"])
+
+    assert result.exit_code == 0
+    assert "Gate Status" in result.output
+    assert "Tool Permission Audit" in result.output
+    assert "Data Boundary Audit" in result.output
+    assert "pytest" in result.output
