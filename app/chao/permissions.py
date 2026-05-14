@@ -43,6 +43,20 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         "description": "将 GitHub issue / PR / commit / CI run 绑定到任务。",
         "permission_policy": "local-cli-github-link-bind",
     },
+    "cli.runner_patch": {
+        "name": "cli.runner_patch",
+        "category": "filesystem.write",
+        "risk": "medium",
+        "description": "Controlled Agent Runner text patch.",
+        "permission_policy": "controlled-runner-text-patch",
+    },
+    "cli.runner_validate": {
+        "name": "cli.runner_validate",
+        "category": "shell.safe",
+        "risk": "medium",
+        "description": "Execute allowlisted Agent Runner validation gates.",
+        "permission_policy": "controlled-runner-validation",
+    },
     "schema_check": {
         "name": "schema_check",
         "category": "postgres.read",
@@ -62,7 +76,8 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
 ROLE_ALLOWED_TOOLS: dict[str, set[str]] = {
     "shangshu": {"cli.new", "cli.bind_github"},
     "emperor": {"cli.approve"},
-    "xingbu": {"schema_check", "data_boundary_check"},
+    "gongbu": {"cli.runner_patch"},
+    "xingbu": {"schema_check", "data_boundary_check", "cli.runner_validate"},
     "hubu": {"data_boundary_check"},
     "menxia": {"schema_check", "data_boundary_check"},
 }

@@ -22,5 +22,6 @@ class ChaoState(TypedDict, total=False):
     status: str
     route_result: dict[str, Any]
     historian_records: list[dict[str, Any]]
+    runner_patch_operations: list[dict[str, str]]
     implementation_result: dict[str, Any]
     validation_result: dict[str, Any]

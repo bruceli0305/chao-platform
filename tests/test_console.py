@@ -303,6 +303,100 @@ def test_get_console_gates_returns_audit_summary(monkeypatch):
     assert queries[1][1] == (7,)
 
 
+def test_get_console_risks_returns_risk_summary(monkeypatch):
+    queries = []
+    rows = [
+        [
+            (
+                "TASK-BLOCKED",
+                "Needs approval",
+                "L3",
+                "NEED_CONFIRMATION",
+                "shangshu",
+                "2026-05-14 00:00:00",
+            )
+        ],
+        [("TASK-FAIL", "pytest", "failed", "uv run pytest -q", "2026-05-14 00:00:01")],
+        [
+            (
+                "TASK-TOOL",
+                "shangshu",
+                "cli.new",
+                "",
+                "failed",
+                "high",
+                "2026-05-14 00:00:02",
+            )
+        ],
+        [(1,)],
+        [(2,)],
+        [(3,)],
+        [
+            (
+                "TASK-PR",
+                "ci_run",
+                "123",
+                "https://github.com/example/repo/actions/runs/123",
+                "failed",
+                "2026-05-14 00:00:03",
+            )
+        ],
+    ]
+
+    class FakeCursor:
+        def __init__(self):
+            self.index = -1
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def execute(self, query, params=None):
+            queries.append((query, params))
+            self.index += 1
+
+        def fetchall(self):
+            return rows[self.index]
+
+        def fetchone(self):
+            return rows[self.index][0]
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def cursor(self):
+            return FakeCursor()
+
+    monkeypatch.setattr(console.psycopg, "connect", lambda _url: FakeConnection())
+
+    risks = console.get_console_risks(limit=4)
+
+    assert risks["blocked_tasks"][0]["task_code"] == "TASK-BLOCKED"
+    assert risks["failed_gates"][0]["gate_name"] == "pytest"
+    assert risks["tool_risks"][0]["tool_name"] == "cli.new"
+    assert risks["data_boundary_risks"] == {
+        "invalid_data_asset_classification_count": 1,
+        "invalid_context_classification_count": 2,
+        "unredacted_ingest_allowed_count": 3,
+    }
+    assert risks["github_risks"][0]["status"] == "failed"
+    assert risks["summary"] == {
+        "blocked_task_count": 1,
+        "failed_gate_count": 1,
+        "tool_risk_count": 1,
+        "data_boundary_risk_count": 6,
+        "github_risk_count": 1,
+    }
+    assert queries[0][1] == (4,)
+    assert queries[-1][1] == (4,)
+
+
 def test_console_task_renders_task_detail(monkeypatch):
     task = {
         "task_code": "TASK-TEST",
@@ -479,3 +573,63 @@ def test_console_gates_renders_gate_summary(monkeypatch):
     assert "Tool Permission Audit" in result.output
     assert "Data Boundary Audit" in result.output
     assert "pytest" in result.output
+
+
+def test_console_risks_renders_risk_summary(monkeypatch):
+    risks = {
+        "blocked_tasks": [
+            {
+                "task_code": "TASK-BLOCKED",
+                "title": "Needs approval",
+                "task_level": "L3",
+                "status": "NEED_CONFIRMATION",
+            }
+        ],
+        "failed_gates": [
+            {
+                "task_code": "TASK-FAIL",
+                "gate_name": "pytest",
+                "status": "failed",
+                "command": "uv run pytest -q",
+            }
+        ],
+        "tool_risks": [
+            {
+                "task_code": "TASK-TOOL",
+                "agent_name": "shangshu",
+                "tool_name": "cli.new",
+                "result_status": "failed",
+            }
+        ],
+        "data_boundary_risks": {
+            "invalid_data_asset_classification_count": 0,
+            "invalid_context_classification_count": 0,
+            "unredacted_ingest_allowed_count": 0,
+        },
+        "github_risks": [
+            {
+                "task_code": "TASK-PR",
+                "link_type": "ci_run",
+                "external_id": "123",
+                "status": "failed",
+            }
+        ],
+        "summary": {
+            "blocked_task_count": 1,
+            "failed_gate_count": 1,
+            "tool_risk_count": 1,
+            "data_boundary_risk_count": 0,
+            "github_risk_count": 1,
+        },
+    }
+
+    monkeypatch.setattr(cli, "get_console_risks", lambda limit=20: risks)
+
+    result = CliRunner().invoke(cli.app, ["console-risks"])
+
+    assert result.exit_code == 0
+    assert "Risk Summary" in result.output
+    assert "Blocked Tasks" in result.output
+    assert "TASK-BLOCKED" in result.output
+    assert "pytest" in result.output
+    assert "ci_run" in result.output

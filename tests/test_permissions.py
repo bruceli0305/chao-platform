@@ -12,6 +12,8 @@ def test_tool_registry_contains_first_batch():
         "cli.new",
         "cli.approve",
         "cli.bind_github",
+        "cli.runner_patch",
+        "cli.runner_validate",
         "schema_check",
         "data_boundary_check",
     }
@@ -50,6 +52,34 @@ def test_shangshu_can_bind_github_link():
 
     assert decision["allowed"] is True
     assert decision["permission_policy"] == "local-cli-github-link-bind"
+
+
+def test_gongbu_can_run_controlled_runner_patch():
+    decision = evaluate_tool_permission(
+        agent_name="gongbu",
+        tool_name="cli.runner_patch",
+        task_level="L1",
+        required_confirmation="none",
+        current_status="DELIVERED",
+    )
+
+    assert decision["allowed"] is True
+    assert decision["permission_policy"] == "controlled-runner-text-patch"
+    assert decision["risk_flag"] is None
+
+
+def test_xingbu_can_run_controlled_runner_validation():
+    decision = evaluate_tool_permission(
+        agent_name="xingbu",
+        tool_name="cli.runner_validate",
+        task_level="L2",
+        required_confirmation="B",
+        current_status="DELIVERED",
+    )
+
+    assert decision["allowed"] is True
+    assert decision["permission_policy"] == "controlled-runner-validation"
+    assert decision["risk_flag"] is None
 
 
 def test_emperor_can_approve_l3_waiting_task():

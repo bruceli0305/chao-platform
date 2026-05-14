@@ -138,11 +138,15 @@ Agent Runner allowed scope 阻断已定义，工部节点执行前会校验 chan
 Agent Runner 刑部验证计划已定义，验证失败不能进入 DELIVERED；
 Agent Runner patch artifact 已定义，执行型任务会生成 runner_patch 交付证据；
 Agent Runner 失败回流已定义，验证失败会生成 runner_failure_feedback 反馈给工部；
+Agent Runner 受控文本 patch 执行器已定义，显式 runner_patch_operations 可在 allowed scope 内真实修改文件；
+Agent Runner runner-patch CLI 已定义，默认 dry-run，显式 --apply 才真实写文件，并写入 tool_calls 审计；
+Agent Runner runner-validate CLI 已定义，可执行 allowlist 验证 gate，并写入 task_events / tool_calls；
 Console 只读总览已定义，CLI 可输出任务、artifact、data_asset 和工具调用概览；
 Console 只读任务详情已定义，CLI 可输出单任务审计链摘要；
 Console 只读审批中心已定义，CLI 可输出 NEED_CONFIRMATION 任务队列；
 Console 只读审计视图已定义，CLI 可输出事件、工具调用、Artifacts、Data Assets 和 GitHub links；
 Console 只读 Gate 视图已定义，CLI 可输出 gate_results、工具权限和数据边界摘要；
+Console 只读风险视图已定义，CLI 可输出阻塞任务、失败 gate、工具风险、数据边界风险和 GitHub 风险；
 任务详情 show 已包含 events / tool_calls / artifacts / data_assets。
 ```
 

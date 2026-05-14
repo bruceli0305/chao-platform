@@ -3,6 +3,7 @@ import pytest
 from app.chao.runner_validation import (
     build_runner_validation_plan,
     build_runner_validation_result,
+    execute_runner_validation_commands,
     require_runner_validation_success,
 )
 
@@ -63,3 +64,38 @@ def test_runner_validation_result_blocks_failed_commands():
 
     with pytest.raises(PermissionError, match="lint"):
         require_runner_validation_success(result)
+
+
+def test_execute_runner_validation_commands_runs_allowlisted_gate():
+    calls = []
+
+    class Completed:
+        returncode = 0
+        stdout = "compile ok"
+        stderr = ""
+
+    def fake_runner(command, **kwargs):
+        calls.append((command, kwargs))
+        return Completed()
+
+    result = execute_runner_validation_commands(
+        ["compile"],
+        repo_root=".",
+        timeout_seconds=5,
+        command_runner=fake_runner,
+    )
+
+    assert result["deliverable"] is True
+    assert result["command_results"][0]["status"] == "passed"
+    assert result["command_results"][0]["output_summary"] == "compile ok"
+    assert calls[0][0] == ["uv", "run", "python", "-m", "compileall", "app", "tests", "main.py"]
+    assert calls[0][1]["timeout"] == 5
+
+
+def test_execute_runner_validation_commands_blocks_manual_gate():
+    result = execute_runner_validation_commands(["manual_validation"])
+
+    assert result["deliverable"] is False
+    assert result["command_results"][0]["status"] == "failed"
+    assert result["command_results"][0]["exit_code"] == 1
+    assert "manual" in result["command_results"][0]["output_summary"]

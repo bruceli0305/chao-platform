@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Annotated
 
 import typer
 from rich import print, print_json
@@ -8,12 +9,15 @@ from rich.table import Table
 
 from app.chao.graph.main_graph import build_graph
 from app.chao.permissions import require_tool_permission
+from app.chao.runner_executor import apply_text_patch_operations
+from app.chao.runner_validation import execute_runner_validation_commands
 from app.chao.services.artifacts import record_artifact
 from app.chao.services.console import (
     get_console_approval_queue,
     get_console_audit,
     get_console_gates,
     get_console_overview,
+    get_console_risks,
 )
 from app.chao.services.data_assets import record_data_asset
 from app.chao.services.events import record_task_event
@@ -423,6 +427,232 @@ def console_gates_command(
             _display_value(gate.get("command")),
         )
     console.print(recent)
+
+
+@app.command("console-risks")
+def console_risks_command(
+    limit: int = typer.Option(20, "--limit", help="Risk record limit"),
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    risks = get_console_risks(limit=limit)
+
+    if as_json:
+        print_json(data=risks)
+        return
+
+    summary = Table(title="Risk Summary")
+    summary.add_column("Metric")
+    summary.add_column("Count")
+    for metric, count in risks["summary"].items():
+        summary.add_row(metric, str(count))
+    console.print(summary)
+
+    blocked = Table(title="Blocked Tasks")
+    blocked.add_column("Task")
+    blocked.add_column("Title")
+    blocked.add_column("Level")
+    blocked.add_column("Status")
+    for task in risks["blocked_tasks"]:
+        blocked.add_row(
+            _display_value(task.get("task_code")),
+            _display_value(task.get("title")),
+            _display_value(task.get("task_level")),
+            _display_value(task.get("status")),
+        )
+    console.print(blocked)
+
+    gates = Table(title="Failed Gates")
+    gates.add_column("Task")
+    gates.add_column("Gate")
+    gates.add_column("Status")
+    gates.add_column("Command")
+    for gate in risks["failed_gates"]:
+        gates.add_row(
+            _display_value(gate.get("task_code")),
+            _display_value(gate.get("gate_name")),
+            _display_value(gate.get("status")),
+            _display_value(gate.get("command")),
+        )
+    console.print(gates)
+
+    tools = Table(title="Tool Risks")
+    tools.add_column("Task")
+    tools.add_column("Agent")
+    tools.add_column("Tool")
+    tools.add_column("Result")
+    for tool_risk in risks["tool_risks"]:
+        tools.add_row(
+            _display_value(tool_risk.get("task_code")),
+            _display_value(tool_risk.get("agent_name")),
+            _display_value(tool_risk.get("tool_name")),
+            _display_value(tool_risk.get("result_status")),
+        )
+    console.print(tools)
+
+    boundary = Table(title="Data Boundary Risks")
+    boundary.add_column("Metric")
+    boundary.add_column("Count")
+    for metric, count in risks["data_boundary_risks"].items():
+        boundary.add_row(metric, str(count))
+    console.print(boundary)
+
+    github = Table(title="GitHub Risks")
+    github.add_column("Task")
+    github.add_column("Type")
+    github.add_column("External ID")
+    github.add_column("Status")
+    for link in risks["github_risks"]:
+        github.add_row(
+            _display_value(link.get("task_code")),
+            _display_value(link.get("link_type")),
+            _display_value(link.get("external_id")),
+            _display_value(link.get("status")),
+        )
+    console.print(github)
+
+
+@app.command("runner-patch")
+def runner_patch_command(
+    task_code: str,
+    path: str,
+    old_text: str = typer.Option(..., "--old-text", help="Text that must match once"),
+    new_text: str = typer.Option(..., "--new-text", help="Replacement text"),
+    apply: bool = typer.Option(False, "--apply", help="Write the patch to disk"),
+    by: str = typer.Option("gongbu", "--by", help="Runner agent name"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    if task["task_level"] == "L4":
+        print("[red]L4 tasks cannot execute runner patches.[/red]")
+        raise typer.Exit(code=1)
+
+    try:
+        permission_decision = require_tool_permission(
+            agent_name=by,
+            tool_name="cli.runner_patch",
+            task_level=task["task_level"],
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
+            current_status=task["status"],
+        )
+        execution_result = apply_text_patch_operations(
+            [
+                {
+                    "path": path,
+                    "old_text": old_text,
+                    "new_text": new_text,
+                }
+            ],
+            dry_run=not apply,
+        )
+    except (PermissionError, ValueError, FileNotFoundError) as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    event_type = "runner_patch_applied" if apply else "runner_patch_dry_run"
+    record_task_event(
+        task_id=task["id"],
+        event_type=event_type,
+        from_status=task["status"],
+        to_status=task["status"],
+        summary=f"Runner patch {'applied' if apply else 'validated'} for {path}",
+        created_by=by,
+    )
+    record_tool_call(
+        task_id=task["id"],
+        agent_name=by,
+        tool_name="cli.runner_patch",
+        arguments_summary=f"task_code={task_code}; path={path}; apply={apply}",
+        permission_policy=permission_decision["permission_policy"],
+        result_status="success",
+        permission_decision=permission_decision,
+        output_summary=(
+            f"changed_files={execution_result['changed_files']}; "
+            f"applied={execution_result['applied']}"
+        ),
+        risk_flag=permission_decision["risk_flag"],
+    )
+
+    print_json(
+        data={
+            "task_code": task_code,
+            "event_type": event_type,
+            "execution_result": execution_result,
+        }
+    )
+
+
+@app.command("runner-validate")
+def runner_validate_command(
+    task_code: str,
+    gate: Annotated[
+        list[str],
+        typer.Option("--gate", help="Validation gate to execute"),
+    ],
+    timeout_seconds: int = typer.Option(120, "--timeout", help="Per-command timeout seconds"),
+    by: str = typer.Option("xingbu", "--by", help="Validation agent name"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    try:
+        permission_decision = require_tool_permission(
+            agent_name=by,
+            tool_name="cli.runner_validate",
+            task_level=task["task_level"],
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
+            current_status=task["status"],
+        )
+        validation_result = execute_runner_validation_commands(
+            gate,
+            timeout_seconds=timeout_seconds,
+        )
+    except (PermissionError, ValueError) as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    result_status = "success" if validation_result["deliverable"] else "failed"
+    event_type = (
+        "runner_validation_passed"
+        if validation_result["deliverable"]
+        else "runner_validation_failed"
+    )
+    record_task_event(
+        task_id=task["id"],
+        event_type=event_type,
+        from_status=task["status"],
+        to_status=task["status"],
+        summary=f"Runner validation {result_status}: {', '.join(gate)}",
+        created_by=by,
+    )
+    record_tool_call(
+        task_id=task["id"],
+        agent_name=by,
+        tool_name="cli.runner_validate",
+        arguments_summary=f"task_code={task_code}; gates={gate}",
+        permission_policy=permission_decision["permission_policy"],
+        result_status=result_status,
+        permission_decision=permission_decision,
+        output_summary=f"deliverable={validation_result['deliverable']}",
+        risk_flag=permission_decision["risk_flag"],
+    )
+
+    print_json(data={"task_code": task_code, "validation_result": validation_result})
+
+    if not validation_result["deliverable"]:
+        raise typer.Exit(code=1)
 
 
 @app.command()

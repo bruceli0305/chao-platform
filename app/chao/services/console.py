@@ -417,3 +417,184 @@ def get_console_gates(limit: int = 20) -> dict[str, Any]:
             "unredacted_ingest_allowed_count": unredacted_ingest_allowed_count,
         },
     }
+
+
+def get_console_risks(limit: int = 20) -> dict[str, Any]:
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                select
+                    task_code,
+                    title,
+                    task_level,
+                    status,
+                    owner,
+                    created_at::text
+                from tasks
+                where status in (
+                    'NEED_CONFIRMATION',
+                    'VALIDATION_FAILED',
+                    'MILESTONE_PLANNING'
+                )
+                order by created_at desc
+                limit %s
+                """,
+                (limit,),
+            )
+            blocked_task_rows = cur.fetchall()
+
+            cur.execute(
+                """
+                select
+                    t.task_code,
+                    g.gate_name,
+                    g.status,
+                    g.command,
+                    g.created_at::text
+                from gate_results g
+                join tasks t on t.id = g.task_id
+                where lower(g.status) not in ('pass', 'passed', 'success', 'ok')
+                order by g.created_at desc
+                limit %s
+                """,
+                (limit,),
+            )
+            failed_gate_rows = cur.fetchall()
+
+            cur.execute(
+                """
+                select
+                    t.task_code,
+                    tc.agent_name,
+                    tc.tool_name,
+                    tc.permission_policy,
+                    tc.result_status,
+                    tc.risk_flag,
+                    tc.started_at::text
+                from tool_calls tc
+                join tasks t on t.id = tc.task_id
+                where tc.result_status <> 'success'
+                   or tc.permission_policy is null
+                   or tc.permission_policy = ''
+                   or tc.permission_decision = '{}'::jsonb
+                order by tc.started_at desc
+                limit %s
+                """,
+                (limit,),
+            )
+            tool_risk_rows = cur.fetchall()
+
+            cur.execute(
+                """
+                select count(*)
+                from data_assets
+                where classification is null
+                   or classification not in ('D0', 'D1', 'D2', 'D3')
+                """
+            )
+            invalid_data_asset_classification_count = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                select count(*)
+                from context_chunks
+                where data_classification is null
+                   or data_classification not in ('D0', 'D1', 'D2', 'D3')
+                """
+            )
+            invalid_context_classification_count = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                select count(*)
+                from context_chunks
+                where ingest_allowed is true and redacted is false
+                """
+            )
+            unredacted_ingest_allowed_count = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                select
+                    t.task_code,
+                    gl.link_type,
+                    gl.external_id,
+                    gl.url,
+                    gl.status,
+                    gl.created_at::text
+                from github_links gl
+                join tasks t on t.id = gl.task_id
+                where lower(coalesce(gl.status, '')) in (
+                    'failure',
+                    'failed',
+                    'error',
+                    'cancelled'
+                )
+                order by gl.created_at desc
+                limit %s
+                """,
+                (limit,),
+            )
+            github_risk_rows = cur.fetchall()
+
+    data_boundary_risks = {
+        "invalid_data_asset_classification_count": invalid_data_asset_classification_count,
+        "invalid_context_classification_count": invalid_context_classification_count,
+        "unredacted_ingest_allowed_count": unredacted_ingest_allowed_count,
+    }
+
+    return {
+        "blocked_tasks": [
+            {
+                "task_code": row[0],
+                "title": row[1],
+                "task_level": row[2],
+                "status": row[3],
+                "owner": row[4],
+                "created_at": row[5],
+            }
+            for row in blocked_task_rows
+        ],
+        "failed_gates": [
+            {
+                "task_code": row[0],
+                "gate_name": row[1],
+                "status": row[2],
+                "command": row[3],
+                "created_at": row[4],
+            }
+            for row in failed_gate_rows
+        ],
+        "tool_risks": [
+            {
+                "task_code": row[0],
+                "agent_name": row[1],
+                "tool_name": row[2],
+                "permission_policy": row[3],
+                "result_status": row[4],
+                "risk_flag": row[5],
+                "started_at": row[6],
+            }
+            for row in tool_risk_rows
+        ],
+        "data_boundary_risks": data_boundary_risks,
+        "github_risks": [
+            {
+                "task_code": row[0],
+                "link_type": row[1],
+                "external_id": row[2],
+                "url": row[3],
+                "status": row[4],
+                "created_at": row[5],
+            }
+            for row in github_risk_rows
+        ],
+        "summary": {
+            "blocked_task_count": len(blocked_task_rows),
+            "failed_gate_count": len(failed_gate_rows),
+            "tool_risk_count": len(tool_risk_rows),
+            "data_boundary_risk_count": sum(data_boundary_risks.values()),
+            "github_risk_count": len(github_risk_rows),
+        },
+    }
