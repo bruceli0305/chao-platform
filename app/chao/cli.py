@@ -21,6 +21,13 @@ app = typer.Typer()
 console = Console()
 
 
+def _display_value(value: object) -> str:
+    if value is None:
+        return ""
+
+    return str(value)
+
+
 @app.command()
 def new(title: str, request: str):
     task_id = str(uuid.uuid4())
@@ -148,6 +155,106 @@ def console_command(
             task["owner"],
         )
     console.print(recent)
+
+
+@app.command("console-task")
+def console_task_command(
+    task_code: str,
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    if as_json:
+        print_json(data=task)
+        return
+
+    summary = Table(title="Task Detail")
+    summary.add_column("Field")
+    summary.add_column("Value")
+    for field in (
+        "task_code",
+        "title",
+        "task_level",
+        "status",
+        "owner",
+        "created_at",
+        "updated_at",
+    ):
+        summary.add_row(field, _display_value(task.get(field)))
+    console.print(summary)
+
+    counts = Table(title="Audit Counts")
+    counts.add_column("Record")
+    counts.add_column("Count")
+    for name in (
+        "events",
+        "tool_calls",
+        "artifacts",
+        "data_assets",
+        "github_links",
+        "historian_records",
+        "gate_results",
+    ):
+        counts.add_row(name, str(len(task.get(name, []))))
+    console.print(counts)
+
+    artifacts = Table(title="Artifacts")
+    artifacts.add_column("Type")
+    artifacts.add_column("URI")
+    artifacts.add_column("Access")
+    for artifact in task.get("artifacts", []):
+        artifacts.add_row(
+            _display_value(artifact.get("artifact_type")),
+            _display_value(artifact.get("artifact_uri")),
+            _display_value(artifact.get("access_level")),
+        )
+    console.print(artifacts)
+
+    data_assets = Table(title="Data Assets")
+    data_assets.add_column("Type")
+    data_assets.add_column("Class")
+    data_assets.add_column("Owner")
+    data_assets.add_column("Storage")
+    for asset in task.get("data_assets", []):
+        data_assets.add_row(
+            _display_value(asset.get("asset_type")),
+            _display_value(asset.get("classification")),
+            _display_value(asset.get("owner")),
+            _display_value(asset.get("primary_storage")),
+        )
+    console.print(data_assets)
+
+    events = Table(title="Events")
+    events.add_column("Type")
+    events.add_column("From")
+    events.add_column("To")
+    events.add_column("By")
+    for event in task.get("events", []):
+        events.add_row(
+            _display_value(event.get("event_type")),
+            _display_value(event.get("from_status")),
+            _display_value(event.get("to_status")),
+            _display_value(event.get("created_by")),
+        )
+    console.print(events)
+
+    tool_calls = Table(title="Tool Calls")
+    tool_calls.add_column("Agent")
+    tool_calls.add_column("Tool")
+    tool_calls.add_column("Policy")
+    tool_calls.add_column("Result")
+    for tool_call in task.get("tool_calls", []):
+        tool_calls.add_row(
+            _display_value(tool_call.get("agent_name")),
+            _display_value(tool_call.get("tool_name")),
+            _display_value(tool_call.get("permission_policy")),
+            _display_value(tool_call.get("result_status")),
+        )
+    console.print(tool_calls)
 
 
 @app.command()

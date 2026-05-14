@@ -312,7 +312,8 @@ CI / PR 绑定；
 ```text
 I1 只读 Console 总览已接入：app/chao/services/console.py 与 CLI console 命令。
 I1 输出任务状态统计、等级统计、最近任务、artifact/data_asset 数量和失败工具调用数量。
-I2 / I3 / Web UI 尚未实现。
+I2 只读任务详情视图已接入：CLI console-task 命令输出单任务审计链摘要。
+I3 / Web UI 尚未实现。
 ```
 
 ## 11. 近期推荐任务队列

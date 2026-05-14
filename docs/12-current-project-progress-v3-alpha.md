@@ -139,6 +139,7 @@ Agent Runner 刑部验证计划已定义，验证失败不能进入 DELIVERED；
 Agent Runner patch artifact 已定义，执行型任务会生成 runner_patch 交付证据；
 Agent Runner 失败回流已定义，验证失败会生成 runner_failure_feedback 反馈给工部；
 Console 只读总览已定义，CLI 可输出任务、artifact、data_asset 和工具调用概览；
+Console 只读任务详情已定义，CLI 可输出单任务审计链摘要；
 任务详情 show 已包含 events / tool_calls / artifacts / data_assets。
 ```
 

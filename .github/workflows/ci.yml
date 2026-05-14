@@ -155,6 +155,11 @@ jobs:
       - name: Verify console overview
         run: uv run python main.py console --json
 
+      - name: Verify console task detail
+        run: |
+          TASK_CODE=$(psql "$DATABASE_URL" -At -c "select task_code from tasks order by created_at desc limit 1;")
+          uv run python main.py console-task "$TASK_CODE" --json
+
       - name: Verify historian records persisted
         run: |
           psql "$DATABASE_URL" -c "select record_type, content, created_by from historian_records order by created_at desc limit 10;"
