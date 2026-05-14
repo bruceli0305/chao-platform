@@ -138,6 +138,7 @@ Agent Runner allowed scope 阻断已定义，工部节点执行前会校验 chan
 Agent Runner 刑部验证计划已定义，验证失败不能进入 DELIVERED；
 Agent Runner patch artifact 已定义，执行型任务会生成 runner_patch 交付证据；
 Agent Runner 失败回流已定义，验证失败会生成 runner_failure_feedback 反馈给工部；
+Console 只读总览已定义，CLI 可输出任务、artifact、data_asset 和工具调用概览；
 任务详情 show 已包含 events / tool_calls / artifacts / data_assets。
 ```
 
@@ -236,7 +237,7 @@ GitHub Issue / PR / Commit / CI 结果与 task 绑定；
 Agent Runner / Sandbox 的真实验证执行；
 状态机持久化 checkpoint；
 L3 / L4 治理 artifact 的人工审核命令与状态推进；
-Web Console。
+Web Console 的页面化 UI。
 ```
 
 ## 5. 当前风险与注意事项

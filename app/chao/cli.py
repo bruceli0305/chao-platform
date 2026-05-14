@@ -9,6 +9,7 @@ from rich.table import Table
 from app.chao.graph.main_graph import build_graph
 from app.chao.permissions import require_tool_permission
 from app.chao.services.artifacts import record_artifact
+from app.chao.services.console import get_console_overview
 from app.chao.services.data_assets import record_data_asset
 from app.chao.services.events import record_task_event
 from app.chao.services.github_links import normalize_github_link_type, record_github_link
@@ -103,6 +104,50 @@ def show(task_code: str):
         raise typer.Exit(code=1)
 
     print_json(data=task)
+
+
+@app.command("console")
+def console_command(
+    limit: int = typer.Option(10, "--limit", help="最近任务数量"),
+    as_json: bool = typer.Option(False, "--json", help="输出 JSON"),
+):
+    overview = get_console_overview(limit=limit)
+
+    if as_json:
+        print_json(data=overview)
+        return
+
+    summary = Table(title="Chao Console Overview")
+    summary.add_column("Metric")
+    summary.add_column("Value")
+    summary.add_row("Artifacts", str(overview["artifact_count"]))
+    summary.add_row("Data Assets", str(overview["data_asset_count"]))
+    summary.add_row("Approved Confirmations", str(overview["approved_confirmations"]))
+    summary.add_row("Failed Tool Calls", str(overview["failed_tool_call_count"]))
+    console.print(summary)
+
+    status_table = Table(title="Task Status")
+    status_table.add_column("Status")
+    status_table.add_column("Count")
+    for status, count in overview["task_status_counts"].items():
+        status_table.add_row(status, str(count))
+    console.print(status_table)
+
+    recent = Table(title="Recent Tasks")
+    recent.add_column("Task Code")
+    recent.add_column("Title")
+    recent.add_column("Level")
+    recent.add_column("Status")
+    recent.add_column("Owner")
+    for task in overview["recent_tasks"]:
+        recent.add_row(
+            task["task_code"],
+            task["title"],
+            task["task_level"],
+            task["status"],
+            task["owner"],
+        )
+    console.print(recent)
 
 
 @app.command()

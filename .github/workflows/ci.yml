@@ -96,6 +96,9 @@ jobs:
       - name: Smoke test CLI status
         run: uv run python main.py status
 
+      - name: Smoke test console overview
+        run: uv run python main.py console --json
+
       - name: Smoke test L1 task
         run: |
           uv run python main.py new "CI-L1-修复文案" "把首页标题从系统管理改成项目管理"
@@ -148,6 +151,9 @@ jobs:
           TASK_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from tasks;" | tr -d ' ')
           echo "TASK_COUNT=$TASK_COUNT"
           test "$TASK_COUNT" -ge 3
+
+      - name: Verify console overview
+        run: uv run python main.py console --json
 
       - name: Verify historian records persisted
         run: |

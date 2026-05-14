@@ -307,6 +307,14 @@ CI / PR 绑定；
 
 暂缓到前面阶段稳定后再做。
 
+当前状态：
+
+```text
+I1 只读 Console 总览已接入：app/chao/services/console.py 与 CLI console 命令。
+I1 输出任务状态统计、等级统计、最近任务、artifact/data_asset 数量和失败工具调用数量。
+I2 / I3 / Web UI 尚未实现。
+```
+
 ## 11. 近期推荐任务队列
 
 按当前进度，建议接下来优先做：
