@@ -57,7 +57,8 @@ H2 分支创建策略已接入：执行型任务生成 codex/ 前缀分支计划
 L4 任务不生成执行分支；
 H3 allowed scope 阻断已接入策略运行时和工部节点；
 H4 刑部验证计划和失败阻断已接入；
-后续 H5 将基于验证结果生成 patch artifact。
+H5 patch artifact 已接入，记录分支计划、变更范围和验证证据；
+后续 H6 将基于验证结果处理失败回流。
 ```
 
 ## 6. 分支创建策略
@@ -87,4 +88,13 @@ Runner 在执行前必须提供拟修改文件列表；
 每个 gate 必须映射到明确命令或人工验证要求；
 任何验证命令失败时 deliverable 必须为 false；
 验证失败必须抛出错误或保持 VALIDATION_FAILED，不能进入 DELIVERED。
+```
+
+## 9. Patch Artifact
+
+```text
+执行型任务必须生成 runner_patch artifact；
+runner_patch artifact 必须记录分支计划、changed_files、工部结果和刑部验证结果；
+L4 任务不得生成 runner_patch artifact；
+当前 MVP 未生成真实 diff patch，后续真实 Runner 必须附加实际 patch 内容。
 ```

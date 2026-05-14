@@ -274,7 +274,8 @@ H1 最小策略运行时已接入 app/chao/runner_policy.py，覆盖 allowed sco
 H2 分支创建策略已接入 app/chao/runner_policy.py：执行型任务生成 codex/ 前缀 branch plan，L4 不生成执行分支。
 H3 allowed scope 阻断已接入 app/chao/runner_policy.py 与工部节点，越界路径会被拒绝。
 H4 刑部验证计划和失败阻断已接入 app/chao/runner_validation.py 与刑部节点。
-H5 / H6 尚未实现。
+H5 runner_patch artifact 已接入，记录分支计划、变更范围和验证证据。
+H6 尚未实现。
 ```
 
 验收：
