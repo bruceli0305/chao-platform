@@ -54,9 +54,7 @@ def test_save_patch_artifact_writes_expected_path(tmp_path, monkeypatch):
     )
 
     assert path == tmp_path / "TASK-TEST-PATCH-patch.md"
-    assert path.read_text(encoding="utf-8").startswith(
-        "# TASK-TEST-PATCH - Runner Patch Artifact"
-    )
+    assert path.read_text(encoding="utf-8").startswith("# TASK-TEST-PATCH - Runner Patch Artifact")
 
 
 def test_build_failure_feedback_artifact_markdown_contains_failed_gates():
