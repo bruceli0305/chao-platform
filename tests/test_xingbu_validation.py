@@ -1,5 +1,3 @@
-import pytest
-
 from app.chao.nodes import xingbu
 
 
@@ -21,7 +19,7 @@ def test_xingbu_records_runner_validation_result():
     assert result["validation_result"]["plan"][0]["gate"] == "manual_validation"
 
 
-def test_xingbu_blocks_failed_runner_validation(monkeypatch):
+def test_xingbu_marks_failed_runner_validation_for_feedback(monkeypatch):
     failed_result = {
         "quality": "验证失败",
         "checks": ["lint"],
@@ -45,15 +43,18 @@ def test_xingbu_blocks_failed_runner_validation(monkeypatch):
         lambda _gates: failed_result,
     )
 
-    with pytest.raises(PermissionError, match="lint"):
-        xingbu.xingbu_validate(
-            {
-                "task_id": "task-1",
-                "task_code": "TASK-TEST",
-                "title": "修复文案",
-                "raw_request": "把首页标题从系统管理改成项目管理",
-                "task_level": "L1",
-                "required_gates": ["lint"],
-                "status": "IMPLEMENTING",
-            }
-        )
+    result = xingbu.xingbu_validate(
+        {
+            "task_id": "task-1",
+            "task_code": "TASK-TEST",
+            "title": "修复文案",
+            "raw_request": "把首页标题从系统管理改成项目管理",
+            "task_level": "L1",
+            "required_gates": ["lint"],
+            "status": "IMPLEMENTING",
+        }
+    )
+
+    assert result["status"] == "VALIDATION_FAILED"
+    assert result["validation_result"]["deliverable"] is False
+    assert result["validation_result"]["command_results"][0]["gate"] == "lint"

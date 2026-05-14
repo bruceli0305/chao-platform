@@ -137,6 +137,7 @@ Agent Runner 分支创建策略已定义，执行型任务生成 codex/ 前缀 b
 Agent Runner allowed scope 阻断已定义，工部节点执行前会校验 changed_files；
 Agent Runner 刑部验证计划已定义，验证失败不能进入 DELIVERED；
 Agent Runner patch artifact 已定义，执行型任务会生成 runner_patch 交付证据；
+Agent Runner 失败回流已定义，验证失败会生成 runner_failure_feedback 反馈给工部；
 任务详情 show 已包含 events / tool_calls / artifacts / data_assets。
 ```
 
@@ -232,7 +233,7 @@ tool permission policy 的真实拦截；
 Skills 路由和执行机制；
 pgvector ingest 白名单、chunk、脱敏和检索；
 GitHub Issue / PR / Commit / CI 结果与 task 绑定；
-Agent Runner / Sandbox 的真实验证执行和失败回流；
+Agent Runner / Sandbox 的真实验证执行；
 状态机持久化 checkpoint；
 L3 / L4 治理 artifact 的人工审核命令与状态推进；
 Web Console。

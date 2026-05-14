@@ -6,7 +6,7 @@ from psycopg.types.json import Jsonb
 
 from app.chao.config import DATABASE_URL
 from app.chao.permissions import require_tool_permission
-from app.chao.runner_artifacts import save_patch_artifact
+from app.chao.runner_artifacts import save_failure_feedback_artifact, save_patch_artifact
 from app.chao.services.artifacts import list_artifacts, record_artifact
 from app.chao.services.bingbu_artifacts import save_bingbu_artifact
 from app.chao.services.data_assets import list_task_data_assets, record_data_asset
@@ -170,6 +170,36 @@ def save_task_result(result: dict[str, Any]) -> None:
             desensitized=True,
             retention_days=365,
             notes="Agent Runner patch 记录，只保存脱敏工程执行证据。",
+        )
+
+    validation_result = result.get("validation_result") or {}
+    if (
+        result.get("implementation_result")
+        and result.get("task_level") != "L4"
+        and validation_result.get("deliverable") is False
+    ):
+        feedback_path = save_failure_feedback_artifact(result)
+        record_artifact(
+            task_id=task_id,
+            artifact_type="runner_failure_feedback",
+            artifact_uri=str(feedback_path),
+            access_level="internal",
+            retention_days=365,
+            summary="Agent Runner failure feedback artifact",
+        )
+        record_data_asset(
+            asset_name=str(feedback_path),
+            asset_type="runner_failure_feedback",
+            classification="D1",
+            primary_storage="Git / Markdown",
+            owner="gongbu",
+            task_id=task_id,
+            allowed_copies=["PostgreSQL", "pgvector"],
+            forbidden_storages=["Secret Manager"],
+            allow_vectorization=True,
+            desensitized=True,
+            retention_days=365,
+            notes="Agent Runner 失败回流记录，只保存脱敏工程反馈证据。",
         )
 
     record_task_event(

@@ -232,6 +232,10 @@ jobs:
           echo "RUNNER_PATCH_RECORD_COUNT=$RUNNER_PATCH_RECORD_COUNT"
           test "$RUNNER_PATCH_RECORD_COUNT" -ge 2
 
+      - name: Verify runner failure records directory
+        run: |
+          test -d .ai-agents/records/failures || mkdir -p .ai-agents/records/failures
+
       - name: Verify artifacts persisted
         run: |
           psql "$DATABASE_URL" -c "select artifact_type, artifact_uri, artifact_hash, access_level, retention_days, summary from artifacts order by created_at desc limit 10;"
@@ -243,7 +247,9 @@ jobs:
           BINGBU_ARTIFACT_URIS=$(psql "$DATABASE_URL" -t -A -c "select artifact_uri from artifacts where artifact_type = 'l3_bingbu_review';")
           MILESTONE_ARTIFACT_URIS=$(psql "$DATABASE_URL" -t -A -c "select artifact_uri from artifacts where artifact_type = 'l4_milestone_plan';")
           RUNNER_PATCH_ARTIFACT_URIS=$(psql "$DATABASE_URL" -t -A -c "select artifact_uri from artifacts where artifact_type = 'runner_patch';")
+          FAILURE_FEEDBACK_COUNT=$(psql "$DATABASE_URL" -t -c "select count(*) from artifacts where artifact_type = 'runner_failure_feedback';" | tr -d ' ')
           echo "ARTIFACT_COUNT=$ARTIFACT_COUNT"
+          echo "FAILURE_FEEDBACK_COUNT=$FAILURE_FEEDBACK_COUNT"
           test "$ARTIFACT_COUNT" -ge 3
           test -n "$MARKDOWN_ARTIFACT_URIS"
           test -n "$DESIGN_ARTIFACT_URIS"

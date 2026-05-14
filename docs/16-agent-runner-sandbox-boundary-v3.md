@@ -58,7 +58,7 @@ L4 任务不生成执行分支；
 H3 allowed scope 阻断已接入策略运行时和工部节点；
 H4 刑部验证计划和失败阻断已接入；
 H5 patch artifact 已接入，记录分支计划、变更范围和验证证据；
-后续 H6 将基于验证结果处理失败回流。
+H6 失败回流已接入，验证失败会生成 runner_failure_feedback artifact。
 ```
 
 ## 6. 分支创建策略
@@ -97,4 +97,14 @@ Runner 在执行前必须提供拟修改文件列表；
 runner_patch artifact 必须记录分支计划、changed_files、工部结果和刑部验证结果；
 L4 任务不得生成 runner_patch artifact；
 当前 MVP 未生成真实 diff patch，后续真实 Runner 必须附加实际 patch 内容。
+```
+
+## 10. 失败回流
+
+```text
+验证失败时任务不得进入 DELIVERED；
+验证失败必须保留 validation_result；
+执行型任务验证失败时必须生成 runner_failure_feedback artifact；
+runner_failure_feedback 必须记录失败 gate、命令、输出摘要和工部修复建议；
+L4 任务仍只生成里程碑规划，不生成执行失败回流 artifact。
 ```
