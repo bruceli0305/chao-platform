@@ -142,6 +142,103 @@ def test_get_console_approval_queue_returns_pending_tasks(monkeypatch):
     assert queries[0][1] == (5,)
 
 
+def test_get_console_audit_returns_recent_records(monkeypatch):
+    queries = []
+    rows = [
+        [
+            (
+                "TASK-1",
+                "task_created",
+                "RAW",
+                "DELIVERED",
+                "created",
+                "shangshu",
+                "2026-05-14 00:00:00",
+            )
+        ],
+        [
+            (
+                "TASK-1",
+                "shangshu",
+                "cli.new",
+                "local-cli-task-create",
+                "success",
+                "low",
+                "2026-05-14 00:00:01",
+            )
+        ],
+        [
+            (
+                "TASK-1",
+                "runner_patch",
+                ".ai-agents/records/patches/TASK-1-patch.md",
+                "internal",
+                365,
+                "2026-05-14 00:00:02",
+            )
+        ],
+        [
+            (
+                "TASK-1",
+                ".ai-agents/records/patches/TASK-1-patch.md",
+                "runner_patch",
+                "D1",
+                "gongbu",
+                "2026-05-14 00:00:03",
+            )
+        ],
+        [
+            (
+                "TASK-1",
+                "pull_request",
+                "42",
+                "https://github.com/example/repo/pull/42",
+                "open",
+                "ci",
+                "2026-05-14 00:00:04",
+            )
+        ],
+    ]
+
+    class FakeCursor:
+        def __init__(self):
+            self.index = -1
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def execute(self, query, params=None):
+            queries.append((query, params))
+            self.index += 1
+
+        def fetchall(self):
+            return rows[self.index]
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def cursor(self):
+            return FakeCursor()
+
+    monkeypatch.setattr(console.psycopg, "connect", lambda _url: FakeConnection())
+
+    audit = console.get_console_audit(limit=3)
+
+    assert audit["events"][0]["event_type"] == "task_created"
+    assert audit["tool_calls"][0]["tool_name"] == "cli.new"
+    assert audit["artifacts"][0]["artifact_type"] == "runner_patch"
+    assert audit["data_assets"][0]["classification"] == "D1"
+    assert audit["github_links"][0]["external_id"] == "42"
+    assert queries[-1][1] == (3,)
+
+
 def test_console_task_renders_task_detail(monkeypatch):
     task = {
         "task_code": "TASK-TEST",
@@ -226,3 +323,60 @@ def test_console_approvals_renders_pending_tasks(monkeypatch):
     assert "Pending Approvals" in result.output
     assert "TASK-L3" in result.output
     assert "A" in result.output
+
+
+def test_console_audit_renders_recent_records(monkeypatch):
+    audit = {
+        "events": [
+            {
+                "task_code": "TASK-1",
+                "event_type": "task_created",
+                "from_status": "RAW",
+                "to_status": "DELIVERED",
+                "created_by": "shangshu",
+            }
+        ],
+        "tool_calls": [
+            {
+                "task_code": "TASK-1",
+                "agent_name": "shangshu",
+                "tool_name": "cli.new",
+                "permission_policy": "local-cli-task-create",
+                "result_status": "success",
+            }
+        ],
+        "artifacts": [
+            {
+                "task_code": "TASK-1",
+                "artifact_type": "runner_patch",
+                "artifact_uri": ".ai-agents/records/patches/TASK-1-patch.md",
+                "access_level": "internal",
+            }
+        ],
+        "data_assets": [
+            {
+                "task_code": "TASK-1",
+                "asset_type": "runner_patch",
+                "classification": "D1",
+                "owner": "gongbu",
+            }
+        ],
+        "github_links": [
+            {
+                "task_code": "TASK-1",
+                "link_type": "pull_request",
+                "external_id": "42",
+                "status": "open",
+            }
+        ],
+    }
+
+    monkeypatch.setattr(cli, "get_console_audit", lambda limit=20: audit)
+
+    result = CliRunner().invoke(cli.app, ["console-audit"])
+
+    assert result.exit_code == 0
+    assert "Recent Events" in result.output
+    assert "cli.new" in result.output
+    assert "runner_patch" in result.output
+    assert "pull_request" in result.output

@@ -9,7 +9,11 @@ from rich.table import Table
 from app.chao.graph.main_graph import build_graph
 from app.chao.permissions import require_tool_permission
 from app.chao.services.artifacts import record_artifact
-from app.chao.services.console import get_console_approval_queue, get_console_overview
+from app.chao.services.console import (
+    get_console_approval_queue,
+    get_console_audit,
+    get_console_overview,
+)
 from app.chao.services.data_assets import record_data_asset
 from app.chao.services.events import record_task_event
 from app.chao.services.github_links import normalize_github_link_type, record_github_link
@@ -285,6 +289,92 @@ def console_approvals_command(
             _display_value(task.get("created_at")),
         )
     console.print(table)
+
+
+@app.command("console-audit")
+def console_audit_command(
+    limit: int = typer.Option(20, "--limit", help="Audit record limit per section"),
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    audit = get_console_audit(limit=limit)
+
+    if as_json:
+        print_json(data=audit)
+        return
+
+    events = Table(title="Recent Events")
+    events.add_column("Task")
+    events.add_column("Type")
+    events.add_column("From")
+    events.add_column("To")
+    events.add_column("By")
+    for event in audit["events"]:
+        events.add_row(
+            _display_value(event.get("task_code")),
+            _display_value(event.get("event_type")),
+            _display_value(event.get("from_status")),
+            _display_value(event.get("to_status")),
+            _display_value(event.get("created_by")),
+        )
+    console.print(events)
+
+    tool_calls = Table(title="Recent Tool Calls")
+    tool_calls.add_column("Task")
+    tool_calls.add_column("Agent")
+    tool_calls.add_column("Tool")
+    tool_calls.add_column("Policy")
+    tool_calls.add_column("Result")
+    for tool_call in audit["tool_calls"]:
+        tool_calls.add_row(
+            _display_value(tool_call.get("task_code")),
+            _display_value(tool_call.get("agent_name")),
+            _display_value(tool_call.get("tool_name")),
+            _display_value(tool_call.get("permission_policy")),
+            _display_value(tool_call.get("result_status")),
+        )
+    console.print(tool_calls)
+
+    artifacts = Table(title="Recent Artifacts")
+    artifacts.add_column("Task")
+    artifacts.add_column("Type")
+    artifacts.add_column("URI")
+    artifacts.add_column("Access")
+    for artifact in audit["artifacts"]:
+        artifacts.add_row(
+            _display_value(artifact.get("task_code")),
+            _display_value(artifact.get("artifact_type")),
+            _display_value(artifact.get("artifact_uri")),
+            _display_value(artifact.get("access_level")),
+        )
+    console.print(artifacts)
+
+    data_assets = Table(title="Recent Data Assets")
+    data_assets.add_column("Task")
+    data_assets.add_column("Type")
+    data_assets.add_column("Class")
+    data_assets.add_column("Owner")
+    for asset in audit["data_assets"]:
+        data_assets.add_row(
+            _display_value(asset.get("task_code")),
+            _display_value(asset.get("asset_type")),
+            _display_value(asset.get("classification")),
+            _display_value(asset.get("owner")),
+        )
+    console.print(data_assets)
+
+    github_links = Table(title="Recent GitHub Links")
+    github_links.add_column("Task")
+    github_links.add_column("Type")
+    github_links.add_column("External ID")
+    github_links.add_column("Status")
+    for link in audit["github_links"]:
+        github_links.add_row(
+            _display_value(link.get("task_code")),
+            _display_value(link.get("link_type")),
+            _display_value(link.get("external_id")),
+            _display_value(link.get("status")),
+        )
+    console.print(github_links)
 
 
 @app.command()

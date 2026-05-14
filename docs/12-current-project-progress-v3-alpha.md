@@ -141,6 +141,7 @@ Agent Runner 失败回流已定义，验证失败会生成 runner_failure_feedba
 Console 只读总览已定义，CLI 可输出任务、artifact、data_asset 和工具调用概览；
 Console 只读任务详情已定义，CLI 可输出单任务审计链摘要；
 Console 只读审批中心已定义，CLI 可输出 NEED_CONFIRMATION 任务队列；
+Console 只读审计视图已定义，CLI 可输出事件、工具调用、Artifacts、Data Assets 和 GitHub links；
 任务详情 show 已包含 events / tool_calls / artifacts / data_assets。
 ```
 

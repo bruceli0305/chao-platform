@@ -314,6 +314,7 @@ I1 只读 Console 总览已接入：app/chao/services/console.py 与 CLI console
 I1 输出任务状态统计、等级统计、最近任务、artifact/data_asset 数量和失败工具调用数量。
 I2 只读任务详情视图已接入：CLI console-task 命令输出单任务审计链摘要。
 I3 只读审批中心已接入：CLI console-approvals 命令输出待确认任务队列。
+I4 只读审计视图已接入：CLI console-audit 命令输出事件、工具调用、Artifacts、Data Assets、GitHub links。
 Web UI 尚未实现。
 ```
 
