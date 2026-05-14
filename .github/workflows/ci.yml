@@ -122,6 +122,9 @@ jobs:
           test "$L4_STATUS" = "NEED_CONFIRMATION"
           test "$L4_LEVEL" = "L4"
 
+      - name: Smoke test console approvals
+        run: uv run python main.py console-approvals --json
+
       - name: Approve L3 task
         run: |
           L3_TASK_CODE=$(psql "$DATABASE_URL" -t -A -c "select task_code from tasks where title = 'CI-L3-数据库迁移' order by created_at desc limit 1;")

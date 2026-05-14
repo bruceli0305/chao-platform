@@ -79,6 +79,69 @@ def test_get_console_overview_returns_dashboard_shape(monkeypatch):
     assert queries[-1][1] == (1,)
 
 
+def test_get_console_approval_queue_returns_pending_tasks(monkeypatch):
+    queries = []
+    rows = [
+        [
+            (
+                "TASK-L3",
+                "Database migration",
+                "L3",
+                "NEED_CONFIRMATION",
+                "shangshu",
+                "2026-05-14 00:00:00",
+                {
+                    "required_confirmation": "A",
+                    "required_skills": ["database-migration"],
+                    "required_skill_paths": [".ai-agents/skills/database-migration/SKILL.md"],
+                },
+            )
+        ]
+    ]
+
+    class FakeCursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def execute(self, query, params=None):
+            queries.append((query, params))
+
+        def fetchall(self):
+            return rows[0]
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def cursor(self):
+            return FakeCursor()
+
+    monkeypatch.setattr(console.psycopg, "connect", lambda _url: FakeConnection())
+
+    approvals = console.get_console_approval_queue(limit=5)
+
+    assert approvals == [
+        {
+            "task_code": "TASK-L3",
+            "title": "Database migration",
+            "task_level": "L3",
+            "status": "NEED_CONFIRMATION",
+            "owner": "shangshu",
+            "created_at": "2026-05-14 00:00:00",
+            "required_confirmation": "A",
+            "required_skills": ["database-migration"],
+            "required_skill_paths": [".ai-agents/skills/database-migration/SKILL.md"],
+        }
+    ]
+    assert queries[0][1] == (5,)
+
+
 def test_console_task_renders_task_detail(monkeypatch):
     task = {
         "task_code": "TASK-TEST",
@@ -141,3 +204,25 @@ def test_console_task_rejects_missing_task(monkeypatch):
 
     assert result.exit_code == 1
     assert "Task not found" in result.output
+
+
+def test_console_approvals_renders_pending_tasks(monkeypatch):
+    approvals = [
+        {
+            "task_code": "TASK-L3",
+            "title": "Database migration",
+            "task_level": "L3",
+            "required_confirmation": "A",
+            "owner": "shangshu",
+            "created_at": "2026-05-14 00:00:00",
+        }
+    ]
+
+    monkeypatch.setattr(cli, "get_console_approval_queue", lambda limit=20: approvals)
+
+    result = CliRunner().invoke(cli.app, ["console-approvals"])
+
+    assert result.exit_code == 0
+    assert "Pending Approvals" in result.output
+    assert "TASK-L3" in result.output
+    assert "A" in result.output

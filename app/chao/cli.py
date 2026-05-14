@@ -9,7 +9,7 @@ from rich.table import Table
 from app.chao.graph.main_graph import build_graph
 from app.chao.permissions import require_tool_permission
 from app.chao.services.artifacts import record_artifact
-from app.chao.services.console import get_console_overview
+from app.chao.services.console import get_console_approval_queue, get_console_overview
 from app.chao.services.data_assets import record_data_asset
 from app.chao.services.events import record_task_event
 from app.chao.services.github_links import normalize_github_link_type, record_github_link
@@ -255,6 +255,36 @@ def console_task_command(
             _display_value(tool_call.get("result_status")),
         )
     console.print(tool_calls)
+
+
+@app.command("console-approvals")
+def console_approvals_command(
+    limit: int = typer.Option(20, "--limit", help="Approval task limit"),
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    approvals = get_console_approval_queue(limit=limit)
+
+    if as_json:
+        print_json(data={"count": len(approvals), "approvals": approvals})
+        return
+
+    table = Table(title="Pending Approvals")
+    table.add_column("Task Code")
+    table.add_column("Title")
+    table.add_column("Level")
+    table.add_column("Required")
+    table.add_column("Owner")
+    table.add_column("Created At")
+    for task in approvals:
+        table.add_row(
+            _display_value(task.get("task_code")),
+            _display_value(task.get("title")),
+            _display_value(task.get("task_level")),
+            _display_value(task.get("required_confirmation")),
+            _display_value(task.get("owner")),
+            _display_value(task.get("created_at")),
+        )
+    console.print(table)
 
 
 @app.command()

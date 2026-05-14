@@ -9,6 +9,13 @@ def _rows_to_counts(rows: list[tuple[str, int]]) -> dict[str, int]:
     return {name: count for name, count in rows}
 
 
+def _route_value(route_result: dict[str, Any] | None, key: str) -> Any:
+    if not route_result:
+        return None
+
+    return route_result.get(key)
+
+
 def get_console_overview(limit: int = 10) -> dict[str, Any]:
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
@@ -92,3 +99,48 @@ def get_console_overview(limit: int = 10) -> dict[str, Any]:
             for row in recent_task_rows
         ],
     }
+
+
+def get_console_approval_queue(limit: int = 20) -> list[dict[str, Any]]:
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                select
+                    t.task_code,
+                    t.title,
+                    t.task_level,
+                    t.status,
+                    t.owner,
+                    t.created_at::text,
+                    tr.route_json
+                from tasks t
+                left join lateral (
+                    select route_json
+                    from task_routes
+                    where task_id = t.id
+                    order by created_at desc
+                    limit 1
+                ) tr on true
+                where t.status = 'NEED_CONFIRMATION'
+                order by t.created_at asc
+                limit %s
+                """,
+                (limit,),
+            )
+            rows = cur.fetchall()
+
+    return [
+        {
+            "task_code": row[0],
+            "title": row[1],
+            "task_level": row[2],
+            "status": row[3],
+            "owner": row[4],
+            "created_at": row[5],
+            "required_confirmation": _route_value(row[6], "required_confirmation"),
+            "required_skills": _route_value(row[6], "required_skills") or [],
+            "required_skill_paths": _route_value(row[6], "required_skill_paths") or [],
+        }
+        for row in rows
+    ]
