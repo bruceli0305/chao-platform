@@ -105,6 +105,7 @@ def build_console_index_html() -> str:
         <input id="task-code" name="task-code" placeholder="TASK-YYYYMMDD-HHMMSS-ffffff">
         <button type="submit">Load</button>
       </form>
+      <div id="task-summary"></div>
       <pre id="task-output">{}</pre>
     </section>
   </main>
@@ -290,9 +291,44 @@ def build_console_index_html() -> str:
       ].join("");
     }
 
+    function renderTaskSummary(task) {
+      if (task.error) {
+        return `<div class="muted">${escapeHtml(task.error)}: ${escapeHtml(task.task_code)}</div>`;
+      }
+
+      const fields = [
+        ["Task", task.task_code],
+        ["Title", task.title],
+        ["Level", task.task_level],
+        ["Status", task.status],
+        ["Owner", task.owner],
+        ["Created", task.created_at],
+        ["Updated", task.updated_at]
+      ];
+      const counts = {
+        events: (task.events ?? []).length,
+        tool_calls: (task.tool_calls ?? []).length,
+        artifacts: (task.artifacts ?? []).length,
+        data_assets: (task.data_assets ?? []).length,
+        github_links: (task.github_links ?? []).length,
+        gate_results: (task.gate_results ?? []).length
+      };
+      const fieldRows = fields.map(([name, value]) => `
+        <tr><td>${escapeHtml(name)}</td><td>${escapeHtml(value)}</td></tr>
+      `).join("");
+
+      return `
+        <table>
+          <tbody>${fieldRows}</tbody>
+        </table>
+        <div class="grid">${Object.entries(counts).map(asMetric).join("")}</div>
+      `;
+    }
+
     async function loadTaskDetail(taskCode) {
       const detail = await loadJson(`/api/console/tasks/${encodeURIComponent(taskCode)}`);
       document.querySelector("#task-code").value = taskCode;
+      document.querySelector("#task-summary").innerHTML = renderTaskSummary(detail);
       document.querySelector("#task-output").textContent = JSON.stringify(detail, null, 2);
     }
 

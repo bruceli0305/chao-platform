@@ -28,6 +28,9 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "renderRiskDetails" in html
     assert "renderGateDetails" in html
     assert "renderAuditTrail" in html
+    assert "task-summary" in html
+    assert "renderTaskSummary" in html
+    assert "gate_results" in html
     assert "Runner Failures" in html
     assert "data-task-code" in html
     assert "Task Detail" in html
