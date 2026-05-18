@@ -72,6 +72,11 @@ def build_console_index_html() -> str:
       <div id="risk-details"></div>
     </section>
     <section>
+      <h2>Gates</h2>
+      <div id="gates" class="grid"></div>
+      <div id="gate-details"></div>
+    </section>
+    <section>
       <h2>Approval Queue</h2>
       <div id="approval-queue"></div>
     </section>
@@ -212,6 +217,25 @@ def build_console_index_html() -> str:
       ].join("");
     }
 
+    function renderGateDetails(gates) {
+      const permissionMetrics = Object.entries(gates.tool_permission_audit ?? {});
+      const boundaryMetrics = Object.entries(gates.data_boundary_audit ?? {});
+      const gateRows = gates.recent_gate_results ?? [];
+
+      return `
+        <h2>Tool Permission Audit</h2>
+        <div class="grid">${permissionMetrics.map(asMetric).join("")}</div>
+        <h2>Data Boundary Audit</h2>
+        <div class="grid">${boundaryMetrics.map(asMetric).join("")}</div>
+        ${renderRiskTable("Recent Gate Results", gateRows, [
+          { key: "task_code", label: "Task" },
+          { key: "gate_name", label: "Gate" },
+          { key: "status", label: "Status" },
+          { key: "command", label: "Command" }
+        ])}
+      `;
+    }
+
     async function loadTaskDetail(taskCode) {
       const detail = await loadJson(`/api/console/tasks/${encodeURIComponent(taskCode)}`);
       document.querySelector("#task-code").value = taskCode;
@@ -226,6 +250,7 @@ def build_console_index_html() -> str:
     async function refresh() {
       const overview = await loadJson("/api/console?limit=8");
       const risks = await loadJson("/api/console/risks?limit=8");
+      const gates = await loadJson("/api/console/gates?limit=8");
       const approvals = await loadJson("/api/console/approvals?limit=8");
       const overviewMetrics = {
         artifacts: overview.artifact_count ?? 0,
@@ -238,6 +263,9 @@ def build_console_index_html() -> str:
       document.querySelector("#risks").innerHTML =
         Object.entries(risks.summary ?? {}).map(asMetric).join("");
       document.querySelector("#risk-details").innerHTML = renderRiskDetails(risks);
+      document.querySelector("#gates").innerHTML =
+        Object.entries(gates.gate_status_counts ?? {}).map(asMetric).join("");
+      document.querySelector("#gate-details").innerHTML = renderGateDetails(gates);
       document.querySelector("#approval-queue").innerHTML =
         renderApprovalQueue(approvals.approvals ?? []);
       document.querySelector("#recent-tasks").innerHTML =
@@ -264,6 +292,12 @@ def build_console_index_html() -> str:
     });
 
     document.querySelector("#risk-details").addEventListener("click", async (event) => {
+      const row = event.target.closest("tr[data-task-code]");
+      if (!row) return;
+      await loadTaskDetail(row.dataset.taskCode);
+    });
+
+    document.querySelector("#gate-details").addEventListener("click", async (event) => {
       const row = event.target.closest("tr[data-task-code]");
       if (!row) return;
       await loadTaskDetail(row.dataset.taskCode);
