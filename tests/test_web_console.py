@@ -9,17 +9,22 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "<title>Chao Console</title>" in html
     assert "/api/console?limit=8" in html
     assert "/api/console/approvals?limit=8" in html
+    assert "/api/console/audit?limit=8" in html
     assert "/api/console/gates?limit=8" in html
     assert "/api/console/risks?limit=8" in html
     assert "/api/console/tasks/" in html
     assert "Approval Queue" in html
     assert "Data Boundary Audit" in html
+    assert "Audit Trail" in html
+    assert "Recent Tool Calls" in html
+    assert "Recent Artifacts" in html
     assert "Recent Gate Results" in html
     assert "Recent Tasks" in html
     assert "risk-details" in html
     assert "gate-details" in html
     assert "renderRiskDetails" in html
     assert "renderGateDetails" in html
+    assert "renderAuditTrail" in html
     assert "Runner Failures" in html
     assert "data-task-code" in html
     assert "Task Detail" in html

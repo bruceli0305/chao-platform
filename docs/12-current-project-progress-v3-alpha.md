@@ -157,6 +157,7 @@ Web Console 最近任务列表已定义，可点击任务加载详情；
 Web Console 审批队列已定义，可查看 NEED_CONFIRMATION 任务并点击加载详情；
 Web Console 风险明细已定义，可查看阻塞任务、Runner 失败、失败 gate、工具风险和 GitHub 风险；
 Web Console Gate / Data Boundary 面板已定义，可查看 gate 状态、工具权限审计和数据边界审计；
+Web Console 审计链面板已定义，可查看事件、工具调用、Artifacts、Data Assets 和 GitHub links；
 任务详情 show 已包含 events / tool_calls / artifacts / data_assets。
 ```
 

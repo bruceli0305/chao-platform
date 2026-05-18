@@ -77,6 +77,10 @@ def build_console_index_html() -> str:
       <div id="gate-details"></div>
     </section>
     <section>
+      <h2>Audit Trail</h2>
+      <div id="audit-trail"></div>
+    </section>
+    <section>
       <h2>Approval Queue</h2>
       <div id="approval-queue"></div>
     </section>
@@ -236,6 +240,45 @@ def build_console_index_html() -> str:
       `;
     }
 
+    function renderAuditTrail(audit) {
+      return [
+        renderRiskTable("Recent Events", audit.events ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "event_type", label: "Event" },
+          { key: "from_status", label: "From" },
+          { key: "to_status", label: "To" }
+        ]),
+        renderRiskTable("Recent Tool Calls", audit.tool_calls ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "agent_name", label: "Agent" },
+          { key: "tool_name", label: "Tool" },
+          { key: "result_status", label: "Result" }
+        ]),
+        renderRiskTable("Recent Artifacts", audit.artifacts ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "artifact_type", label: "Type" },
+          { key: "artifact_uri", label: "URI" }
+        ]),
+        renderRiskTable("Recent Data Assets", audit.data_assets ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "asset_type", label: "Type" },
+          { key: "classification", label: "Class" },
+          { key: "owner", label: "Owner" }
+        ]),
+        renderRiskTable("Recent GitHub Links", audit.github_links ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "link_type", label: "Type" },
+          { key: "external_id", label: "External ID" },
+          { key: "status", label: "Status" }
+        ])
+      ].join("");
+    }
+
     async function loadTaskDetail(taskCode) {
       const detail = await loadJson(`/api/console/tasks/${encodeURIComponent(taskCode)}`);
       document.querySelector("#task-code").value = taskCode;
@@ -251,6 +294,7 @@ def build_console_index_html() -> str:
       const overview = await loadJson("/api/console?limit=8");
       const risks = await loadJson("/api/console/risks?limit=8");
       const gates = await loadJson("/api/console/gates?limit=8");
+      const audit = await loadJson("/api/console/audit?limit=8");
       const approvals = await loadJson("/api/console/approvals?limit=8");
       const overviewMetrics = {
         artifacts: overview.artifact_count ?? 0,
@@ -266,6 +310,7 @@ def build_console_index_html() -> str:
       document.querySelector("#gates").innerHTML =
         Object.entries(gates.gate_status_counts ?? {}).map(asMetric).join("");
       document.querySelector("#gate-details").innerHTML = renderGateDetails(gates);
+      document.querySelector("#audit-trail").innerHTML = renderAuditTrail(audit);
       document.querySelector("#approval-queue").innerHTML =
         renderApprovalQueue(approvals.approvals ?? []);
       document.querySelector("#recent-tasks").innerHTML =
@@ -298,6 +343,12 @@ def build_console_index_html() -> str:
     });
 
     document.querySelector("#gate-details").addEventListener("click", async (event) => {
+      const row = event.target.closest("tr[data-task-code]");
+      if (!row) return;
+      await loadTaskDetail(row.dataset.taskCode);
+    });
+
+    document.querySelector("#audit-trail").addEventListener("click", async (event) => {
       const row = event.target.closest("tr[data-task-code]");
       if (!row) return;
       await loadTaskDetail(row.dataset.taskCode);
