@@ -326,6 +326,7 @@ I12 Web Console 审批队列已接入：根路径展示 NEED_CONFIRMATION 任务
 I13 Web Console 风险明细已接入：根路径展示阻塞任务、Runner 失败、失败 gate、工具风险和 GitHub 风险。
 I14 Web Console Gate / Data Boundary 面板已接入：根路径展示 gate 状态、工具权限审计和数据边界审计。
 I15 Web Console 审计链面板已接入：根路径展示事件、工具调用、Artifacts、Data Assets 和 GitHub links。
+I16 Web Console 刷新控制已接入：根路径可调整查询数量并手动刷新页面数据。
 完整 Web UI 尚未实现。
 ```
 

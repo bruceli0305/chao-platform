@@ -37,6 +37,8 @@ def build_console_index_html() -> str:
     .metric { border: 1px solid #e2e7ef; border-radius: 6px; padding: 12px; background: #fbfcfe; }
     .metric strong { display: block; font-size: 22px; margin-top: 6px; }
     form { display: flex; gap: 8px; flex-wrap: wrap; }
+    .controls { align-items: center; }
+    .controls input { max-width: 90px; min-width: 90px; }
     input {
       min-width: 280px; flex: 1; padding: 9px 10px;
       border: 1px solid #cbd3df; border-radius: 6px;
@@ -62,6 +64,15 @@ def build_console_index_html() -> str:
     <div class="muted">Read-only local control plane</div>
   </header>
   <main>
+    <section>
+      <h2>Controls</h2>
+      <form id="refresh-form" class="controls">
+        <label for="record-limit">Limit</label>
+        <input id="record-limit" name="record-limit" type="number" min="1" max="100" value="8">
+        <button type="submit">Refresh</button>
+        <span id="last-updated" class="muted">Not loaded</span>
+      </form>
+    </section>
     <section>
       <h2>Overview</h2>
       <div id="overview" class="grid"></div>
@@ -290,12 +301,19 @@ def build_console_index_html() -> str:
       return response.json();
     }
 
+    function selectedLimit() {
+      const value = Number.parseInt(document.querySelector("#record-limit").value, 10);
+      if (Number.isNaN(value)) return 8;
+      return Math.min(Math.max(value, 1), 100);
+    }
+
     async function refresh() {
-      const overview = await loadJson("/api/console?limit=8");
-      const risks = await loadJson("/api/console/risks?limit=8");
-      const gates = await loadJson("/api/console/gates?limit=8");
-      const audit = await loadJson("/api/console/audit?limit=8");
-      const approvals = await loadJson("/api/console/approvals?limit=8");
+      const limit = selectedLimit();
+      const overview = await loadJson(`/api/console?limit=${limit}`);
+      const risks = await loadJson(`/api/console/risks?limit=${limit}`);
+      const gates = await loadJson(`/api/console/gates?limit=${limit}`);
+      const audit = await loadJson(`/api/console/audit?limit=${limit}`);
+      const approvals = await loadJson(`/api/console/approvals?limit=${limit}`);
       const overviewMetrics = {
         artifacts: overview.artifact_count ?? 0,
         data_assets: overview.data_asset_count ?? 0,
@@ -315,7 +333,14 @@ def build_console_index_html() -> str:
         renderApprovalQueue(approvals.approvals ?? []);
       document.querySelector("#recent-tasks").innerHTML =
         renderRecentTasks(overview.recent_tasks ?? []);
+      document.querySelector("#last-updated").textContent =
+        `Last updated ${new Date().toLocaleTimeString()}`;
     }
+
+    document.querySelector("#refresh-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await refresh();
+    });
 
     document.querySelector("#task-form").addEventListener("submit", async (event) => {
       event.preventDefault();

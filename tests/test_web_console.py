@@ -7,11 +7,14 @@ def test_build_console_index_html_contains_read_only_ui():
     html = web_console.build_console_index_html()
 
     assert "<title>Chao Console</title>" in html
-    assert "/api/console?limit=8" in html
-    assert "/api/console/approvals?limit=8" in html
-    assert "/api/console/audit?limit=8" in html
-    assert "/api/console/gates?limit=8" in html
-    assert "/api/console/risks?limit=8" in html
+    assert "record-limit" in html
+    assert "Refresh" in html
+    assert "selectedLimit" in html
+    assert "/api/console?limit=${limit}" in html
+    assert "/api/console/approvals?limit=${limit}" in html
+    assert "/api/console/audit?limit=${limit}" in html
+    assert "/api/console/gates?limit=${limit}" in html
+    assert "/api/console/risks?limit=${limit}" in html
     assert "/api/console/tasks/" in html
     assert "Approval Queue" in html
     assert "Data Boundary Audit" in html
