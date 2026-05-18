@@ -152,6 +152,7 @@ Console 只读风险视图已定义，CLI 可输出阻塞任务、失败 gate、
 Console 风险视图已接入 runner_failure_feedback 回流证据，可直接定位 Runner 失败 artifact；
 Web Console JSON API 基座已定义，CLI web-console 可提供只读 console API；
 Web Console 任务详情 API 已定义，可按 task_code 返回单任务审计链；
+Web Console 最小页面已定义，根路径可查看 overview、risks 并查询任务详情；
 任务详情 show 已包含 events / tool_calls / artifacts / data_assets。
 ```
 

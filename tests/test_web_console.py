@@ -3,6 +3,16 @@ from http import HTTPStatus
 from app.chao import web_console
 
 
+def test_build_console_index_html_contains_read_only_ui():
+    html = web_console.build_console_index_html()
+
+    assert "<title>Chao Console</title>" in html
+    assert "/api/console?limit=8" in html
+    assert "/api/console/risks?limit=8" in html
+    assert "/api/console/tasks/" in html
+    assert "Task Detail" in html
+
+
 def test_build_console_response_returns_overview(monkeypatch):
     calls = []
 
