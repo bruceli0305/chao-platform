@@ -485,6 +485,18 @@ def console_risks_command(
         )
     console.print(gates)
 
+    runner_failures = Table(title="Runner Failure Feedback")
+    runner_failures.add_column("Task")
+    runner_failures.add_column("Artifact")
+    runner_failures.add_column("URI")
+    for failure in risks["runner_failures"]:
+        runner_failures.add_row(
+            _display_value(failure.get("task_code")),
+            _display_value(failure.get("artifact_type")),
+            _display_value(failure.get("artifact_uri")),
+        )
+    console.print(runner_failures)
+
     tools = Table(title="Tool Risks")
     tools.add_column("Task")
     tools.add_column("Agent")

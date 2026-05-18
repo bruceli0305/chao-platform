@@ -466,6 +466,23 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
                 """
                 select
                     t.task_code,
+                    a.artifact_type,
+                    a.artifact_uri,
+                    a.created_at::text
+                from artifacts a
+                join tasks t on t.id = a.task_id
+                where a.artifact_type = 'runner_failure_feedback'
+                order by a.created_at desc
+                limit %s
+                """,
+                (limit,),
+            )
+            runner_failure_rows = cur.fetchall()
+
+            cur.execute(
+                """
+                select
+                    t.task_code,
                     tc.agent_name,
                     tc.tool_name,
                     tc.permission_policy,
@@ -566,6 +583,15 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
             }
             for row in failed_gate_rows
         ],
+        "runner_failures": [
+            {
+                "task_code": row[0],
+                "artifact_type": row[1],
+                "artifact_uri": row[2],
+                "created_at": row[3],
+            }
+            for row in runner_failure_rows
+        ],
         "tool_risks": [
             {
                 "task_code": row[0],
@@ -593,6 +619,7 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
         "summary": {
             "blocked_task_count": len(blocked_task_rows),
             "failed_gate_count": len(failed_gate_rows),
+            "runner_failure_count": len(runner_failure_rows),
             "tool_risk_count": len(tool_risk_rows),
             "data_boundary_risk_count": sum(data_boundary_risks.values()),
             "github_risk_count": len(github_risk_rows),

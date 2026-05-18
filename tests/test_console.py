@@ -319,6 +319,14 @@ def test_get_console_risks_returns_risk_summary(monkeypatch):
         [("TASK-FAIL", "pytest", "failed", "uv run pytest -q", "2026-05-14 00:00:01")],
         [
             (
+                "TASK-RUNNER-FAIL",
+                "runner_failure_feedback",
+                ".ai-agents/records/failures/TASK-RUNNER-FAIL-failure-feedback.md",
+                "2026-05-14 00:00:02",
+            )
+        ],
+        [
+            (
                 "TASK-TOOL",
                 "shangshu",
                 "cli.new",
@@ -379,6 +387,7 @@ def test_get_console_risks_returns_risk_summary(monkeypatch):
 
     assert risks["blocked_tasks"][0]["task_code"] == "TASK-BLOCKED"
     assert risks["failed_gates"][0]["gate_name"] == "pytest"
+    assert risks["runner_failures"][0]["artifact_type"] == "runner_failure_feedback"
     assert risks["tool_risks"][0]["tool_name"] == "cli.new"
     assert risks["data_boundary_risks"] == {
         "invalid_data_asset_classification_count": 1,
@@ -389,6 +398,7 @@ def test_get_console_risks_returns_risk_summary(monkeypatch):
     assert risks["summary"] == {
         "blocked_task_count": 1,
         "failed_gate_count": 1,
+        "runner_failure_count": 1,
         "tool_risk_count": 1,
         "data_boundary_risk_count": 6,
         "github_risk_count": 1,
