@@ -69,6 +69,7 @@ def build_console_index_html() -> str:
     <section>
       <h2>Risks</h2>
       <div id="risks" class="grid"></div>
+      <div id="risk-details"></div>
     </section>
     <section>
       <h2>Approval Queue</h2>
@@ -149,6 +150,68 @@ def build_console_index_html() -> str:
       `;
     }
 
+    function renderRiskTable(title, rows, columns) {
+      if (!rows.length) {
+        return `<div class="muted">${title}: none.</div>`;
+      }
+
+      const head = columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("");
+      const body = rows.map((row) => {
+        const taskCode = row.task_code ? ` data-task-code="${escapeHtml(row.task_code)}"` : "";
+        const cells = columns.map((column) =>
+          `<td>${escapeHtml(row[column.key])}</td>`
+        ).join("");
+        return `<tr${taskCode}>${cells}</tr>`;
+      }).join("");
+
+      return `
+        <h2>${escapeHtml(title)}</h2>
+        <table>
+          <thead><tr>${head}</tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      `;
+    }
+
+    function renderRiskDetails(risks) {
+      return [
+        renderRiskTable("Blocked Tasks", risks.blocked_tasks ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "title", label: "Title" },
+          { key: "task_level", label: "Level" },
+          { key: "status", label: "Status" }
+        ]),
+        renderRiskTable("Runner Failures", risks.runner_failures ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "artifact_type", label: "Artifact" },
+          { key: "artifact_uri", label: "URI" }
+        ]),
+        renderRiskTable("Failed Gates", risks.failed_gates ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "gate_name", label: "Gate" },
+          { key: "status", label: "Status" },
+          { key: "command", label: "Command" }
+        ]),
+        renderRiskTable("Tool Risks", risks.tool_risks ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "agent_name", label: "Agent" },
+          { key: "tool_name", label: "Tool" },
+          { key: "result_status", label: "Result" }
+        ]),
+        renderRiskTable("GitHub Risks", risks.github_risks ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "link_type", label: "Type" },
+          { key: "external_id", label: "External ID" },
+          { key: "status", label: "Status" }
+        ])
+      ].join("");
+    }
+
     async function loadTaskDetail(taskCode) {
       const detail = await loadJson(`/api/console/tasks/${encodeURIComponent(taskCode)}`);
       document.querySelector("#task-code").value = taskCode;
@@ -174,6 +237,7 @@ def build_console_index_html() -> str:
         Object.entries(overviewMetrics).map(asMetric).join("");
       document.querySelector("#risks").innerHTML =
         Object.entries(risks.summary ?? {}).map(asMetric).join("");
+      document.querySelector("#risk-details").innerHTML = renderRiskDetails(risks);
       document.querySelector("#approval-queue").innerHTML =
         renderApprovalQueue(approvals.approvals ?? []);
       document.querySelector("#recent-tasks").innerHTML =
@@ -194,6 +258,12 @@ def build_console_index_html() -> str:
     });
 
     document.querySelector("#approval-queue").addEventListener("click", async (event) => {
+      const row = event.target.closest("tr[data-task-code]");
+      if (!row) return;
+      await loadTaskDetail(row.dataset.taskCode);
+    });
+
+    document.querySelector("#risk-details").addEventListener("click", async (event) => {
       const row = event.target.closest("tr[data-task-code]");
       if (!row) return;
       await loadTaskDetail(row.dataset.taskCode);

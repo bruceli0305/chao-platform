@@ -13,6 +13,9 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "/api/console/tasks/" in html
     assert "Approval Queue" in html
     assert "Recent Tasks" in html
+    assert "risk-details" in html
+    assert "renderRiskDetails" in html
+    assert "Runner Failures" in html
     assert "data-task-code" in html
     assert "Task Detail" in html
 
