@@ -321,6 +321,7 @@ I7 Runner 失败回流视图已接入：CLI console-risks 命令输出 runner_fa
 I8 Web Console JSON API 基座已接入：CLI web-console 命令提供只读 console API。
 I9 Web Console 任务详情 API 已接入：`/api/console/tasks/{task_code}` 返回单任务审计链。
 I10 Web Console 最小页面已接入：根路径展示 overview、risks 和任务详情查询。
+I11 Web Console 最近任务列表已接入：根路径可点击最近任务加载详情。
 完整 Web UI 尚未实现。
 ```
 

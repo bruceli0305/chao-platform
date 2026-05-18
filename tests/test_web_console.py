@@ -10,6 +10,8 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "/api/console?limit=8" in html
     assert "/api/console/risks?limit=8" in html
     assert "/api/console/tasks/" in html
+    assert "Recent Tasks" in html
+    assert "data-task-code" in html
     assert "Task Detail" in html
 
 

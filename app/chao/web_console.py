@@ -51,6 +51,8 @@ def build_console_index_html() -> str:
     }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
     th, td { text-align: left; border-bottom: 1px solid #e5e9f0; padding: 8px; font-size: 13px; }
+    tr[data-task-code] { cursor: pointer; }
+    tr[data-task-code]:hover { background: #f3f7fc; }
     .muted { color: #5f6c7b; font-size: 13px; }
   </style>
 </head>
@@ -69,6 +71,10 @@ def build_console_index_html() -> str:
       <div id="risks" class="grid"></div>
     </section>
     <section>
+      <h2>Recent Tasks</h2>
+      <div id="recent-tasks"></div>
+    </section>
+    <section>
       <h2>Task Detail</h2>
       <form id="task-form">
         <input id="task-code" name="task-code" placeholder="TASK-YYYYMMDD-HHMMSS-ffffff">
@@ -80,6 +86,45 @@ def build_console_index_html() -> str:
   <script>
     const asMetric = ([name, value]) =>
       `<div class="metric"><span>${name}</span><strong>${value}</strong></div>`;
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function renderRecentTasks(tasks) {
+      if (!tasks.length) {
+        return '<div class="muted">No recent tasks.</div>';
+      }
+
+      const rows = tasks.map((task) => `
+        <tr data-task-code="${escapeHtml(task.task_code)}">
+          <td>${escapeHtml(task.task_code)}</td>
+          <td>${escapeHtml(task.title)}</td>
+          <td>${escapeHtml(task.task_level)}</td>
+          <td>${escapeHtml(task.status)}</td>
+          <td>${escapeHtml(task.owner)}</td>
+        </tr>
+      `).join("");
+
+      return `
+        <table>
+          <thead>
+            <tr><th>Task</th><th>Title</th><th>Level</th><th>Status</th><th>Owner</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    async function loadTaskDetail(taskCode) {
+      const detail = await loadJson(`/api/console/tasks/${encodeURIComponent(taskCode)}`);
+      document.querySelector("#task-code").value = taskCode;
+      document.querySelector("#task-output").textContent = JSON.stringify(detail, null, 2);
+    }
 
     async function loadJson(path) {
       const response = await fetch(path, { cache: "no-store" });
@@ -99,14 +144,21 @@ def build_console_index_html() -> str:
         Object.entries(overviewMetrics).map(asMetric).join("");
       document.querySelector("#risks").innerHTML =
         Object.entries(risks.summary ?? {}).map(asMetric).join("");
+      document.querySelector("#recent-tasks").innerHTML =
+        renderRecentTasks(overview.recent_tasks ?? []);
     }
 
     document.querySelector("#task-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const taskCode = document.querySelector("#task-code").value.trim();
       if (!taskCode) return;
-      const detail = await loadJson(`/api/console/tasks/${encodeURIComponent(taskCode)}`);
-      document.querySelector("#task-output").textContent = JSON.stringify(detail, null, 2);
+      await loadTaskDetail(taskCode);
+    });
+
+    document.querySelector("#recent-tasks").addEventListener("click", async (event) => {
+      const row = event.target.closest("tr[data-task-code]");
+      if (!row) return;
+      await loadTaskDetail(row.dataset.taskCode);
     });
 
     refresh().catch((error) => {
