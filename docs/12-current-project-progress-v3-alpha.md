@@ -141,6 +141,8 @@ Agent Runner 失败回流已定义，验证失败会生成 runner_failure_feedba
 Agent Runner 受控文本 patch 执行器已定义，显式 runner_patch_operations 可在 allowed scope 内真实修改文件；
 Agent Runner runner-patch CLI 已定义，默认 dry-run，显式 --apply 才真实写文件，并写入 tool_calls 审计；
 Agent Runner runner-validate CLI 已定义，可执行 allowlist 验证 gate，并写入 task_events / tool_calls；
+Agent Runner runner-attempt CLI 已定义，可串联 patch、validation，并在 --apply 后登记 runner_patch 或 runner_failure_feedback；
+Agent Runner runner-attempt 状态回写已定义，dry-run 不改状态，--apply 后按验证结果更新为 DELIVERED 或 VALIDATION_FAILED；
 Console 只读总览已定义，CLI 可输出任务、artifact、data_asset 和工具调用概览；
 Console 只读任务详情已定义，CLI 可输出单任务审计链摘要；
 Console 只读审批中心已定义，CLI 可输出 NEED_CONFIRMATION 任务队列；

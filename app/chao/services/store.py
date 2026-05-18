@@ -233,6 +233,21 @@ def save_task_result(result: dict[str, Any]) -> None:
     )
 
 
+def update_task_status(task_id: str, status: str) -> None:
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                update tasks
+                set status = %s, updated_at = now()
+                where id = %s
+                """,
+                (status, task_id),
+            )
+
+        conn.commit()
+
+
 def list_tasks(limit: int = 10) -> list[dict[str, Any]]:
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:

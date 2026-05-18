@@ -9,7 +9,11 @@ from rich.table import Table
 
 from app.chao.graph.main_graph import build_graph
 from app.chao.permissions import require_tool_permission
-from app.chao.runner_executor import apply_text_patch_operations
+from app.chao.runner_artifacts import save_failure_feedback_artifact, save_patch_artifact
+from app.chao.runner_executor import (
+    apply_text_patch_operations,
+    build_implementation_result_from_execution,
+)
 from app.chao.runner_validation import execute_runner_validation_commands
 from app.chao.services.artifacts import record_artifact
 from app.chao.services.console import (
@@ -23,7 +27,13 @@ from app.chao.services.data_assets import record_data_asset
 from app.chao.services.events import record_task_event
 from app.chao.services.github_links import normalize_github_link_type, record_github_link
 from app.chao.services.markdown_records import save_task_markdown
-from app.chao.services.store import approve_task, get_task_detail, list_tasks, save_task_result
+from app.chao.services.store import (
+    approve_task,
+    get_task_detail,
+    list_tasks,
+    save_task_result,
+    update_task_status,
+)
 from app.chao.services.tool_calls import record_tool_call
 
 app = typer.Typer()
@@ -652,6 +662,167 @@ def runner_validate_command(
     print_json(data={"task_code": task_code, "validation_result": validation_result})
 
     if not validation_result["deliverable"]:
+        raise typer.Exit(code=1)
+
+
+@app.command("runner-attempt")
+def runner_attempt_command(
+    task_code: str,
+    path: str,
+    gate: Annotated[
+        list[str],
+        typer.Option("--gate", help="Validation gate to execute after patch"),
+    ],
+    old_text: str = typer.Option(..., "--old-text", help="Text that must match once"),
+    new_text: str = typer.Option(..., "--new-text", help="Replacement text"),
+    apply: bool = typer.Option(False, "--apply", help="Write the patch before validation"),
+    timeout_seconds: int = typer.Option(120, "--timeout", help="Per-command timeout seconds"),
+    patch_by: str = typer.Option("gongbu", "--patch-by", help="Patch agent name"),
+    validate_by: str = typer.Option("xingbu", "--validate-by", help="Validation agent name"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    if task["task_level"] == "L4":
+        print("[red]L4 tasks cannot execute runner attempts.[/red]")
+        raise typer.Exit(code=1)
+
+    try:
+        patch_permission = require_tool_permission(
+            agent_name=patch_by,
+            tool_name="cli.runner_patch",
+            task_level=task["task_level"],
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
+            current_status=task["status"],
+        )
+        validation_permission = require_tool_permission(
+            agent_name=validate_by,
+            tool_name="cli.runner_validate",
+            task_level=task["task_level"],
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
+            current_status=task["status"],
+        )
+        execution_result = apply_text_patch_operations(
+            [
+                {
+                    "path": path,
+                    "old_text": old_text,
+                    "new_text": new_text,
+                }
+            ],
+            dry_run=not apply,
+        )
+        validation_result = execute_runner_validation_commands(
+            gate,
+            timeout_seconds=timeout_seconds,
+        )
+    except (PermissionError, ValueError, FileNotFoundError) as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    implementation_result = build_implementation_result_from_execution(execution_result)
+    delivered = validation_result["deliverable"]
+    next_status = "DELIVERED" if delivered else "VALIDATION_FAILED"
+    artifact_uri = None
+    artifact_type = None
+
+    if apply:
+        artifact_task = {
+            **task,
+            "status": next_status,
+            "implementation_result": implementation_result,
+            "validation_result": validation_result,
+        }
+        if delivered:
+            artifact_path = save_patch_artifact(artifact_task)
+            artifact_type = "runner_patch"
+            artifact_summary = "Agent Runner patch attempt artifact"
+        else:
+            artifact_path = save_failure_feedback_artifact(artifact_task)
+            artifact_type = "runner_failure_feedback"
+            artifact_summary = "Agent Runner failed patch attempt artifact"
+
+        artifact_uri = str(artifact_path)
+        record_artifact(
+            task_id=task["id"],
+            artifact_type=artifact_type,
+            artifact_uri=artifact_uri,
+            access_level="internal",
+            retention_days=365,
+            summary=artifact_summary,
+        )
+        record_data_asset(
+            asset_name=artifact_uri,
+            asset_type=artifact_type,
+            classification="D1",
+            primary_storage="Git / Markdown",
+            owner="gongbu",
+            task_id=task["id"],
+            allowed_copies=["PostgreSQL", "pgvector"],
+            forbidden_storages=["Secret Manager"],
+            allow_vectorization=True,
+            desensitized=True,
+            retention_days=365,
+            notes="Agent Runner patch attempt evidence.",
+        )
+        update_task_status(task["id"], next_status)
+
+    event_type = "runner_attempt_delivered" if delivered else "runner_attempt_failed"
+    record_task_event(
+        task_id=task["id"],
+        event_type=event_type,
+        from_status=task["status"],
+        to_status=next_status if apply else task["status"],
+        summary=f"Runner attempt {'applied' if apply else 'dry-run'}: {', '.join(gate)}",
+        created_by=patch_by,
+    )
+    record_tool_call(
+        task_id=task["id"],
+        agent_name=patch_by,
+        tool_name="cli.runner_patch",
+        arguments_summary=f"task_code={task_code}; path={path}; apply={apply}",
+        permission_policy=patch_permission["permission_policy"],
+        result_status="success",
+        permission_decision=patch_permission,
+        output_summary=(
+            f"changed_files={execution_result['changed_files']}; "
+            f"applied={execution_result['applied']}"
+        ),
+        risk_flag=patch_permission["risk_flag"],
+    )
+    record_tool_call(
+        task_id=task["id"],
+        agent_name=validate_by,
+        tool_name="cli.runner_validate",
+        arguments_summary=f"task_code={task_code}; gates={gate}",
+        permission_policy=validation_permission["permission_policy"],
+        result_status="success" if delivered else "failed",
+        permission_decision=validation_permission,
+        output_summary=f"deliverable={delivered}",
+        risk_flag=validation_permission["risk_flag"],
+    )
+
+    print_json(
+        data={
+            "task_code": task_code,
+            "status": next_status,
+            "artifact_type": artifact_type,
+            "artifact_uri": artifact_uri,
+            "implementation_result": implementation_result,
+            "validation_result": validation_result,
+        }
+    )
+
+    if not delivered:
         raise typer.Exit(code=1)
 
 

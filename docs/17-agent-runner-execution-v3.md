@@ -22,10 +22,12 @@ app/chao/runner_executor.py
 app/chao/nodes/gongbu.py
 app/chao/cli.py runner-patch
 app/chao/cli.py runner-validate
+app/chao/cli.py runner-attempt
 tests/test_runner_executor.py
 tests/test_gongbu_runner_scope.py
 tests/test_cli_runner_patch.py
 tests/test_cli_runner_validate.py
+tests/test_cli_runner_attempt.py
 ```
 
 ## Operation Shape
@@ -76,3 +78,30 @@ The command runs only known executable gates from `app/chao/runner_validation.py
 Manual or external gates fail explicitly instead of being treated as passed.
 Successful and failed validation attempts are written to `task_events` and
 `tool_calls`.
+
+J4 adds a combined patch + validation attempt command:
+
+```bash
+uv run python main.py runner-attempt TASK-xxx app/chao/example.py \
+  --old-text "before" \
+  --new-text "after" \
+  --gate compile \
+  --apply
+```
+
+Without `--apply`, the command validates the patch and runs the gates but does
+not write files or record patch artifacts. With `--apply`, it writes the patch,
+runs validation, and records:
+
+```text
+runner_patch when validation passes;
+runner_failure_feedback when validation fails.
+```
+
+J5 keeps the control plane status aligned with applied runner attempts:
+
+```text
+dry-run attempts record audit evidence but do not update tasks.status;
+applied attempts update tasks.status to DELIVERED when validation passes;
+applied attempts update tasks.status to VALIDATION_FAILED when validation fails.
+```
