@@ -71,6 +71,10 @@ def build_console_index_html() -> str:
       <div id="risks" class="grid"></div>
     </section>
     <section>
+      <h2>Approval Queue</h2>
+      <div id="approval-queue"></div>
+    </section>
+    <section>
       <h2>Recent Tasks</h2>
       <div id="recent-tasks"></div>
     </section>
@@ -120,6 +124,31 @@ def build_console_index_html() -> str:
       `;
     }
 
+    function renderApprovalQueue(tasks) {
+      if (!tasks.length) {
+        return '<div class="muted">No tasks waiting for confirmation.</div>';
+      }
+
+      const rows = tasks.map((task) => `
+        <tr data-task-code="${escapeHtml(task.task_code)}">
+          <td>${escapeHtml(task.task_code)}</td>
+          <td>${escapeHtml(task.title)}</td>
+          <td>${escapeHtml(task.task_level)}</td>
+          <td>${escapeHtml(task.required_confirmation)}</td>
+          <td>${escapeHtml(task.owner)}</td>
+        </tr>
+      `).join("");
+
+      return `
+        <table>
+          <thead>
+            <tr><th>Task</th><th>Title</th><th>Level</th><th>Confirm</th><th>Owner</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
     async function loadTaskDetail(taskCode) {
       const detail = await loadJson(`/api/console/tasks/${encodeURIComponent(taskCode)}`);
       document.querySelector("#task-code").value = taskCode;
@@ -134,6 +163,7 @@ def build_console_index_html() -> str:
     async function refresh() {
       const overview = await loadJson("/api/console?limit=8");
       const risks = await loadJson("/api/console/risks?limit=8");
+      const approvals = await loadJson("/api/console/approvals?limit=8");
       const overviewMetrics = {
         artifacts: overview.artifact_count ?? 0,
         data_assets: overview.data_asset_count ?? 0,
@@ -144,6 +174,8 @@ def build_console_index_html() -> str:
         Object.entries(overviewMetrics).map(asMetric).join("");
       document.querySelector("#risks").innerHTML =
         Object.entries(risks.summary ?? {}).map(asMetric).join("");
+      document.querySelector("#approval-queue").innerHTML =
+        renderApprovalQueue(approvals.approvals ?? []);
       document.querySelector("#recent-tasks").innerHTML =
         renderRecentTasks(overview.recent_tasks ?? []);
     }
@@ -156,6 +188,12 @@ def build_console_index_html() -> str:
     });
 
     document.querySelector("#recent-tasks").addEventListener("click", async (event) => {
+      const row = event.target.closest("tr[data-task-code]");
+      if (!row) return;
+      await loadTaskDetail(row.dataset.taskCode);
+    });
+
+    document.querySelector("#approval-queue").addEventListener("click", async (event) => {
       const row = event.target.closest("tr[data-task-code]");
       if (!row) return;
       await loadTaskDetail(row.dataset.taskCode);

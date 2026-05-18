@@ -154,6 +154,7 @@ Web Console JSON API 基座已定义，CLI web-console 可提供只读 console A
 Web Console 任务详情 API 已定义，可按 task_code 返回单任务审计链；
 Web Console 最小页面已定义，根路径可查看 overview、risks 并查询任务详情；
 Web Console 最近任务列表已定义，可点击任务加载详情；
+Web Console 审批队列已定义，可查看 NEED_CONFIRMATION 任务并点击加载详情；
 任务详情 show 已包含 events / tool_calls / artifacts / data_assets。
 ```
 
