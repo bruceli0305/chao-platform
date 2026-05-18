@@ -150,6 +150,7 @@ Console 只读审计视图已定义，CLI 可输出事件、工具调用、Artif
 Console 只读 Gate 视图已定义，CLI 可输出 gate_results、工具权限和数据边界摘要；
 Console 只读风险视图已定义，CLI 可输出阻塞任务、失败 gate、工具风险、数据边界风险和 GitHub 风险；
 Console 风险视图已接入 runner_failure_feedback 回流证据，可直接定位 Runner 失败 artifact；
+Web Console JSON API 基座已定义，CLI web-console 可提供只读 console API；
 任务详情 show 已包含 events / tool_calls / artifacts / data_assets。
 ```
 

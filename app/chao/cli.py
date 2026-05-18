@@ -35,6 +35,7 @@ from app.chao.services.store import (
     update_task_status,
 )
 from app.chao.services.tool_calls import record_tool_call
+from app.chao.web_console import run_web_console_server
 
 app = typer.Typer()
 console = Console()
@@ -531,6 +532,15 @@ def console_risks_command(
             _display_value(link.get("status")),
         )
     console.print(github)
+
+
+@app.command("web-console")
+def web_console_command(
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind host"),
+    port: int = typer.Option(8765, "--port", help="Bind port"),
+):
+    print(f"Chao Web Console listening on http://{host}:{port}")
+    run_web_console_server(host=host, port=port)
 
 
 @app.command("runner-patch")

@@ -603,6 +603,13 @@ def test_console_risks_renders_risk_summary(monkeypatch):
                 "command": "uv run pytest -q",
             }
         ],
+        "runner_failures": [
+            {
+                "task_code": "TASK-RUNNER-FAIL",
+                "artifact_type": "runner_failure_feedback",
+                "artifact_uri": ".ai-agents/records/failures/TASK-RUNNER-FAIL-failure-feedback.md",
+            }
+        ],
         "tool_risks": [
             {
                 "task_code": "TASK-TOOL",
@@ -627,6 +634,7 @@ def test_console_risks_renders_risk_summary(monkeypatch):
         "summary": {
             "blocked_task_count": 1,
             "failed_gate_count": 1,
+            "runner_failure_count": 1,
             "tool_risk_count": 1,
             "data_boundary_risk_count": 0,
             "github_risk_count": 1,
@@ -641,5 +649,6 @@ def test_console_risks_renders_risk_summary(monkeypatch):
     assert "Risk Summary" in result.output
     assert "Blocked Tasks" in result.output
     assert "TASK-BLOCKED" in result.output
+    assert "runner_failure_feedback" in result.output
     assert "pytest" in result.output
     assert "ci_run" in result.output
