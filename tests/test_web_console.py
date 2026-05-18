@@ -35,9 +35,46 @@ def test_build_console_response_clamps_limit(monkeypatch):
     assert calls == [100]
 
 
+def test_build_console_response_returns_task_detail(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(
+        web_console,
+        "get_task_detail",
+        lambda task_code: (
+            calls.append(task_code)
+            or {
+                "task_code": task_code,
+                "events": [],
+                "tool_calls": [],
+                "artifacts": [],
+                "data_assets": [],
+            }
+        ),
+    )
+
+    status_code, payload = web_console.build_console_response(
+        "/api/console/tasks/TASK-20260518-120000"
+    )
+
+    assert status_code == HTTPStatus.OK
+    assert payload["task_code"] == "TASK-20260518-120000"
+    assert calls == ["TASK-20260518-120000"]
+
+
+def test_build_console_response_returns_not_found_for_missing_task(monkeypatch):
+    monkeypatch.setattr(web_console, "get_task_detail", lambda _task_code: None)
+
+    status_code, payload = web_console.build_console_response("/api/console/tasks/TASK-MISSING")
+
+    assert status_code == HTTPStatus.NOT_FOUND
+    assert payload == {"error": "task_not_found", "task_code": "TASK-MISSING"}
+
+
 def test_build_console_response_returns_not_found_for_unknown_path():
     status_code, payload = web_console.build_console_response("/api/missing")
 
     assert status_code == HTTPStatus.NOT_FOUND
     assert payload["error"] == "not_found"
     assert "/api/console" in payload["available_paths"]
+    assert "/api/console/tasks/{task_code}" in payload["available_paths"]

@@ -2,7 +2,7 @@ import json
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from app.chao.services.console import (
     get_console_approval_queue,
@@ -11,6 +11,7 @@ from app.chao.services.console import (
     get_console_overview,
     get_console_risks,
 )
+from app.chao.services.store import get_task_detail
 
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
@@ -45,6 +46,16 @@ def build_console_response(path: str, query_string: str = "") -> tuple[int, dict
         return HTTPStatus.OK, get_console_gates(limit=limit)
     if path == "/api/console/risks":
         return HTTPStatus.OK, get_console_risks(limit=limit)
+    if path.startswith("/api/console/tasks/"):
+        task_code = unquote(path.removeprefix("/api/console/tasks/")).strip()
+        if not task_code or "/" in task_code:
+            return HTTPStatus.NOT_FOUND, {"error": "task_not_found", "task_code": task_code}
+
+        task = get_task_detail(task_code)
+        if task is None:
+            return HTTPStatus.NOT_FOUND, {"error": "task_not_found", "task_code": task_code}
+
+        return HTTPStatus.OK, task
 
     return HTTPStatus.NOT_FOUND, {
         "error": "not_found",
@@ -56,6 +67,7 @@ def build_console_response(path: str, query_string: str = "") -> tuple[int, dict
             "/api/console/audit",
             "/api/console/gates",
             "/api/console/risks",
+            "/api/console/tasks/{task_code}",
         ],
     }
 
