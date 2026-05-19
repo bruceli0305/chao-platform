@@ -14,6 +14,16 @@
 高风险操作必须确认。
 ```
 
+## 2.1 协议层拦截
+
+```text
+工具适配器必须先构造 ToolGatewayRequest；
+工具 handler 必须交给 execute_tool_gateway_request 包裹；
+权限 denied 时不得调用真实工具；
+工具失败时必须返回 failed 审计结果，不得返回假成功；
+返回 audit 字段必须写入 tool_calls 或等价审计位置。
+```
+
 ## 3. 审计字段
 
 ```text

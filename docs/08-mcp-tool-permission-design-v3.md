@@ -90,8 +90,19 @@ risk_flag。
 app/chao/permissions.py 定义 TOOL_REGISTRY、ROLE_ALLOWED_TOOLS、LEVEL_ALLOWED_RISKS；
 evaluate_tool_permission 负责输出 allowed、permission_policy、requires_confirmation 和 risk_flag；
 require_tool_permission 负责在调用前强制拒绝未授权工具；
-第一批登记工具：cli.new、cli.approve、schema_check、data_boundary_check；
+app/chao/tool_gateway.py 提供协议层拦截入口，授权前不会执行工具 handler；
+第一批登记工具：cli.new、cli.approve、cli.bind_github、runner 系列命令、schema_check、data_boundary_check；
 tool_calls.permission_policy 记录策略名，tool_calls.permission_decision 记录完整决策 JSON。
+```
+
+E7 最小工具协议网关：
+
+```text
+ToolGatewayRequest 标准化 protocol、agent_name、tool_name、task_level、required_confirmation、current_status 和 arguments_summary；
+evaluate_tool_gateway_request 只做权限判断并生成审计字段；
+execute_tool_gateway_request 先判断权限，denied 时不调用 handler，allowed 后才执行 handler；
+handler 失败会返回 failed 和错误摘要，不会伪装成功；
+返回的 audit 字段可直接用于 tool_calls 记录。
 ```
 
 ## 7. 升级触发

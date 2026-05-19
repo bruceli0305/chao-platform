@@ -157,6 +157,7 @@ Agent Runner runner-attempt 状态回写已定义，dry-run 不改状态，--app
 Agent Runner runner-branch CLI 已定义，默认 dry-run，显式 --apply 才创建并切换 codex/ 执行分支；
 Agent Runner runner-workspace CLI 已定义，默认 dry-run，显式 --apply 才在 .chao/sandboxes 下创建隔离 git worktree；
 Agent Runner runner-sandbox CLI 已定义，默认 dry-run，显式 --apply 才用 Docker 执行 allowlist gate；
+Tool Gateway 协议层拦截已定义，未授权工具不会执行 handler，并输出可写入 tool_calls 的审计字段；
 Console 只读总览已定义，CLI 可输出任务、artifact、data_asset 和工具调用概览；
 Console 只读任务详情已定义，CLI 可输出单任务审计链摘要；
 Console 只读审批中心已定义，CLI 可输出 NEED_CONFIRMATION 任务队列；
@@ -270,7 +271,7 @@ Markdown 史官记录生成。
 ## 4. 当前尚未完成
 
 ```text
-MCP Server / 工具协议层的真实拦截；
+真实 MCP Server 进程和外部 MCP 工具适配器；
 Skills 自动读取、执行和交付记录闭环；
 pgvector embedding 生成与向量相似度检索；
 GitHub Issue / PR / Commit / CI 结果与 task 的自动双向同步；
@@ -283,7 +284,7 @@ Web Console 的审批操作和产品化 UI。
 ## 5. 当前风险与注意事项
 
 ```text
-1. 当前工具调用审计还是 CLI 层模拟，不是真实 MCP 工具拦截；
+1. 当前已有本地 Tool Gateway 拦截入口，但尚未接入真实 MCP Server 进程；
 2. 当前 data_assets 已登记任务 Markdown、治理 artifact 和 ingest 来源，但尚未覆盖所有未来数据来源；
 3. pgvector 已有 context_chunks 写入和只读搜索，但尚未生成 embedding，也尚未使用向量相似度检索；
 4. L3 approve 后已进入 DESIGNING，后续 REVIEWING / SCHEDULING 仍待完善；
@@ -295,7 +296,7 @@ Web Console 的审批操作和产品化 UI。
 ## 6. 当前建议操作
 
 ```text
-1. 补 MCP Server / 工具协议层的真实权限拦截；
+1. 补真实 MCP Server 进程和外部工具 adapter；
 2. pgvector 下一步从 ILIKE 搜索升级为 embedding 写入和向量相似度检索；
 3. 持续使用 Ubuntu + Docker 作为最终验证环境，数据库变更统一通过 Docker psql 执行。
 ```
