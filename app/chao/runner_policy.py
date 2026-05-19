@@ -24,6 +24,15 @@ class RunnerBranchPlan(TypedDict):
     reason: str
 
 
+class RunnerWorkspacePlan(TypedDict):
+    workspace_required: bool
+    workspace_path: str | None
+    branch_name: str | None
+    base_ref: str
+    create_command: list[str] | None
+    reason: str
+
+
 class RunnerScopeDecision(TypedDict):
     allowed: bool
     checked_paths: list[str]
@@ -229,4 +238,49 @@ def build_runner_branch_plan(
         "base_ref": base_ref,
         "create_command": ["git", "checkout", "-b", branch_name, base_ref],
         "reason": "执行型任务必须在 codex/ 前缀分支中运行。",
+    }
+
+
+def build_runner_workspace_plan(
+    *,
+    task_code: str,
+    title: str,
+    task_level: TaskLevel,
+    base_ref: str = "HEAD",
+) -> RunnerWorkspacePlan:
+    policy = build_runner_boundary_policy(task_level)
+
+    if not policy["can_execute"]:
+        return {
+            "workspace_required": False,
+            "workspace_path": None,
+            "branch_name": None,
+            "base_ref": base_ref,
+            "create_command": None,
+            "reason": f"{task_level} 任务只生成规划，不创建隔离工作区。",
+        }
+
+    branch_name = build_runner_branch_name(
+        task_code=task_code,
+        title=title,
+        branch_prefix=policy["required_branch_prefix"],
+    )
+    workspace_slug = normalize_branch_slug(branch_name.replace("/", "-"), fallback="runner")
+    workspace_path = f"{policy['sandbox_root']}/{workspace_slug}"
+
+    return {
+        "workspace_required": True,
+        "workspace_path": workspace_path,
+        "branch_name": branch_name,
+        "base_ref": base_ref,
+        "create_command": [
+            "git",
+            "worktree",
+            "add",
+            "-b",
+            branch_name,
+            workspace_path,
+            base_ref,
+        ],
+        "reason": "执行型任务应优先在 .chao/sandboxes 下的隔离 worktree 中运行。",
     }

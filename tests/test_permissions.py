@@ -14,7 +14,9 @@ def test_tool_registry_contains_first_batch():
         "cli.bind_github",
         "cli.runner_branch",
         "cli.runner_patch",
+        "cli.runner_sandbox",
         "cli.runner_validate",
+        "cli.runner_workspace",
         "schema_check",
         "data_boundary_check",
     }
@@ -80,6 +82,34 @@ def test_gongbu_can_create_controlled_runner_branch():
 
     assert decision["allowed"] is True
     assert decision["permission_policy"] == "controlled-runner-branch"
+    assert decision["risk_flag"] is None
+
+
+def test_gongbu_can_create_controlled_runner_workspace():
+    decision = evaluate_tool_permission(
+        agent_name="gongbu",
+        tool_name="cli.runner_workspace",
+        task_level="L2",
+        required_confirmation="B",
+        current_status="DELIVERED",
+    )
+
+    assert decision["allowed"] is True
+    assert decision["permission_policy"] == "controlled-runner-workspace"
+    assert decision["risk_flag"] is None
+
+
+def test_gongbu_can_run_controlled_runner_sandbox():
+    decision = evaluate_tool_permission(
+        agent_name="gongbu",
+        tool_name="cli.runner_sandbox",
+        task_level="L2",
+        required_confirmation="B",
+        current_status="DELIVERED",
+    )
+
+    assert decision["allowed"] is True
+    assert decision["permission_policy"] == "controlled-runner-sandbox"
     assert decision["risk_flag"] is None
 
 

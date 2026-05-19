@@ -4,6 +4,7 @@ from app.chao.runner_policy import (
     build_runner_boundary_policy,
     build_runner_branch_name,
     build_runner_branch_plan,
+    build_runner_workspace_plan,
     check_change_paths,
     evaluate_change_scope,
     is_change_path_allowed,
@@ -122,6 +123,42 @@ def test_runner_branch_plan_for_l4_does_not_create_execution_branch():
 
     assert plan["branch_required"] is False
     assert plan["branch_name"] is None
+    assert plan["create_command"] is None
+    assert "只生成规划" in plan["reason"]
+
+
+def test_runner_workspace_plan_for_l2_uses_sandbox_worktree():
+    plan = build_runner_workspace_plan(
+        task_code="TASK-20260511-191300-226866",
+        title="Patch demo",
+        task_level="L2",
+        base_ref="main",
+    )
+
+    assert plan["workspace_required"] is True
+    assert plan["workspace_path"] == ".chao/sandboxes/codex-task-20260511-191300-226866-patch-demo"
+    assert plan["branch_name"] == "codex/task-20260511-191300-226866-patch-demo"
+    assert plan["create_command"] == [
+        "git",
+        "worktree",
+        "add",
+        "-b",
+        "codex/task-20260511-191300-226866-patch-demo",
+        ".chao/sandboxes/codex-task-20260511-191300-226866-patch-demo",
+        "main",
+    ]
+
+
+def test_runner_workspace_plan_for_l4_does_not_create_workspace():
+    plan = build_runner_workspace_plan(
+        task_code="TASK-20260511-191300-226866",
+        title="Roadmap",
+        task_level="L4",
+        base_ref="main",
+    )
+
+    assert plan["workspace_required"] is False
+    assert plan["workspace_path"] is None
     assert plan["create_command"] is None
     assert "只生成规划" in plan["reason"]
 

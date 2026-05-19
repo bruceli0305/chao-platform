@@ -57,6 +57,20 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         "description": "Create or inspect the controlled Agent Runner branch.",
         "permission_policy": "controlled-runner-branch",
     },
+    "cli.runner_workspace": {
+        "name": "cli.runner_workspace",
+        "category": "git.write",
+        "risk": "medium",
+        "description": "Create or inspect the isolated Agent Runner worktree.",
+        "permission_policy": "controlled-runner-workspace",
+    },
+    "cli.runner_sandbox": {
+        "name": "cli.runner_sandbox",
+        "category": "docker.execute",
+        "risk": "medium",
+        "description": "Run allowlisted Agent Runner gates inside a Docker sandbox.",
+        "permission_policy": "controlled-runner-sandbox",
+    },
     "cli.runner_validate": {
         "name": "cli.runner_validate",
         "category": "shell.safe",
@@ -83,7 +97,12 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
 ROLE_ALLOWED_TOOLS: dict[str, set[str]] = {
     "shangshu": {"cli.new", "cli.bind_github"},
     "emperor": {"cli.approve"},
-    "gongbu": {"cli.runner_branch", "cli.runner_patch"},
+    "gongbu": {
+        "cli.runner_branch",
+        "cli.runner_patch",
+        "cli.runner_sandbox",
+        "cli.runner_workspace",
+    },
     "xingbu": {"schema_check", "data_boundary_check", "cli.runner_validate"},
     "hubu": {"data_boundary_check"},
     "menxia": {"schema_check", "data_boundary_check"},

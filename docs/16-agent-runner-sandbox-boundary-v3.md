@@ -59,6 +59,9 @@ H3 allowed scope 阻断已接入策略运行时和工部节点；
 H4 刑部验证计划和失败阻断已接入；
 H5 patch artifact 已接入，记录分支计划、变更范围和验证证据；
 H6 失败回流已接入，验证失败会生成 runner_failure_feedback artifact。
+H7 runner-branch CLI 已接入，可检查或真实创建 codex/ 执行分支；
+H8 runner-workspace CLI 已接入，可检查或真实创建 .chao/sandboxes 下的隔离 git worktree。
+H9 runner-sandbox CLI 已接入，可检查或真实执行 Docker sandbox allowlist gate。
 ```
 
 ## 6. 分支创建策略
@@ -69,6 +72,28 @@ H6 失败回流已接入，验证失败会生成 runner_failure_feedback artifac
 默认 base_ref 为 HEAD，可由调用方指定为 main 或其他安全基线；
 策略层只生成 create_command，不直接执行 git 命令；
 main / master / trunk、路径穿越、空格、反斜杠和异常 ref 语法必须拒绝。
+```
+
+## 6.1 隔离工作区策略
+
+```text
+Runner 优先使用 git worktree 创建隔离工作区；
+默认路径为 .chao/sandboxes/<safe-branch-slug>；
+创建命令为 git worktree add -b <codex/branch> <workspace_path> <base_ref>；
+命令默认 dry-run，只有显式 --apply 才创建工作区；
+如果目标工作区或目标分支已存在，必须拒绝真实创建；
+.chao/ 必须被 .gitignore 忽略，避免隔离执行物进入仓库。
+```
+
+## 6.2 Docker Sandbox 策略
+
+```text
+Runner Sandbox 使用 docker run --rm 执行 allowlist gate；
+默认镜像为 ghcr.io/astral-sh/uv:python3.12-bookworm-slim；
+默认挂载 workspace_path 到容器 /workspace，并以 /workspace 为工作目录；
+命令默认 dry-run，只有显式 --apply 才执行 Docker；
+manual_validation、milestone_review、secret_scan 等非自动 gate 不允许进入 Docker 自动执行；
+Docker 执行结果必须写入 task_events 和 tool_calls。
 ```
 
 ## 7. Allowed Scope 阻断

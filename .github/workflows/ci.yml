@@ -73,7 +73,21 @@ jobs:
         run: uv run pytest -q
 
       - name: Agent runner boundary smoke
-        run: uv run pytest tests/test_runner_policy.py tests/test_runner_executor.py tests/test_gongbu_runner_scope.py tests/test_cli_runner_patch.py tests/test_cli_runner_validate.py tests/test_cli_runner_attempt.py -q
+        run: |
+          uv run pytest \
+            tests/test_runner_policy.py \
+            tests/test_runner_branch.py \
+            tests/test_runner_workspace.py \
+            tests/test_runner_sandbox.py \
+            tests/test_runner_executor.py \
+            tests/test_gongbu_runner_scope.py \
+            tests/test_cli_runner_branch.py \
+            tests/test_cli_runner_workspace.py \
+            tests/test_cli_runner_sandbox.py \
+            tests/test_cli_runner_patch.py \
+            tests/test_cli_runner_validate.py \
+            tests/test_cli_runner_attempt.py \
+            -q
 
       - name: Agent runner validation smoke
         run: uv run pytest tests/test_runner_validation.py tests/test_xingbu_validation.py -q
@@ -176,6 +190,16 @@ jobs:
         run: |
           TASK_CODE=$(psql "$DATABASE_URL" -At -c "select task_code from tasks where task_level = 'L1' order by created_at desc limit 1;")
           uv run python main.py runner-patch "$TASK_CODE" main.py --old-text "from app.chao.cli import app" --new-text "from app.chao.cli import app"
+
+      - name: Verify runner workspace dry run
+        run: |
+          TASK_CODE=$(psql "$DATABASE_URL" -At -c "select task_code from tasks where task_level = 'L1' order by created_at desc limit 1;")
+          uv run python main.py runner-workspace "$TASK_CODE" --base-ref HEAD
+
+      - name: Verify runner sandbox dry run
+        run: |
+          TASK_CODE=$(psql "$DATABASE_URL" -At -c "select task_code from tasks where task_level = 'L1' order by created_at desc limit 1;")
+          uv run python main.py runner-sandbox "$TASK_CODE" --gate compile --workspace-path .
 
       - name: Verify runner validation command
         run: |

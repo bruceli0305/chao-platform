@@ -15,8 +15,10 @@ from app.chao.runner_executor import (
     apply_text_patch_operations,
     build_implementation_result_from_execution,
 )
-from app.chao.runner_policy import build_runner_branch_plan
+from app.chao.runner_policy import build_runner_branch_plan, build_runner_workspace_plan
+from app.chao.runner_sandbox import DEFAULT_SANDBOX_IMAGE, execute_runner_sandbox_commands
 from app.chao.runner_validation import execute_runner_validation_commands
+from app.chao.runner_workspace import create_runner_workspace
 from app.chao.services.artifacts import record_artifact
 from app.chao.services.console import (
     get_console_approval_queue,
@@ -621,6 +623,172 @@ def runner_branch_command(
             "branch_result": branch_result,
         }
     )
+
+
+@app.command("runner-workspace")
+def runner_workspace_command(
+    task_code: str,
+    base_ref: str = typer.Option("HEAD", "--base-ref", help="Git base ref for worktree creation"),
+    apply: bool = typer.Option(False, "--apply", help="Create the isolated runner worktree"),
+    by: str = typer.Option("gongbu", "--by", help="Runner agent name"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    try:
+        permission_decision = require_tool_permission(
+            agent_name=by,
+            tool_name="cli.runner_workspace",
+            task_level=task["task_level"],
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
+            current_status=task["status"],
+        )
+        workspace_plan = build_runner_workspace_plan(
+            task_code=task_code,
+            title=task.get("title", ""),
+            task_level=task["task_level"],
+            base_ref=base_ref,
+        )
+        workspace_result = create_runner_workspace(
+            workspace_plan,
+            dry_run=not apply,
+        )
+    except (PermissionError, RuntimeError, ValueError) as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    if workspace_result["created"]:
+        event_type = "runner_workspace_created"
+    elif workspace_result["workspace_required"]:
+        event_type = "runner_workspace_dry_run"
+    else:
+        event_type = "runner_workspace_skipped"
+
+    record_task_event(
+        task_id=task["id"],
+        event_type=event_type,
+        from_status=task["status"],
+        to_status=task["status"],
+        summary=f"Runner workspace {'created' if workspace_result['created'] else 'checked'}",
+        created_by=by,
+    )
+    record_tool_call(
+        task_id=task["id"],
+        agent_name=by,
+        tool_name="cli.runner_workspace",
+        arguments_summary=f"task_code={task_code}; base_ref={base_ref}; apply={apply}",
+        permission_policy=permission_decision["permission_policy"],
+        result_status="success",
+        permission_decision=permission_decision,
+        output_summary=(
+            f"workspace_path={workspace_result['workspace_path']}; "
+            f"created={workspace_result['created']}; errors={workspace_result['errors']}"
+        ),
+        risk_flag=permission_decision["risk_flag"],
+    )
+
+    print_json(
+        data={
+            "task_code": task_code,
+            "event_type": event_type,
+            "workspace_plan": workspace_plan,
+            "workspace_result": workspace_result,
+        }
+    )
+
+
+@app.command("runner-sandbox")
+def runner_sandbox_command(
+    task_code: str,
+    gate: Annotated[
+        list[str],
+        typer.Option("--gate", help="Validation gate to run in Docker sandbox"),
+    ],
+    workspace_path: str = typer.Option(".", "--workspace-path", help="Workspace path to mount"),
+    image: str = typer.Option(DEFAULT_SANDBOX_IMAGE, "--image", help="Docker image"),
+    apply: bool = typer.Option(False, "--apply", help="Run the sandbox commands"),
+    timeout_seconds: int = typer.Option(120, "--timeout", help="Per-command timeout seconds"),
+    by: str = typer.Option("gongbu", "--by", help="Runner agent name"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    try:
+        permission_decision = require_tool_permission(
+            agent_name=by,
+            tool_name="cli.runner_sandbox",
+            task_level=task["task_level"],
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
+            current_status=task["status"],
+        )
+        sandbox_result = execute_runner_sandbox_commands(
+            gate,
+            workspace_path=workspace_path,
+            image=image,
+            dry_run=not apply,
+            timeout_seconds=timeout_seconds,
+        )
+    except (PermissionError, RuntimeError, ValueError) as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    event_type = (
+        "runner_sandbox_dry_run"
+        if sandbox_result["dry_run"]
+        else ("runner_sandbox_passed" if sandbox_result["deliverable"] else "runner_sandbox_failed")
+    )
+    result_status = (
+        "success" if sandbox_result["dry_run"] or sandbox_result["deliverable"] else "failed"
+    )
+
+    record_task_event(
+        task_id=task["id"],
+        event_type=event_type,
+        from_status=task["status"],
+        to_status=task["status"],
+        summary=f"Runner sandbox {'planned' if sandbox_result['dry_run'] else 'executed'}",
+        created_by=by,
+    )
+    record_tool_call(
+        task_id=task["id"],
+        agent_name=by,
+        tool_name="cli.runner_sandbox",
+        arguments_summary=(
+            f"task_code={task_code}; gates={gate}; workspace_path={workspace_path}; "
+            f"image={image}; apply={apply}"
+        ),
+        permission_policy=permission_decision["permission_policy"],
+        result_status=result_status,
+        permission_decision=permission_decision,
+        output_summary=(
+            f"executed={sandbox_result['executed']}; "
+            f"deliverable={sandbox_result['deliverable']}; errors={sandbox_result['errors']}"
+        ),
+        risk_flag=permission_decision["risk_flag"],
+    )
+
+    print_json(
+        data={
+            "task_code": task_code,
+            "event_type": event_type,
+            "sandbox_result": sandbox_result,
+        }
+    )
+
+    if not sandbox_result["dry_run"] and not sandbox_result["deliverable"]:
+        raise typer.Exit(code=1)
 
 
 @app.command("runner-patch")
