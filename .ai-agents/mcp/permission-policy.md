@@ -40,11 +40,22 @@ uv run python main.py tool-gateway-serve
 
 ```text
 health；
+tools.list；
 tool.evaluate；
+tool.execute；
 tool.execute.echo。
 ```
 
-`tool.execute.echo` 只用于验证 adapter 拦截行为；真实工具 handler 必须后续显式注册。
+`tools.list` 返回已注册的真实工具 handler；
+`tool.execute` 必须携带 `request` 和可选 `arguments` 对象，执行前先经过权限网关；
+`tool.execute.echo` 只用于验证 adapter 拦截行为。
+
+当前真实 handler：
+
+```text
+schema_check；
+data_boundary_check。
+```
 
 ## 3. 审计字段
 

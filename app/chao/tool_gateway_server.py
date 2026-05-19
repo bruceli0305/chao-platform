@@ -7,6 +7,10 @@ from app.chao.tool_gateway import (
     evaluate_tool_gateway_request,
     execute_tool_gateway_request,
 )
+from app.chao.tool_gateway_handlers import (
+    execute_registered_tool_handler,
+    list_tool_handlers,
+)
 
 SERVER_NAME = "chao-tool-gateway"
 
@@ -63,6 +67,25 @@ def handle_tool_gateway_message(message: dict[str, Any]) -> dict[str, Any]:
         if method == "tool.evaluate":
             request = _request_from_params(params)
             return _success(message_id, evaluate_tool_gateway_request(request))
+
+        if method == "tools.list":
+            return _success(message_id, {"tools": list_tool_handlers()})
+
+        if method == "tool.execute":
+            request = _request_from_params(params)
+            arguments = params.get("arguments") or {}
+            if not isinstance(arguments, dict):
+                return _error(message_id, "invalid_params", "arguments must be an object")
+            return _success(
+                message_id,
+                execute_tool_gateway_request(
+                    request,
+                    lambda: execute_registered_tool_handler(
+                        request["tool_name"],
+                        arguments,
+                    ),
+                ),
+            )
 
         if method == "tool.execute.echo":
             request = _request_from_params(params)

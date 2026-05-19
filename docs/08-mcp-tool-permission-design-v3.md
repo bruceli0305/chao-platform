@@ -110,9 +110,19 @@ E8 外部工具 adapter：
 ```text
 app/chao/tool_gateway_server.py 提供 JSON Lines stdio adapter；
 CLI 命令为 uv run python main.py tool-gateway-serve；
-支持 health、tool.evaluate、tool.execute.echo；
-tool.execute.echo 仅用于验证外部进程的权限拦截，真实工具 handler 后续显式注册；
+支持 health、tools.list、tool.evaluate、tool.execute、tool.execute.echo；
+tool.execute.echo 仅用于验证外部进程的权限拦截；
 adapter 返回 JSON-RPC 风格响应，便于后续替换或包裹为标准 MCP Server。
+```
+
+E9 真实工具 handler 注册：
+
+```text
+app/chao/tool_gateway_handlers.py 提供受控 handler registry；
+当前注册 schema_check 与 data_boundary_check；
+tool.execute 根据 request.tool_name 查找 handler，并在权限网关允许后才执行；
+handler 进程内调用脚本 main()，捕获 stdout / stderr / exit_code，避免外部 shell 执行和 JSONL 输出串扰；
+未注册 handler 返回 failed 审计结果，不伪装成功。
 ```
 
 ## 7. 升级触发
