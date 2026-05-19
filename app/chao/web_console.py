@@ -62,6 +62,7 @@ def build_console_index_html() -> str:
     tr[data-task-code] { cursor: pointer; }
     tr[data-task-code]:hover { background: #f3f7fc; }
     .muted { color: #5f6c7b; font-size: 13px; }
+    .muted a { color: #1f6feb; }
   </style>
 </head>
 <body>
@@ -121,6 +122,9 @@ def build_console_index_html() -> str:
         <input id="task-code" name="task-code" placeholder="TASK-YYYYMMDD-HHMMSS-ffffff">
         <button type="submit">Load</button>
       </form>
+      <div id="task-link-row" class="muted">
+        Task link: <a id="task-link" href="#">No task selected</a>
+      </div>
       <div id="task-summary"></div>
       <div id="task-detail-tables"></div>
       <pre id="task-output">{}</pre>
@@ -391,10 +395,22 @@ def build_console_index_html() -> str:
       ].join("");
     }
 
-    function updateTaskUrl(taskCode) {
+    function buildTaskUrl(taskCode) {
       const url = new URL(window.location.href);
       url.searchParams.set("task", taskCode);
+      return url;
+    }
+
+    function updateTaskUrl(taskCode) {
+      const url = buildTaskUrl(taskCode);
       window.history.replaceState({}, "", url);
+    }
+
+    function updateTaskLink(taskCode) {
+      const url = buildTaskUrl(taskCode);
+      const link = document.querySelector("#task-link");
+      link.href = url;
+      link.textContent = url;
     }
 
     async function loadTaskDetail(taskCode, updateUrl = true) {
@@ -403,6 +419,7 @@ def build_console_index_html() -> str:
       document.querySelector("#task-summary").innerHTML = renderTaskSummary(detail);
       document.querySelector("#task-detail-tables").innerHTML = renderTaskDetailTables(detail);
       document.querySelector("#task-output").textContent = JSON.stringify(detail, null, 2);
+      updateTaskLink(taskCode);
       if (updateUrl) {
         updateTaskUrl(taskCode);
       }
