@@ -34,7 +34,8 @@ def test_execute_llm_chat_completion_dry_run_does_not_require_api_key():
     assert result.request["payload"]["messages"][0]["content"] == "<redacted>"
 
 
-def test_execute_llm_chat_completion_execute_requires_api_key():
+def test_execute_llm_chat_completion_execute_requires_api_key(monkeypatch):
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
     config = build_llm_provider_config(environ={})
 
     result = execute_llm_chat_completion(config, "hello", dry_run=False)
