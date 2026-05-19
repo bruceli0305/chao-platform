@@ -2,6 +2,7 @@ import json
 import sys
 from typing import Any, TextIO
 
+from app.chao.mcp_sdk import get_mcp_sdk_status
 from app.chao.tool_gateway import ToolGatewayRequest, execute_tool_gateway_request
 from app.chao.tool_gateway_handlers import (
     execute_registered_tool_handler,
@@ -115,6 +116,7 @@ def handle_mcp_message(message: dict[str, Any]) -> dict[str, Any] | None:
                         "name": SERVER_NAME,
                         "version": SERVER_VERSION,
                     },
+                    "sdk": get_mcp_sdk_status(),
                 },
             )
 

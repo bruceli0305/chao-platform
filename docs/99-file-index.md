@@ -19,6 +19,7 @@ This package uses English filenames to avoid ZIP encoding issues on Windows / Gi
 - `docs/06-technical-architecture-v3.md`
 - `docs/07-data-and-memory-architecture-v3.md`
 - `docs/08-mcp-tool-permission-design-v3.md`
+- `docs/17-llm-provider-config-v3.md`
 - `docs/09-skills-design-spec-v3.md`
 - `docs/10-engineering-gates-quality-system-v3.md`
 - `docs/11-data-storage-boundary-v3.md`

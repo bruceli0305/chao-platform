@@ -133,7 +133,8 @@ CLI 命令为 uv run python main.py mcp-serve；
 支持 initialize、notifications/initialized、tools/list、tools/call；
 tools/list 以 MCP 工具描述格式返回已注册 handler 与 inputSchema；
 tools/call 将 MCP 工具调用映射到 ToolGatewayRequest，仍先经过权限网关再执行 handler；
-当前尚未引入第三方 MCP SDK 包，后续可在该外壳稳定后替换为官方 SDK 实现。
+pyproject.toml 已声明官方 mcp 依赖，initialize 会返回 SDK 安装状态；
+后续需要做真实 MCP 客户端联调。
 ```
 
 ## 7. 升级触发

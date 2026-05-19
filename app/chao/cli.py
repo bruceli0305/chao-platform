@@ -8,6 +8,7 @@ from rich.console import Console
 from rich.table import Table
 
 from app.chao.graph.main_graph import build_graph
+from app.chao.llm_providers import build_llm_provider_config, list_llm_provider_defaults
 from app.chao.mcp_server import serve_mcp
 from app.chao.permissions import require_tool_permission
 from app.chao.runner_artifacts import save_failure_feedback_artifact, save_patch_artifact
@@ -557,6 +558,27 @@ def tool_gateway_serve_command():
 @app.command("mcp-serve")
 def mcp_serve_command():
     raise typer.Exit(code=serve_mcp())
+
+
+@app.command("llm-providers")
+def llm_providers_command(
+    provider: str | None = typer.Option(None, "--provider", help="Provider to resolve"),
+):
+    defaults = [
+        {
+            "name": item.name,
+            "api_style": item.api_style,
+            "base_url": item.base_url,
+            "api_key_env": item.api_key_env,
+            "model_env": item.model_env,
+            "default_model": item.default_model,
+            "notes": item.notes,
+        }
+        for item in list_llm_provider_defaults()
+    ]
+    selected = build_llm_provider_config(provider).to_safe_dict()
+
+    print_json(data={"providers": defaults, "selected": selected})
 
 
 @app.command("runner-branch")
