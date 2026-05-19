@@ -92,7 +92,7 @@ def build_llm_provider_config(
     provider: str | None = None,
     environ: Mapping[str, str] | None = None,
 ) -> LLMProviderConfig:
-    env = environ or os.environ
+    env = os.environ if environ is None else environ
     provider_name = (provider or env.get("CHAO_LLM_PROVIDER") or "deepseek").lower()
     defaults = get_llm_provider_defaults(provider_name)
 
