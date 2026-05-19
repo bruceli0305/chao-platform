@@ -28,9 +28,10 @@
 
 ```text
 uv run python main.py tool-gateway-serve
+uv run python main.py mcp-serve
 ```
 
-该命令通过 stdin/stdout 接收 JSON Lines：
+`tool-gateway-serve` 通过 stdin/stdout 接收朝内部 JSON Lines：
 
 ```json
 {"jsonrpc":"2.0","id":"1","method":"tool.evaluate","params":{"request":{"protocol":"jsonl","agent_name":"gongbu","tool_name":"cli.runner_patch","task_level":"L2","required_confirmation":"B","current_status":"DELIVERED","arguments_summary":"path=app/chao/demo.py"}}}
@@ -56,6 +57,19 @@ tool.execute.echo。
 schema_check；
 data_boundary_check。
 ```
+
+`mcp-serve` 通过 stdin/stdout 接收 MCP 风格 JSON-RPC：
+
+```text
+initialize；
+notifications/initialized；
+tools/list；
+tools/call。
+```
+
+`tools/call` 的 `params.name` 必须是已注册 handler 名称；`params.arguments`
+必须携带 `agent_name`、`task_level`、`required_confirmation`、`current_status`
+和 `arguments_summary`，并可通过 `arguments.arguments` 传递工具参数。
 
 ## 3. 审计字段
 

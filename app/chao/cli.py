@@ -8,6 +8,7 @@ from rich.console import Console
 from rich.table import Table
 
 from app.chao.graph.main_graph import build_graph
+from app.chao.mcp_server import serve_mcp
 from app.chao.permissions import require_tool_permission
 from app.chao.runner_artifacts import save_failure_feedback_artifact, save_patch_artifact
 from app.chao.runner_branch import create_runner_branch
@@ -551,6 +552,11 @@ def web_console_command(
 @app.command("tool-gateway-serve")
 def tool_gateway_serve_command():
     raise typer.Exit(code=serve_tool_gateway())
+
+
+@app.command("mcp-serve")
+def mcp_serve_command():
+    raise typer.Exit(code=serve_mcp())
 
 
 @app.command("runner-branch")
