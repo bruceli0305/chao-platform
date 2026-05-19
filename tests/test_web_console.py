@@ -13,7 +13,14 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "#overview-section" in html
     assert "#task-detail-section" in html
     assert "selectedLimit" in html
-    assert "/api/console?limit=${limit}" in html
+    assert "task-search" in html
+    assert "status-filter" in html
+    assert "level-filter" in html
+    assert "selectedTaskFilters" in html
+    assert "buildOverviewQuery" in html
+    assert "updateFilterUrl" in html
+    assert "hydrateFiltersFromUrl" in html
+    assert "/api/console?${buildOverviewQuery(limit, filters)}" in html
     assert "/api/console/approvals?limit=${limit}" in html
     assert "/api/console/audit?limit=${limit}" in html
     assert "/api/console/gates?limit=${limit}" in html
@@ -55,14 +62,50 @@ def test_build_console_response_returns_overview(monkeypatch):
     monkeypatch.setattr(
         web_console,
         "get_console_overview",
-        lambda limit=20: calls.append(limit) or {"task_status_counts": {"DELIVERED": 1}},
+        lambda limit=20, **filters: (
+            calls.append((limit, filters)) or {"task_status_counts": {"DELIVERED": 1}}
+        ),
     )
 
     status_code, payload = web_console.build_console_response("/api/console", "limit=3")
 
     assert status_code == HTTPStatus.OK
     assert payload["task_status_counts"] == {"DELIVERED": 1}
-    assert calls == [3]
+    assert calls == [(3, {"search": None, "status": None, "task_level": None})]
+
+
+def test_build_console_response_passes_overview_filters(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(
+        web_console,
+        "get_console_overview",
+        lambda limit=20, **filters: (
+            calls.append((limit, filters)) or {"filters": filters, "recent_tasks": []}
+        ),
+    )
+
+    status_code, payload = web_console.build_console_response(
+        "/api/console",
+        "limit=5&search=TASK-1&status=DELIVERED&task_level=L2",
+    )
+
+    assert status_code == HTTPStatus.OK
+    assert payload["filters"] == {
+        "search": "TASK-1",
+        "status": "DELIVERED",
+        "task_level": "L2",
+    }
+    assert calls == [
+        (
+            5,
+            {
+                "search": "TASK-1",
+                "status": "DELIVERED",
+                "task_level": "L2",
+            },
+        )
+    ]
 
 
 def test_build_console_response_clamps_limit(monkeypatch):

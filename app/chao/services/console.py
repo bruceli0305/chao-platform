@@ -16,7 +16,33 @@ def _route_value(route_result: dict[str, Any] | None, key: str) -> Any:
     return route_result.get(key)
 
 
-def get_console_overview(limit: int = 10) -> dict[str, Any]:
+def get_console_overview(
+    limit: int = 10,
+    *,
+    search: str | None = None,
+    status: str | None = None,
+    task_level: str | None = None,
+) -> dict[str, Any]:
+    where_clauses = []
+    params: list[Any] = []
+
+    if search:
+        pattern = f"%{search}%"
+        where_clauses.append("(task_code ilike %s or title ilike %s)")
+        params.extend([pattern, pattern])
+
+    if status:
+        where_clauses.append("status = %s")
+        params.append(status)
+
+    if task_level:
+        where_clauses.append("task_level = %s")
+        params.append(task_level)
+
+    where_sql = ""
+    if where_clauses:
+        where_sql = "where " + " and ".join(where_clauses)
+
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -64,7 +90,7 @@ def get_console_overview(limit: int = 10) -> dict[str, Any]:
             failed_tool_call_count = cur.fetchone()[0]
 
             cur.execute(
-                """
+                f"""
                 select
                     task_code,
                     title,
@@ -73,14 +99,20 @@ def get_console_overview(limit: int = 10) -> dict[str, Any]:
                     owner,
                     created_at::text
                 from tasks
+                {where_sql}
                 order by created_at desc
                 limit %s
                 """,
-                (limit,),
+                (*params, limit),
             )
             recent_task_rows = cur.fetchall()
 
     return {
+        "filters": {
+            "search": search,
+            "status": status,
+            "task_level": task_level,
+        },
         "task_status_counts": _rows_to_counts(task_status_rows),
         "task_level_counts": _rows_to_counts(task_level_rows),
         "approved_confirmations": approved_confirmations,

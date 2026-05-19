@@ -44,10 +44,15 @@ def build_console_index_html() -> str:
     .metric strong { display: block; font-size: 22px; margin-top: 6px; }
     form { display: flex; gap: 8px; flex-wrap: wrap; }
     .controls { align-items: center; }
-    .controls input { max-width: 90px; min-width: 90px; }
+    .controls input[type="number"] { max-width: 90px; min-width: 90px; }
+    .controls input[type="search"] { max-width: 320px; min-width: 220px; }
     input {
       min-width: 280px; flex: 1; padding: 9px 10px;
       border: 1px solid #cbd3df; border-radius: 6px;
+    }
+    select {
+      padding: 9px 10px; border: 1px solid #cbd3df; border-radius: 6px;
+      background: #fff;
     }
     button {
       padding: 9px 12px; border: 0; border-radius: 6px;
@@ -86,6 +91,25 @@ def build_console_index_html() -> str:
       <form id="refresh-form" class="controls">
         <label for="record-limit">Limit</label>
         <input id="record-limit" name="record-limit" type="number" min="1" max="100" value="8">
+        <label for="task-search">Search</label>
+        <input id="task-search" name="task-search" type="search" placeholder="Task code or title">
+        <label for="status-filter">Status</label>
+        <select id="status-filter" name="status-filter">
+          <option value="">All</option>
+          <option value="DELIVERED">DELIVERED</option>
+          <option value="NEED_CONFIRMATION">NEED_CONFIRMATION</option>
+          <option value="DESIGNING">DESIGNING</option>
+          <option value="MILESTONE_PLANNING">MILESTONE_PLANNING</option>
+          <option value="VALIDATION_FAILED">VALIDATION_FAILED</option>
+        </select>
+        <label for="level-filter">Level</label>
+        <select id="level-filter" name="level-filter">
+          <option value="">All</option>
+          <option value="L1">L1</option>
+          <option value="L2">L2</option>
+          <option value="L3">L3</option>
+          <option value="L4">L4</option>
+        </select>
         <button type="submit">Refresh</button>
         <span id="last-updated" class="muted">Not loaded</span>
       </form>
@@ -436,13 +460,58 @@ def build_console_index_html() -> str:
       return Math.min(Math.max(value, 1), 100);
     }
 
+    function selectedTaskFilters() {
+      return {
+        search: document.querySelector("#task-search").value.trim(),
+        status: document.querySelector("#status-filter").value,
+        task_level: document.querySelector("#level-filter").value
+      };
+    }
+
+    function buildOverviewQuery(limit, filters) {
+      const params = new URLSearchParams();
+      params.set("limit", limit);
+      if (filters.search) params.set("search", filters.search);
+      if (filters.status) params.set("status", filters.status);
+      if (filters.task_level) params.set("task_level", filters.task_level);
+      return params.toString();
+    }
+
+    function updateFilterUrl(limit, filters) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("limit", limit);
+      for (const key of ["search", "status", "task_level"]) {
+        if (filters[key]) {
+          url.searchParams.set(key, filters[key]);
+        } else {
+          url.searchParams.delete(key);
+        }
+      }
+      window.history.replaceState({}, "", url);
+    }
+
+    function hydrateFiltersFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const limit = params.get("limit");
+      const search = params.get("search");
+      const status = params.get("status");
+      const taskLevel = params.get("task_level");
+
+      if (limit) document.querySelector("#record-limit").value = limit;
+      if (search) document.querySelector("#task-search").value = search;
+      if (status) document.querySelector("#status-filter").value = status;
+      if (taskLevel) document.querySelector("#level-filter").value = taskLevel;
+    }
+
     async function refresh() {
       const limit = selectedLimit();
-      const overview = await loadJson(`/api/console?limit=${limit}`);
+      const filters = selectedTaskFilters();
+      const overview = await loadJson(`/api/console?${buildOverviewQuery(limit, filters)}`);
       const risks = await loadJson(`/api/console/risks?limit=${limit}`);
       const gates = await loadJson(`/api/console/gates?limit=${limit}`);
       const audit = await loadJson(`/api/console/audit?limit=${limit}`);
       const approvals = await loadJson(`/api/console/approvals?limit=${limit}`);
+      updateFilterUrl(limit, filters);
       const overviewMetrics = {
         artifacts: overview.artifact_count ?? 0,
         data_assets: overview.data_asset_count ?? 0,
@@ -509,6 +578,7 @@ def build_console_index_html() -> str:
     });
 
     async function boot() {
+      hydrateFiltersFromUrl();
       await refresh();
       const taskCode = new URLSearchParams(window.location.search).get("task");
       if (taskCode) {
@@ -539,14 +609,34 @@ def _parse_limit(query: dict[str, list[str]]) -> int:
     return min(max(limit, 1), MAX_LIMIT)
 
 
+def _parse_optional_filter(query: dict[str, list[str]], name: str) -> str | None:
+    values = query.get(name, [])
+    if not values:
+        return None
+
+    value = values[0].strip()
+    if not value:
+        return None
+
+    return value
+
+
 def build_console_response(path: str, query_string: str = "") -> tuple[int, dict[str, Any]]:
     query = parse_qs(query_string)
     limit = _parse_limit(query)
+    search = _parse_optional_filter(query, "search")
+    status = _parse_optional_filter(query, "status")
+    task_level = _parse_optional_filter(query, "task_level")
 
     if path == "/health":
         return HTTPStatus.OK, {"status": "ok"}
     if path == "/api/console":
-        return HTTPStatus.OK, get_console_overview(limit=limit)
+        return HTTPStatus.OK, get_console_overview(
+            limit=limit,
+            search=search,
+            status=status,
+            task_level=task_level,
+        )
     if path == "/api/console/approvals":
         return HTTPStatus.OK, {"approvals": get_console_approval_queue(limit=limit)}
     if path == "/api/console/audit":
