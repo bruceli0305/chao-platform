@@ -106,6 +106,7 @@ def build_console_index_html() -> str:
         <button type="submit">Load</button>
       </form>
       <div id="task-summary"></div>
+      <div id="task-detail-tables"></div>
       <pre id="task-output">{}</pre>
     </section>
   </main>
@@ -325,10 +326,60 @@ def build_console_index_html() -> str:
       `;
     }
 
+    function renderTaskDetailTables(task) {
+      if (task.error) {
+        return "";
+      }
+
+      return [
+        renderRiskTable("Task Events", task.events ?? [
+        ], [
+          { key: "event_type", label: "Event" },
+          { key: "from_status", label: "From" },
+          { key: "to_status", label: "To" },
+          { key: "created_by", label: "By" }
+        ]),
+        renderRiskTable("Task Tool Calls", task.tool_calls ?? [
+        ], [
+          { key: "agent_name", label: "Agent" },
+          { key: "tool_name", label: "Tool" },
+          { key: "result_status", label: "Result" },
+          { key: "risk_flag", label: "Risk" }
+        ]),
+        renderRiskTable("Task Artifacts", task.artifacts ?? [
+        ], [
+          { key: "artifact_type", label: "Type" },
+          { key: "artifact_uri", label: "URI" },
+          { key: "access_level", label: "Access" }
+        ]),
+        renderRiskTable("Task Data Assets", task.data_assets ?? [
+        ], [
+          { key: "asset_type", label: "Type" },
+          { key: "classification", label: "Class" },
+          { key: "owner", label: "Owner" },
+          { key: "primary_storage", label: "Storage" }
+        ]),
+        renderRiskTable("Task GitHub Links", task.github_links ?? [
+        ], [
+          { key: "link_type", label: "Type" },
+          { key: "external_id", label: "External ID" },
+          { key: "status", label: "Status" },
+          { key: "url", label: "URL" }
+        ]),
+        renderRiskTable("Task Gate Results", task.gate_results ?? [
+        ], [
+          { key: "gate_name", label: "Gate" },
+          { key: "status", label: "Status" },
+          { key: "command", label: "Command" }
+        ])
+      ].join("");
+    }
+
     async function loadTaskDetail(taskCode) {
       const detail = await loadJson(`/api/console/tasks/${encodeURIComponent(taskCode)}`);
       document.querySelector("#task-code").value = taskCode;
       document.querySelector("#task-summary").innerHTML = renderTaskSummary(detail);
+      document.querySelector("#task-detail-tables").innerHTML = renderTaskDetailTables(detail);
       document.querySelector("#task-output").textContent = JSON.stringify(detail, null, 2);
     }
 
