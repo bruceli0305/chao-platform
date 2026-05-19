@@ -1,4 +1,4 @@
-from scripts.search_context import map_context_row
+from scripts.search_context import map_context_row, search_context
 
 
 def test_map_context_row():
@@ -12,7 +12,7 @@ def test_map_context_row():
         "project_default",
         "ingest_markdown",
         "2026-05-11 12:00:00+08",
-        "数据边界摘要",
+        "context preview",
     )
 
     assert map_context_row(row) == {
@@ -25,5 +25,32 @@ def test_map_context_row():
         "retention_policy": "project_default",
         "created_by": "ingest_markdown",
         "created_at": "2026-05-11 12:00:00+08",
-        "content_preview": "数据边界摘要",
+        "content_preview": "context preview",
     }
+
+
+def test_map_context_row_includes_vector_distance():
+    row = (
+        "docs/11-data-storage-boundary-v3.md",
+        "documentation",
+        "D1",
+        "abc123",
+        True,
+        True,
+        "project_default",
+        "ingest_markdown",
+        "2026-05-11 12:00:00+08",
+        "context preview",
+        0.123,
+    )
+
+    assert map_context_row(row)["vector_distance"] == 0.123
+
+
+def test_search_context_rejects_unknown_mode():
+    try:
+        search_context("data-boundary", mode="unknown")
+    except ValueError as exc:
+        assert str(exc) == "unsupported search mode: unknown"
+    else:
+        raise AssertionError("expected unsupported mode to raise ValueError")

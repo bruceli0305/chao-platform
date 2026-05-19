@@ -4,7 +4,6 @@ import sys
 import psycopg
 from dotenv import load_dotenv
 
-
 REQUIRED_TABLES = [
     "tasks",
     "task_routes",
@@ -45,6 +44,7 @@ REQUIRED_COLUMNS = {
         "ingest_allowed",
         "retention_policy",
         "created_by",
+        "embedding",
     ],
     "tool_calls": [
         "permission_decision",

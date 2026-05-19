@@ -1,4 +1,5 @@
 from scripts import ingest_markdown
+from scripts.context_embeddings import EMBEDDING_DIMENSIONS, EMBEDDING_MODEL
 from scripts.ingest_markdown import (
     build_data_asset_record,
     build_dry_run_report,
@@ -74,6 +75,8 @@ def test_collect_candidates_keeps_content_for_write(tmp_path):
     assert rejected == []
     assert candidates[0]["source_uri"] == "docs/policy.md"
     assert candidates[0]["content"] == "Policy"
+    assert len(candidates[0]["embedding"]) == EMBEDDING_DIMENSIONS
+    assert candidates[0]["embedding_model"] == EMBEDDING_MODEL
 
 
 def test_extract_task_code_from_task_record_path():
@@ -106,7 +109,7 @@ def test_build_data_asset_record():
         "desensitized": True,
         "retention_days": 3650,
         "owner": "historian",
-        "notes": "source_hash=abc123; source_type=documentation",
+        "notes": "source_hash=abc123; source_type=documentation; embedding_model=local-hash-v1",
     }
 
 
@@ -157,6 +160,8 @@ def test_write_ingest_results_skips_task_record_without_task(monkeypatch):
                 "retention_policy": "project_default",
                 "created_by": "ingest_markdown",
                 "content": "summary",
+                "embedding": [0.0] * EMBEDDING_DIMENSIONS,
+                "embedding_model": EMBEDDING_MODEL,
             }
         ]
     )
@@ -170,6 +175,7 @@ def test_summarize_candidate_removes_content():
     candidate = {
         "source_uri": "README.md",
         "content": "full content",
+        "embedding": [0.0] * EMBEDDING_DIMENSIONS,
         "source_hash": "abc123",
     }
 

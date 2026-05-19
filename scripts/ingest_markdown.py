@@ -10,8 +10,20 @@ from dotenv import load_dotenv
 
 try:
     from scripts import data_boundary_check
+    from scripts.context_embeddings import (
+        EMBEDDING_DIMENSIONS,
+        EMBEDDING_MODEL,
+        build_local_embedding,
+        format_pgvector,
+    )
 except ModuleNotFoundError:
     import data_boundary_check
+    from context_embeddings import (
+        EMBEDDING_DIMENSIONS,
+        EMBEDDING_MODEL,
+        build_local_embedding,
+        format_pgvector,
+    )
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -69,6 +81,9 @@ def build_candidate(root: Path, repo_path: str) -> dict[str, Any]:
         "retention_policy": "project_default",
         "created_by": "ingest_markdown",
         "content": content,
+        "embedding": build_local_embedding(content),
+        "embedding_model": EMBEDDING_MODEL,
+        "embedding_dimensions": EMBEDDING_DIMENSIONS,
     }
 
 
@@ -100,7 +115,11 @@ def build_data_asset_record(candidate: dict[str, Any], task_id: str | None) -> d
         "desensitized": candidate["redacted"],
         "retention_days": 3650,
         "owner": "historian",
-        "notes": f"source_hash={candidate['source_hash']}; source_type={candidate['source_type']}",
+        "notes": (
+            f"source_hash={candidate['source_hash']}; "
+            f"source_type={candidate['source_type']}; "
+            f"embedding_model={candidate.get('embedding_model', EMBEDDING_MODEL)}"
+        ),
     }
 
 
@@ -168,7 +187,7 @@ def build_dry_run_report(root: Path, tracked_files: list[str]) -> dict[str, Any]
 
 
 def summarize_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in candidate.items() if key != "content"}
+    return {key: value for key, value in candidate.items() if key not in {"content", "embedding"}}
 
 
 def build_report(
@@ -256,7 +275,8 @@ def write_ingest_results(candidates: list[dict[str, Any]]) -> tuple[int, int, in
                         ingest_allowed,
                         retention_policy,
                         created_by,
-                        content
+                        content,
+                        embedding
                     )
                     values (
                         gen_random_uuid(),
@@ -268,7 +288,8 @@ def write_ingest_results(candidates: list[dict[str, Any]]) -> tuple[int, int, in
                         %s,
                         %s,
                         %s,
-                        %s
+                        %s,
+                        %s::vector
                     )
                     """,
                     (
@@ -281,6 +302,7 @@ def write_ingest_results(candidates: list[dict[str, Any]]) -> tuple[int, int, in
                         candidate["retention_policy"],
                         candidate["created_by"],
                         candidate["content"],
+                        format_pgvector(candidate["embedding"]),
                     ),
                 )
                 written_count += 1

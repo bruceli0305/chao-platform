@@ -10,6 +10,7 @@ def test_context_chunks_metadata_columns_are_required():
         "ingest_allowed",
         "retention_policy",
         "created_by",
+        "embedding",
     ]
 
 
