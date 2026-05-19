@@ -37,6 +37,9 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "renderTaskDetailTables" in html
     assert "Task Tool Calls" in html
     assert "Task Gate Results" in html
+    assert "URLSearchParams(window.location.search)" in html
+    assert "history.replaceState" in html
+    assert "loadTaskDetail(taskCode, false)" in html
     assert "gate_results" in html
     assert "Runner Failures" in html
     assert "data-task-code" in html

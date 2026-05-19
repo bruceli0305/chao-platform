@@ -391,12 +391,21 @@ def build_console_index_html() -> str:
       ].join("");
     }
 
-    async function loadTaskDetail(taskCode) {
+    function updateTaskUrl(taskCode) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("task", taskCode);
+      window.history.replaceState({}, "", url);
+    }
+
+    async function loadTaskDetail(taskCode, updateUrl = true) {
       const detail = await loadJson(`/api/console/tasks/${encodeURIComponent(taskCode)}`);
       document.querySelector("#task-code").value = taskCode;
       document.querySelector("#task-summary").innerHTML = renderTaskSummary(detail);
       document.querySelector("#task-detail-tables").innerHTML = renderTaskDetailTables(detail);
       document.querySelector("#task-output").textContent = JSON.stringify(detail, null, 2);
+      if (updateUrl) {
+        updateTaskUrl(taskCode);
+      }
     }
 
     async function loadJson(path) {
@@ -482,7 +491,15 @@ def build_console_index_html() -> str:
       await loadTaskDetail(row.dataset.taskCode);
     });
 
-    refresh().catch((error) => {
+    async function boot() {
+      await refresh();
+      const taskCode = new URLSearchParams(window.location.search).get("task");
+      if (taskCode) {
+        await loadTaskDetail(taskCode, false);
+      }
+    }
+
+    boot().catch((error) => {
       document.querySelector("#overview").innerHTML =
         `<div class="metric">Load failed<strong>${error}</strong></div>`;
     });
