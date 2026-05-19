@@ -48,6 +48,7 @@ uv run python main.py llm-providers --provider deepseek
 uv run python main.py llm-providers --provider openai-compatible
 uv run python main.py llm-chat TASK-xxxx "summarize this task"
 uv run python main.py llm-chat TASK-xxxx "summarize this task" --execute
+uv run python main.py llm-chat TASK-xxxx "summarize this task" --data-classification D1 --execute
 ```
 
 `llm-chat` 会根据 `TASK_CODE` 读取任务详情，并将任务标题、原始需求、路由、
@@ -98,9 +99,23 @@ api_key / apikey / secret / token / password 赋值片段。
 zhongshu
 ```
 
-## 5. 后续
+## 5. 外发策略
+
+`llm-chat` 在真实外发前执行 LLM egress policy：
 
 ```text
-按任务等级限制可用 Provider 和模型；
-为 D2 / D3 数据增加脱敏与禁止外发策略。
+dry-run：允许，不调用外部 Provider；
+--execute：仅允许 L1 / L2 任务；
+--execute：仅允许 D0 / D1 数据；
+任务 data_assets 中出现更高分级时，以最高分级为准；
+D2 / D3 / D4、L3 / L4 或未知分级会被拒绝外发，并写入 tool_calls 审计。
+```
+
+`--data-classification` 用于声明本次 prompt 中包含的最高数据分级，默认 `D1`。
+
+## 6. 后续
+
+```text
+按 Provider / 模型增加更细粒度 allowlist；
+为 L3 / L4 增加人工确认后的临时外发授权流程。
 ```

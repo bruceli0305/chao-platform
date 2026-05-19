@@ -10,6 +10,7 @@ from rich.table import Table
 from app.chao.graph.main_graph import build_graph
 from app.chao.llm_client import execute_llm_chat_completion
 from app.chao.llm_context import build_llm_task_prompt
+from app.chao.llm_policy import evaluate_llm_egress_policy, resolve_task_data_classification
 from app.chao.llm_providers import build_llm_provider_config, list_llm_provider_defaults
 from app.chao.mcp_server import serve_mcp
 from app.chao.permissions import require_tool_permission
@@ -590,6 +591,11 @@ def llm_chat_command(
     provider: str | None = typer.Option(None, "--provider", help="LLM provider"),
     by: str = typer.Option("zhongshu", "--by", help="Agent name"),
     system_prompt: str | None = typer.Option(None, "--system", help="Optional system prompt"),
+    data_classification: str = typer.Option(
+        "D1",
+        "--data-classification",
+        help="Highest data classification included in the LLM prompt",
+    ),
     temperature: float = typer.Option(0.2, "--temperature", min=0.0, max=2.0),
     max_tokens: int = typer.Option(1024, "--max-tokens", min=1),
     execute: bool = typer.Option(False, "--execute", help="Call the external provider"),
@@ -613,19 +619,50 @@ def llm_chat_command(
             current_status=task["status"],
         )
         llm_prompt = build_llm_task_prompt(task, prompt)
-        result = execute_llm_chat_completion(
-            provider_config,
-            llm_prompt,
-            system_prompt=system_prompt,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            dry_run=not execute,
+        resolved_classification = resolve_task_data_classification(task, data_classification)
+        egress_decision = evaluate_llm_egress_policy(
+            task_level=task["task_level"],
+            data_classification=resolved_classification,
+            provider=provider_config.name,
+            execute=execute,
         )
+        if egress_decision.allowed:
+            result = execute_llm_chat_completion(
+                provider_config,
+                llm_prompt,
+                system_prompt=system_prompt,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                dry_run=not execute,
+            )
+            result_payload = result.to_safe_dict()
+            result_status = "success" if result.status in {"success", "dry_run"} else "failed"
+            output_summary = (
+                f"provider={provider_config.name}; model={provider_config.model}; "
+                f"status={result.status}; dry_run={result.dry_run}; "
+                f"data_classification={resolved_classification}; error={result.error}"
+            )
+        else:
+            result_payload = {
+                "provider": provider_config.name,
+                "model": provider_config.model,
+                "status": "denied",
+                "dry_run": not execute,
+                "request": None,
+                "response": None,
+                "error": egress_decision.reason,
+                "egress_policy": egress_decision.to_dict(),
+            }
+            result_status = "denied"
+            output_summary = (
+                f"provider={provider_config.name}; model={provider_config.model}; "
+                f"status=denied; dry_run={not execute}; "
+                f"data_classification={resolved_classification}; error={egress_decision.reason}"
+            )
     except (PermissionError, RuntimeError, ValueError) as exc:
         print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
-    result_status = "success" if result.status in {"success", "dry_run"} else "failed"
     record_tool_call(
         task_id=task["id"],
         agent_name=by,
@@ -633,19 +670,20 @@ def llm_chat_command(
         arguments_summary=(
             f"task_code={task_code}; provider={provider_config.name}; "
             f"model={provider_config.model}; user_prompt_chars={len(prompt)}; "
-            f"llm_prompt_chars={len(llm_prompt)}; execute={execute}"
+            f"llm_prompt_chars={len(llm_prompt)}; data_classification={resolved_classification}; "
+            f"execute={execute}"
         ),
         permission_policy=permission_decision["permission_policy"],
         result_status=result_status,
-        permission_decision=permission_decision,
-        output_summary=(
-            f"provider={provider_config.name}; model={provider_config.model}; "
-            f"status={result.status}; dry_run={result.dry_run}; error={result.error}"
-        ),
-        risk_flag=permission_decision["risk_flag"],
+        permission_decision={
+            **permission_decision,
+            "egress_policy": egress_decision.to_dict(),
+        },
+        output_summary=output_summary,
+        risk_flag=permission_decision["risk_flag"] or not egress_decision.allowed,
     )
 
-    print_json(data=result.to_safe_dict())
+    print_json(data=result_payload)
 
     if result_status != "success":
         raise typer.Exit(code=1)
