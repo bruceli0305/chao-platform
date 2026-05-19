@@ -161,6 +161,7 @@ Web Console 审计链面板已定义，可查看事件、工具调用、Artifact
 Web Console 刷新控制已定义，可调整查询数量并手动刷新页面数据；
 Web Console 任务详情摘要已定义，可查看基础字段和审计对象计数；
 Web Console 任务详情审计表已定义，可查看单任务事件、工具调用、Artifacts、Data Assets、GitHub links 和 gate 结果；
+Web Console 页面导航已定义，可快速跳转各只读面板；
 任务详情 show 已包含 events / tool_calls / artifacts / data_assets。
 ```
 

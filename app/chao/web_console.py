@@ -32,6 +32,12 @@ def build_console_index_html() -> str:
     h1, h2 { margin: 0; letter-spacing: 0; }
     h1 { font-size: 22px; }
     h2 { font-size: 16px; }
+    nav { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    nav a {
+      color: #fff; text-decoration: none; border: 1px solid #56708c;
+      border-radius: 6px; padding: 5px 8px; font-size: 13px;
+    }
+    nav a:hover { background: #1c3a5b; }
     section { background: #fff; border: 1px solid #d9dee7; border-radius: 8px; padding: 16px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
     .metric { border: 1px solid #e2e7ef; border-radius: 6px; padding: 12px; background: #fbfcfe; }
@@ -62,9 +68,19 @@ def build_console_index_html() -> str:
   <header>
     <h1>Chao Console</h1>
     <div class="muted">Read-only local control plane</div>
+    <nav aria-label="Console sections">
+      <a href="#controls-section">Controls</a>
+      <a href="#overview-section">Overview</a>
+      <a href="#risks-section">Risks</a>
+      <a href="#gates-section">Gates</a>
+      <a href="#audit-section">Audit</a>
+      <a href="#approvals-section">Approvals</a>
+      <a href="#recent-section">Recent</a>
+      <a href="#task-detail-section">Task Detail</a>
+    </nav>
   </header>
   <main>
-    <section>
+    <section id="controls-section">
       <h2>Controls</h2>
       <form id="refresh-form" class="controls">
         <label for="record-limit">Limit</label>
@@ -73,33 +89,33 @@ def build_console_index_html() -> str:
         <span id="last-updated" class="muted">Not loaded</span>
       </form>
     </section>
-    <section>
+    <section id="overview-section">
       <h2>Overview</h2>
       <div id="overview" class="grid"></div>
     </section>
-    <section>
+    <section id="risks-section">
       <h2>Risks</h2>
       <div id="risks" class="grid"></div>
       <div id="risk-details"></div>
     </section>
-    <section>
+    <section id="gates-section">
       <h2>Gates</h2>
       <div id="gates" class="grid"></div>
       <div id="gate-details"></div>
     </section>
-    <section>
+    <section id="audit-section">
       <h2>Audit Trail</h2>
       <div id="audit-trail"></div>
     </section>
-    <section>
+    <section id="approvals-section">
       <h2>Approval Queue</h2>
       <div id="approval-queue"></div>
     </section>
-    <section>
+    <section id="recent-section">
       <h2>Recent Tasks</h2>
       <div id="recent-tasks"></div>
     </section>
-    <section>
+    <section id="task-detail-section">
       <h2>Task Detail</h2>
       <form id="task-form">
         <input id="task-code" name="task-code" placeholder="TASK-YYYYMMDD-HHMMSS-ffffff">

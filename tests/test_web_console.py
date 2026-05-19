@@ -9,6 +9,9 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "<title>Chao Console</title>" in html
     assert "record-limit" in html
     assert "Refresh" in html
+    assert "Console sections" in html
+    assert "#overview-section" in html
+    assert "#task-detail-section" in html
     assert "selectedLimit" in html
     assert "/api/console?limit=${limit}" in html
     assert "/api/console/approvals?limit=${limit}" in html
