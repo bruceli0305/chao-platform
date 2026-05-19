@@ -8,6 +8,7 @@ from rich.console import Console
 from rich.table import Table
 
 from app.chao.graph.main_graph import build_graph
+from app.chao.llm_client import execute_llm_chat_completion
 from app.chao.llm_providers import build_llm_provider_config, list_llm_provider_defaults
 from app.chao.mcp_server import serve_mcp
 from app.chao.permissions import require_tool_permission
@@ -579,6 +580,72 @@ def llm_providers_command(
     selected = build_llm_provider_config(provider).to_safe_dict()
 
     print_json(data={"providers": defaults, "selected": selected})
+
+
+@app.command("llm-chat")
+def llm_chat_command(
+    task_code: str,
+    prompt: str,
+    provider: str | None = typer.Option(None, "--provider", help="LLM provider"),
+    by: str = typer.Option("zhongshu", "--by", help="Agent name"),
+    system_prompt: str | None = typer.Option(None, "--system", help="Optional system prompt"),
+    temperature: float = typer.Option(0.2, "--temperature", min=0.0, max=2.0),
+    max_tokens: int = typer.Option(1024, "--max-tokens", min=1),
+    execute: bool = typer.Option(False, "--execute", help="Call the external provider"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    try:
+        provider_config = build_llm_provider_config(provider)
+        permission_decision = require_tool_permission(
+            agent_name=by,
+            tool_name="llm.chat_completion",
+            task_level=task["task_level"],
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
+            current_status=task["status"],
+        )
+        result = execute_llm_chat_completion(
+            provider_config,
+            prompt,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            dry_run=not execute,
+        )
+    except (PermissionError, RuntimeError, ValueError) as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    result_status = "success" if result.status in {"success", "dry_run"} else "failed"
+    record_tool_call(
+        task_id=task["id"],
+        agent_name=by,
+        tool_name="llm.chat_completion",
+        arguments_summary=(
+            f"task_code={task_code}; provider={provider_config.name}; "
+            f"model={provider_config.model}; prompt_chars={len(prompt)}; execute={execute}"
+        ),
+        permission_policy=permission_decision["permission_policy"],
+        result_status=result_status,
+        permission_decision=permission_decision,
+        output_summary=(
+            f"provider={provider_config.name}; model={provider_config.model}; "
+            f"status={result.status}; dry_run={result.dry_run}; error={result.error}"
+        ),
+        risk_flag=permission_decision["risk_flag"],
+    )
+
+    print_json(data=result.to_safe_dict())
+
+    if result_status != "success":
+        raise typer.Exit(code=1)
 
 
 @app.command("runner-branch")

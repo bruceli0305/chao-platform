@@ -92,6 +92,13 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         "description": "扫描 Git 跟踪文件、边界路径和疑似 Secret。",
         "permission_policy": "data-boundary-validation",
     },
+    "llm.chat_completion": {
+        "name": "llm.chat_completion",
+        "category": "llm.external",
+        "risk": "medium",
+        "description": "Call a configured external LLM provider with a task-scoped prompt.",
+        "permission_policy": "llm-provider-chat-completion",
+    },
 }
 
 ROLE_ALLOWED_TOOLS: dict[str, set[str]] = {
@@ -106,6 +113,7 @@ ROLE_ALLOWED_TOOLS: dict[str, set[str]] = {
     "xingbu": {"schema_check", "data_boundary_check", "cli.runner_validate"},
     "hubu": {"data_boundary_check"},
     "menxia": {"schema_check", "data_boundary_check"},
+    "zhongshu": {"llm.chat_completion"},
 }
 
 LEVEL_ALLOWED_RISKS: dict[TaskLevel, set[ToolRisk]] = {

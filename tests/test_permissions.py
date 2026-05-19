@@ -19,6 +19,7 @@ def test_tool_registry_contains_first_batch():
         "cli.runner_workspace",
         "schema_check",
         "data_boundary_check",
+        "llm.chat_completion",
     }
     assert {tool["name"] for tool in list_tools()} == set(TOOL_REGISTRY)
 
@@ -124,6 +125,20 @@ def test_xingbu_can_run_controlled_runner_validation():
 
     assert decision["allowed"] is True
     assert decision["permission_policy"] == "controlled-runner-validation"
+    assert decision["risk_flag"] is None
+
+
+def test_zhongshu_can_call_configured_llm_provider():
+    decision = evaluate_tool_permission(
+        agent_name="zhongshu",
+        tool_name="llm.chat_completion",
+        task_level="L2",
+        required_confirmation="B",
+        current_status="DELIVERED",
+    )
+
+    assert decision["allowed"] is True
+    assert decision["permission_policy"] == "llm-provider-chat-completion"
     assert decision["risk_flag"] is None
 
 

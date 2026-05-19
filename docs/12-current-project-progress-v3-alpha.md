@@ -163,6 +163,7 @@ Tool Gateway 真实 handler registry 已定义，tool.execute 可在权限允许
 MCP Server stdio 外壳已定义，mcp-serve 支持 initialize、tools/list 和 tools/call，并复用权限网关；
 官方 MCP Python SDK 依赖已声明，MCP initialize 会返回 SDK 安装状态；
 LLM Provider 配置层已定义，默认支持 DeepSeek，并支持 OpenAI、Anthropic、OpenAI-compatible；
+LLM Chat 最小 client 已定义，llm-chat 默认 dry-run，显式 --execute 才调用外部 Provider，并写入 tool_calls 审计；
 Console 只读总览已定义，CLI 可输出任务、artifact、data_asset 和工具调用概览；
 Console 只读任务详情已定义，CLI 可输出单任务审计链摘要；
 Console 只读审批中心已定义，CLI 可输出 NEED_CONFIRMATION 任务队列；
@@ -279,7 +280,7 @@ Markdown 史官记录生成。
 
 ```text
 官方 MCP SDK 客户端联调；
-真实 LLM 调用 client 与模型调用审计；
+LLM Provider 按任务等级 / 数据分级的外发策略；
 Skills 自动读取、执行和交付记录闭环；
 GitHub Issue / PR / Commit / CI 结果与 task 的自动双向同步；
 Docker Sandbox 的镜像固化、缓存策略和真实流水线接入；
@@ -304,7 +305,7 @@ Web Console 的审批操作和产品化 UI。
 
 ```text
 1. 完成真实 MCP 客户端联调；
-2. 接入真实 LLM 调用 client，并建立模型调用审计；
+2. 补 LLM Provider 按任务等级 / 数据分级的外发策略；
 3. Skills 自动读取、执行和交付记录闭环；
 4. 持续使用 Ubuntu + Docker 作为最终验证环境，数据库变更统一通过 Docker psql 执行。
 ```
