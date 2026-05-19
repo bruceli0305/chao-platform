@@ -50,6 +50,10 @@ uv run python main.py llm-chat TASK-xxxx "summarize this task"
 uv run python main.py llm-chat TASK-xxxx "summarize this task" --execute
 ```
 
+`llm-chat` 会根据 `TASK_CODE` 读取任务详情，并将任务标题、原始需求、路由、
+事件、artifact、data asset、gate 和 GitHub link 摘要拼成任务上下文后发送给
+Provider。上下文只包含审计摘要和元数据，不读取 artifact 正文。
+
 输出中只包含：
 
 ```text
@@ -73,9 +77,19 @@ api_key_set 布尔值。
 ```text
 tool_name = llm.chat_completion；
 permission_policy = llm-provider-chat-completion；
-arguments_summary 只记录 provider、model、prompt_chars 和 execute；
+arguments_summary 只记录 provider、model、user_prompt_chars、llm_prompt_chars 和 execute；
 output_summary 只记录 provider、model、status、dry_run 和 error；
 不保存 prompt 正文、API Key 或完整响应正文。
+```
+
+外发前会对常见 Secret 形态进行脱敏：
+
+```text
+private key；
+GitHub token；
+OpenAI-style sk token；
+AWS access key；
+api_key / apikey / secret / token / password 赋值片段。
 ```
 
 允许调用角色：

@@ -188,6 +188,7 @@ E9 app/chao/tool_gateway_handlers.py 已注册 schema_check 与 data_boundary_ch
 E10 app/chao/mcp_server.py 已接入 MCP 风格 stdio JSON-RPC 外壳，支持 initialize、tools/list 和 tools/call。
 E11 pyproject.toml 已声明 mcp 依赖，app/chao/mcp_sdk.py 可检测官方 SDK 安装状态。
 E12 app/chao/llm_client.py 已接入 DeepSeek / OpenAI / Anthropic / OpenAI-compatible 调用请求，llm-chat 默认 dry-run，显式 --execute 后调用外部 Provider 并写入 tool_calls。
+E13 app/chao/llm_context.py 已接入 TASK_CODE 上下文组装，llm-chat 会外发任务摘要上下文并脱敏常见 Secret 形态。
 ```
 
 验收：

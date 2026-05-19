@@ -5,15 +5,40 @@ from app.chao import cli
 
 def test_llm_chat_dry_run_records_tool_call(monkeypatch):
     calls = []
+    prompts = []
     task = {
         "id": "task-1",
         "task_code": "TASK-1",
+        "title": "Console summary",
+        "raw_request": "Summarize console delivery.",
         "task_level": "L2",
         "status": "DELIVERED",
         "route_result": {"required_confirmation": "B"},
     }
 
+    def fake_execute(_config, prompt, **_kwargs):
+        prompts.append(prompt)
+
+        class Result:
+            status = "dry_run"
+            dry_run = True
+            error = None
+
+            def to_safe_dict(self):
+                return {
+                    "provider": "deepseek",
+                    "model": "deepseek-chat",
+                    "status": "dry_run",
+                    "dry_run": True,
+                    "request": {},
+                    "response": None,
+                    "error": None,
+                }
+
+        return Result()
+
     monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: task)
+    monkeypatch.setattr(cli, "execute_llm_chat_completion", fake_execute)
     monkeypatch.setattr(cli, "record_tool_call", lambda **kwargs: calls.append(kwargs))
 
     result = CliRunner().invoke(
@@ -30,6 +55,8 @@ def test_llm_chat_dry_run_records_tool_call(monkeypatch):
     assert calls[0]["permission_policy"] == "llm-provider-chat-completion"
     assert calls[0]["result_status"] == "success"
     assert "summarize the task" not in calls[0]["arguments_summary"]
+    assert "Summarize console delivery." in prompts[0]
+    assert "summarize the task" in prompts[0]
 
 
 def test_llm_chat_denies_unapproved_role(monkeypatch):

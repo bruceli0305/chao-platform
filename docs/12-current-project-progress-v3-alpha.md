@@ -164,6 +164,7 @@ MCP Server stdio 外壳已定义，mcp-serve 支持 initialize、tools/list 和 
 官方 MCP Python SDK 依赖已声明，MCP initialize 会返回 SDK 安装状态；
 LLM Provider 配置层已定义，默认支持 DeepSeek，并支持 OpenAI、Anthropic、OpenAI-compatible；
 LLM Chat 最小 client 已定义，llm-chat 默认 dry-run，显式 --execute 才调用外部 Provider，并写入 tool_calls 审计；
+LLM Chat 任务上下文组装已定义，llm-chat 会按 TASK_CODE 外发任务摘要上下文并在外发前脱敏常见 Secret 形态；
 Console 只读总览已定义，CLI 可输出任务、artifact、data_asset 和工具调用概览；
 Console 只读任务详情已定义，CLI 可输出单任务审计链摘要；
 Console 只读审批中心已定义，CLI 可输出 NEED_CONFIRMATION 任务队列；

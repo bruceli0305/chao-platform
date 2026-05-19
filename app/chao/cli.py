@@ -9,6 +9,7 @@ from rich.table import Table
 
 from app.chao.graph.main_graph import build_graph
 from app.chao.llm_client import execute_llm_chat_completion
+from app.chao.llm_context import build_llm_task_prompt
 from app.chao.llm_providers import build_llm_provider_config, list_llm_provider_defaults
 from app.chao.mcp_server import serve_mcp
 from app.chao.permissions import require_tool_permission
@@ -611,9 +612,10 @@ def llm_chat_command(
             ),
             current_status=task["status"],
         )
+        llm_prompt = build_llm_task_prompt(task, prompt)
         result = execute_llm_chat_completion(
             provider_config,
-            prompt,
+            llm_prompt,
             system_prompt=system_prompt,
             temperature=temperature,
             max_tokens=max_tokens,
@@ -630,7 +632,8 @@ def llm_chat_command(
         tool_name="llm.chat_completion",
         arguments_summary=(
             f"task_code={task_code}; provider={provider_config.name}; "
-            f"model={provider_config.model}; prompt_chars={len(prompt)}; execute={execute}"
+            f"model={provider_config.model}; user_prompt_chars={len(prompt)}; "
+            f"llm_prompt_chars={len(llm_prompt)}; execute={execute}"
         ),
         permission_policy=permission_decision["permission_policy"],
         result_status=result_status,
