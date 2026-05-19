@@ -39,6 +39,7 @@ from app.chao.services.store import (
     update_task_status,
 )
 from app.chao.services.tool_calls import record_tool_call
+from app.chao.tool_gateway_server import serve_tool_gateway
 from app.chao.web_console import run_web_console_server
 
 app = typer.Typer()
@@ -545,6 +546,11 @@ def web_console_command(
 ):
     print(f"Chao Web Console listening on http://{host}:{port}")
     run_web_console_server(host=host, port=port)
+
+
+@app.command("tool-gateway-serve")
+def tool_gateway_serve_command():
+    raise typer.Exit(code=serve_tool_gateway())
 
 
 @app.command("runner-branch")

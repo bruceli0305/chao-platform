@@ -24,6 +24,28 @@
 返回 audit 字段必须写入 tool_calls 或等价审计位置。
 ```
 
+## 2.2 外部 adapter 入口
+
+```text
+uv run python main.py tool-gateway-serve
+```
+
+该命令通过 stdin/stdout 接收 JSON Lines：
+
+```json
+{"jsonrpc":"2.0","id":"1","method":"tool.evaluate","params":{"request":{"protocol":"jsonl","agent_name":"gongbu","tool_name":"cli.runner_patch","task_level":"L2","required_confirmation":"B","current_status":"DELIVERED","arguments_summary":"path=app/chao/demo.py"}}}
+```
+
+当前支持：
+
+```text
+health；
+tool.evaluate；
+tool.execute.echo。
+```
+
+`tool.execute.echo` 只用于验证 adapter 拦截行为；真实工具 handler 必须后续显式注册。
+
 ## 3. 审计字段
 
 ```text

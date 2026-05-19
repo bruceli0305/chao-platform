@@ -105,6 +105,16 @@ handler 失败会返回 failed 和错误摘要，不会伪装成功；
 返回的 audit 字段可直接用于 tool_calls 记录。
 ```
 
+E8 外部工具 adapter：
+
+```text
+app/chao/tool_gateway_server.py 提供 JSON Lines stdio adapter；
+CLI 命令为 uv run python main.py tool-gateway-serve；
+支持 health、tool.evaluate、tool.execute.echo；
+tool.execute.echo 仅用于验证外部进程的权限拦截，真实工具 handler 后续显式注册；
+adapter 返回 JSON-RPC 风格响应，便于后续替换或包裹为标准 MCP Server。
+```
+
 ## 7. 升级触发
 
 以下情况必须暂停并升级：
