@@ -20,6 +20,9 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "buildOverviewQuery" in html
     assert "updateFilterUrl" in html
     assert "hydrateFiltersFromUrl" in html
+    assert "renderNotice" in html
+    assert "renderPanelError" in html
+    assert "Console load failed" in html
     assert "/api/console?${buildOverviewQuery(limit, filters)}" in html
     assert "/api/console/approvals?limit=${limit}" in html
     assert "/api/console/audit?limit=${limit}" in html
@@ -158,6 +161,21 @@ def test_build_console_response_returns_not_found_for_missing_task(monkeypatch):
 
     assert status_code == HTTPStatus.NOT_FOUND
     assert payload == {"error": "task_not_found", "task_code": "TASK-MISSING"}
+
+
+def test_build_console_response_returns_service_unavailable_on_data_error(monkeypatch):
+    def raise_data_error(**_kwargs):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(web_console, "get_console_overview", raise_data_error)
+
+    status_code, payload = web_console.build_console_response("/api/console")
+
+    assert status_code == HTTPStatus.SERVICE_UNAVAILABLE
+    assert payload["error"] == "service_unavailable"
+    assert payload["message"] == "Console data unavailable."
+    assert payload["path"] == "/api/console"
+    assert payload["detail"] == "database unavailable"
 
 
 def test_build_console_response_returns_not_found_for_unknown_path():

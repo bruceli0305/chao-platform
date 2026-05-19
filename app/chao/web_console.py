@@ -68,6 +68,11 @@ def build_console_index_html() -> str:
     tr[data-task-code]:hover { background: #f3f7fc; }
     .muted { color: #5f6c7b; font-size: 13px; }
     .muted a { color: #1f6feb; }
+    .notice {
+      border: 1px solid #d8e0ea; border-radius: 6px; padding: 12px;
+      background: #fbfcfe; color: #445268; margin-top: 12px;
+    }
+    .notice.error { border-color: #f1b9b9; background: #fff7f7; color: #7a2f2f; }
   </style>
 </head>
 <body>
@@ -166,6 +171,19 @@ def build_console_index_html() -> str:
         .replaceAll('"', "&quot;");
     }
 
+    function hasError(payload) {
+      return Boolean(payload?.error);
+    }
+
+    function renderNotice(message, type = "info") {
+      return `<div class="notice ${escapeHtml(type)}">${escapeHtml(message)}</div>`;
+    }
+
+    function renderPanelError(title, payload) {
+      const detail = payload?.message || payload?.detail || payload?.error || "Unknown error";
+      return renderNotice(`${title}: ${detail}`, "error");
+    }
+
     function renderRecentTasks(tasks) {
       if (!tasks.length) {
         return '<div class="muted">No recent tasks.</div>';
@@ -192,6 +210,10 @@ def build_console_index_html() -> str:
     }
 
     function renderApprovalQueue(tasks) {
+      if (hasError(tasks)) {
+        return renderPanelError("Approval Queue", tasks);
+      }
+
       if (!tasks.length) {
         return '<div class="muted">No tasks waiting for confirmation.</div>';
       }
@@ -240,6 +262,10 @@ def build_console_index_html() -> str:
     }
 
     function renderRiskDetails(risks) {
+      if (hasError(risks)) {
+        return renderPanelError("Risk details", risks);
+      }
+
       return [
         renderRiskTable("Blocked Tasks", risks.blocked_tasks ?? [
         ], [
@@ -279,6 +305,10 @@ def build_console_index_html() -> str:
     }
 
     function renderGateDetails(gates) {
+      if (hasError(gates)) {
+        return renderPanelError("Gate details", gates);
+      }
+
       const permissionMetrics = Object.entries(gates.tool_permission_audit ?? {});
       const boundaryMetrics = Object.entries(gates.data_boundary_audit ?? {});
       const gateRows = gates.recent_gate_results ?? [];
@@ -298,6 +328,10 @@ def build_console_index_html() -> str:
     }
 
     function renderAuditTrail(audit) {
+      if (hasError(audit)) {
+        return renderPanelError("Audit Trail", audit);
+      }
+
       return [
         renderRiskTable("Recent Events", audit.events ?? [
         ], [
@@ -338,7 +372,7 @@ def build_console_index_html() -> str:
 
     function renderTaskSummary(task) {
       if (task.error) {
-        return `<div class="muted">${escapeHtml(task.error)}: ${escapeHtml(task.task_code)}</div>`;
+        return renderPanelError("Task Detail", task);
       }
 
       const fields = [
@@ -451,7 +485,11 @@ def build_console_index_html() -> str:
 
     async function loadJson(path) {
       const response = await fetch(path, { cache: "no-store" });
-      return response.json();
+      const payload = await response.json();
+      if (!response.ok) {
+        return { ...payload, http_status: response.status };
+      }
+      return payload;
     }
 
     function selectedLimit() {
@@ -512,25 +550,35 @@ def build_console_index_html() -> str:
       const audit = await loadJson(`/api/console/audit?limit=${limit}`);
       const approvals = await loadJson(`/api/console/approvals?limit=${limit}`);
       updateFilterUrl(limit, filters);
-      const overviewMetrics = {
-        artifacts: overview.artifact_count ?? 0,
-        data_assets: overview.data_asset_count ?? 0,
-        failed_tool_calls: overview.failed_tool_call_count ?? 0,
-        recent_tasks: (overview.recent_tasks ?? []).length
-      };
-      document.querySelector("#overview").innerHTML =
-        Object.entries(overviewMetrics).map(asMetric).join("");
-      document.querySelector("#risks").innerHTML =
-        Object.entries(risks.summary ?? {}).map(asMetric).join("");
+      if (hasError(overview)) {
+        document.querySelector("#overview").innerHTML = renderPanelError("Overview", overview);
+        document.querySelector("#recent-tasks").innerHTML = renderPanelError(
+          "Recent Tasks",
+          overview
+        );
+      } else {
+        const overviewMetrics = {
+          artifacts: overview.artifact_count ?? 0,
+          data_assets: overview.data_asset_count ?? 0,
+          failed_tool_calls: overview.failed_tool_call_count ?? 0,
+          recent_tasks: (overview.recent_tasks ?? []).length
+        };
+        document.querySelector("#overview").innerHTML =
+          Object.entries(overviewMetrics).map(asMetric).join("");
+        document.querySelector("#recent-tasks").innerHTML =
+          renderRecentTasks(overview.recent_tasks ?? []);
+      }
+      document.querySelector("#risks").innerHTML = hasError(risks)
+        ? renderPanelError("Risks", risks)
+        : Object.entries(risks.summary ?? {}).map(asMetric).join("");
       document.querySelector("#risk-details").innerHTML = renderRiskDetails(risks);
-      document.querySelector("#gates").innerHTML =
-        Object.entries(gates.gate_status_counts ?? {}).map(asMetric).join("");
+      document.querySelector("#gates").innerHTML = hasError(gates)
+        ? renderPanelError("Gates", gates)
+        : Object.entries(gates.gate_status_counts ?? {}).map(asMetric).join("");
       document.querySelector("#gate-details").innerHTML = renderGateDetails(gates);
       document.querySelector("#audit-trail").innerHTML = renderAuditTrail(audit);
       document.querySelector("#approval-queue").innerHTML =
-        renderApprovalQueue(approvals.approvals ?? []);
-      document.querySelector("#recent-tasks").innerHTML =
-        renderRecentTasks(overview.recent_tasks ?? []);
+        renderApprovalQueue(approvals.error ? approvals : (approvals.approvals ?? []));
       document.querySelector("#last-updated").textContent =
         `Last updated ${new Date().toLocaleTimeString()}`;
     }
@@ -588,7 +636,7 @@ def build_console_index_html() -> str:
 
     boot().catch((error) => {
       document.querySelector("#overview").innerHTML =
-        `<div class="metric">Load failed<strong>${error}</strong></div>`;
+        renderNotice(`Console load failed: ${error}`, "error");
     });
   </script>
 </body>
@@ -621,6 +669,15 @@ def _parse_optional_filter(query: dict[str, list[str]], name: str) -> str | None
     return value
 
 
+def _build_service_error(path: str, exc: Exception) -> dict[str, Any]:
+    return {
+        "error": "service_unavailable",
+        "message": "Console data unavailable.",
+        "path": path,
+        "detail": str(exc),
+    }
+
+
 def build_console_response(path: str, query_string: str = "") -> tuple[int, dict[str, Any]]:
     query = parse_qs(query_string)
     limit = _parse_limit(query)
@@ -630,31 +687,35 @@ def build_console_response(path: str, query_string: str = "") -> tuple[int, dict
 
     if path == "/health":
         return HTTPStatus.OK, {"status": "ok"}
-    if path == "/api/console":
-        return HTTPStatus.OK, get_console_overview(
-            limit=limit,
-            search=search,
-            status=status,
-            task_level=task_level,
-        )
-    if path == "/api/console/approvals":
-        return HTTPStatus.OK, {"approvals": get_console_approval_queue(limit=limit)}
-    if path == "/api/console/audit":
-        return HTTPStatus.OK, get_console_audit(limit=limit)
-    if path == "/api/console/gates":
-        return HTTPStatus.OK, get_console_gates(limit=limit)
-    if path == "/api/console/risks":
-        return HTTPStatus.OK, get_console_risks(limit=limit)
-    if path.startswith("/api/console/tasks/"):
-        task_code = unquote(path.removeprefix("/api/console/tasks/")).strip()
-        if not task_code or "/" in task_code:
-            return HTTPStatus.NOT_FOUND, {"error": "task_not_found", "task_code": task_code}
 
-        task = get_task_detail(task_code)
-        if task is None:
-            return HTTPStatus.NOT_FOUND, {"error": "task_not_found", "task_code": task_code}
+    try:
+        if path == "/api/console":
+            return HTTPStatus.OK, get_console_overview(
+                limit=limit,
+                search=search,
+                status=status,
+                task_level=task_level,
+            )
+        if path == "/api/console/approvals":
+            return HTTPStatus.OK, {"approvals": get_console_approval_queue(limit=limit)}
+        if path == "/api/console/audit":
+            return HTTPStatus.OK, get_console_audit(limit=limit)
+        if path == "/api/console/gates":
+            return HTTPStatus.OK, get_console_gates(limit=limit)
+        if path == "/api/console/risks":
+            return HTTPStatus.OK, get_console_risks(limit=limit)
+        if path.startswith("/api/console/tasks/"):
+            task_code = unquote(path.removeprefix("/api/console/tasks/")).strip()
+            if not task_code or "/" in task_code:
+                return HTTPStatus.NOT_FOUND, {"error": "task_not_found", "task_code": task_code}
 
-        return HTTPStatus.OK, task
+            task = get_task_detail(task_code)
+            if task is None:
+                return HTTPStatus.NOT_FOUND, {"error": "task_not_found", "task_code": task_code}
+
+            return HTTPStatus.OK, task
+    except Exception as exc:
+        return HTTPStatus.SERVICE_UNAVAILABLE, _build_service_error(path, exc)
 
     return HTTPStatus.NOT_FOUND, {
         "error": "not_found",

@@ -176,6 +176,7 @@ Web Console 页面导航已定义，可快速跳转各只读面板；
 Web Console 任务详情深链接已定义，可通过 URL task 参数自动加载任务详情；
 Web Console 任务详情链接已定义，加载任务后可直接复制当前任务 URL；
 Web Console 任务搜索 / 状态过滤 / 等级过滤已定义，可通过 URL query 保留筛选条件；
+Web Console 空态 / 错误态已定义，数据库或接口不可用时返回 503 并在页面显示可读提示；
 任务详情 show 已包含 events / tool_calls / artifacts / data_assets。
 ```
 
