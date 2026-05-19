@@ -154,6 +154,7 @@ Agent Runner runner-patch CLI 已定义，默认 dry-run，显式 --apply 才真
 Agent Runner runner-validate CLI 已定义，可执行 allowlist 验证 gate，并写入 task_events / tool_calls；
 Agent Runner runner-attempt CLI 已定义，可串联 patch、validation，并在 --apply 后登记 runner_patch 或 runner_failure_feedback；
 Agent Runner runner-attempt 状态回写已定义，dry-run 不改状态，--apply 后按验证结果更新为 DELIVERED 或 VALIDATION_FAILED；
+Agent Runner runner-branch CLI 已定义，默认 dry-run，显式 --apply 才创建并切换 codex/ 执行分支；
 Console 只读总览已定义，CLI 可输出任务、artifact、data_asset 和工具调用概览；
 Console 只读任务详情已定义，CLI 可输出单任务审计链摘要；
 Console 只读审批中心已定义，CLI 可输出 NEED_CONFIRMATION 任务队列；
@@ -271,10 +272,10 @@ MCP Server / 工具协议层的真实拦截；
 Skills 自动读取、执行和交付记录闭环；
 pgvector embedding 生成与向量相似度检索；
 GitHub Issue / PR / Commit / CI 结果与 task 的自动双向同步；
-Agent Runner 的真实分支创建、隔离工作区和 Docker Sandbox 执行；
+Agent Runner 的隔离工作区和 Docker Sandbox 执行；
 状态机持久化 checkpoint；
 L3 / L4 治理 artifact 的人工审核命令与状态推进；
-Web Console 的审批操作、搜索过滤和产品化 UI。
+Web Console 的审批操作和产品化 UI。
 ```
 
 ## 5. 当前风险与注意事项
@@ -292,9 +293,8 @@ Web Console 的审批操作、搜索过滤和产品化 UI。
 ## 6. 当前建议操作
 
 ```text
-1. 先收尾 Web Console 只读 Alpha：补齐任务搜索、过滤和关键空态；
-2. 再推进 Agent Runner 真实分支执行和隔离工作区；
-3. 随后补 MCP Server / 工具协议层的真实权限拦截；
-4. pgvector 下一步从 ILIKE 搜索升级为 embedding 写入和向量相似度检索；
-5. 持续使用 Ubuntu + Docker 作为最终验证环境，数据库变更统一通过 Docker psql 执行。
+1. 继续推进 Agent Runner 隔离工作区或 Docker Sandbox 最小执行流；
+2. 随后补 MCP Server / 工具协议层的真实权限拦截；
+3. pgvector 下一步从 ILIKE 搜索升级为 embedding 写入和向量相似度检索；
+4. 持续使用 Ubuntu + Docker 作为最终验证环境，数据库变更统一通过 Docker psql 执行。
 ```

@@ -10,10 +10,12 @@ from rich.table import Table
 from app.chao.graph.main_graph import build_graph
 from app.chao.permissions import require_tool_permission
 from app.chao.runner_artifacts import save_failure_feedback_artifact, save_patch_artifact
+from app.chao.runner_branch import create_runner_branch
 from app.chao.runner_executor import (
     apply_text_patch_operations,
     build_implementation_result_from_execution,
 )
+from app.chao.runner_policy import build_runner_branch_plan
 from app.chao.runner_validation import execute_runner_validation_commands
 from app.chao.services.artifacts import record_artifact
 from app.chao.services.console import (
@@ -541,6 +543,84 @@ def web_console_command(
 ):
     print(f"Chao Web Console listening on http://{host}:{port}")
     run_web_console_server(host=host, port=port)
+
+
+@app.command("runner-branch")
+def runner_branch_command(
+    task_code: str,
+    base_ref: str = typer.Option("HEAD", "--base-ref", help="Git base ref for branch creation"),
+    apply: bool = typer.Option(False, "--apply", help="Create and switch to the runner branch"),
+    by: str = typer.Option("gongbu", "--by", help="Runner agent name"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    try:
+        permission_decision = require_tool_permission(
+            agent_name=by,
+            tool_name="cli.runner_branch",
+            task_level=task["task_level"],
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
+            current_status=task["status"],
+        )
+        branch_plan = build_runner_branch_plan(
+            task_code=task_code,
+            title=task.get("title", ""),
+            task_level=task["task_level"],
+            base_ref=base_ref,
+        )
+        branch_result = create_runner_branch(
+            branch_plan,
+            dry_run=not apply,
+        )
+    except (PermissionError, RuntimeError, ValueError) as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    if branch_result["created"]:
+        event_type = "runner_branch_created"
+    elif branch_result["branch_required"]:
+        event_type = "runner_branch_dry_run"
+    else:
+        event_type = "runner_branch_skipped"
+
+    record_task_event(
+        task_id=task["id"],
+        event_type=event_type,
+        from_status=task["status"],
+        to_status=task["status"],
+        summary=f"Runner branch {'created' if branch_result['created'] else 'checked'}",
+        created_by=by,
+    )
+    record_tool_call(
+        task_id=task["id"],
+        agent_name=by,
+        tool_name="cli.runner_branch",
+        arguments_summary=f"task_code={task_code}; base_ref={base_ref}; apply={apply}",
+        permission_policy=permission_decision["permission_policy"],
+        result_status="success",
+        permission_decision=permission_decision,
+        output_summary=(
+            f"branch_name={branch_result['branch_name']}; "
+            f"created={branch_result['created']}; errors={branch_result['errors']}"
+        ),
+        risk_flag=permission_decision["risk_flag"],
+    )
+
+    print_json(
+        data={
+            "task_code": task_code,
+            "event_type": event_type,
+            "branch_plan": branch_plan,
+            "branch_result": branch_result,
+        }
+    )
 
 
 @app.command("runner-patch")

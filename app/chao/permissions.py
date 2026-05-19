@@ -50,6 +50,13 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         "description": "Controlled Agent Runner text patch.",
         "permission_policy": "controlled-runner-text-patch",
     },
+    "cli.runner_branch": {
+        "name": "cli.runner_branch",
+        "category": "git.write",
+        "risk": "medium",
+        "description": "Create or inspect the controlled Agent Runner branch.",
+        "permission_policy": "controlled-runner-branch",
+    },
     "cli.runner_validate": {
         "name": "cli.runner_validate",
         "category": "shell.safe",
@@ -76,7 +83,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
 ROLE_ALLOWED_TOOLS: dict[str, set[str]] = {
     "shangshu": {"cli.new", "cli.bind_github"},
     "emperor": {"cli.approve"},
-    "gongbu": {"cli.runner_patch"},
+    "gongbu": {"cli.runner_branch", "cli.runner_patch"},
     "xingbu": {"schema_check", "data_boundary_check", "cli.runner_validate"},
     "hubu": {"data_boundary_check"},
     "menxia": {"schema_check", "data_boundary_check"},

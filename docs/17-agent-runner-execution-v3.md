@@ -19,12 +19,16 @@ Default CLI task creation still does not modify repository files automatically.
 
 ```text
 app/chao/runner_executor.py
+app/chao/runner_branch.py
 app/chao/nodes/gongbu.py
+app/chao/cli.py runner-branch
 app/chao/cli.py runner-patch
 app/chao/cli.py runner-validate
 app/chao/cli.py runner-attempt
 tests/test_runner_executor.py
+tests/test_runner_branch.py
 tests/test_gongbu_runner_scope.py
+tests/test_cli_runner_branch.py
 tests/test_cli_runner_patch.py
 tests/test_cli_runner_validate.py
 tests/test_cli_runner_attempt.py
@@ -105,3 +109,14 @@ dry-run attempts record audit evidence but do not update tasks.status;
 applied attempts update tasks.status to DELIVERED when validation passes;
 applied attempts update tasks.status to VALIDATION_FAILED when validation fails.
 ```
+
+J6 adds controlled branch creation:
+
+```bash
+uv run python main.py runner-branch TASK-xxx --base-ref main
+uv run python main.py runner-branch TASK-xxx --base-ref main --apply
+```
+
+The command is dry-run by default. Passing `--apply` creates and switches to the
+planned `codex/` runner branch after checking that the branch name is valid and
+the target branch does not already exist.

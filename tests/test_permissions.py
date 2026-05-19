@@ -12,6 +12,7 @@ def test_tool_registry_contains_first_batch():
         "cli.new",
         "cli.approve",
         "cli.bind_github",
+        "cli.runner_branch",
         "cli.runner_patch",
         "cli.runner_validate",
         "schema_check",
@@ -65,6 +66,20 @@ def test_gongbu_can_run_controlled_runner_patch():
 
     assert decision["allowed"] is True
     assert decision["permission_policy"] == "controlled-runner-text-patch"
+    assert decision["risk_flag"] is None
+
+
+def test_gongbu_can_create_controlled_runner_branch():
+    decision = evaluate_tool_permission(
+        agent_name="gongbu",
+        tool_name="cli.runner_branch",
+        task_level="L2",
+        required_confirmation="B",
+        current_status="DELIVERED",
+    )
+
+    assert decision["allowed"] is True
+    assert decision["permission_policy"] == "controlled-runner-branch"
     assert decision["risk_flag"] is None
 
 
