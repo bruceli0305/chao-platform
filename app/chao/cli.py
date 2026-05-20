@@ -41,7 +41,11 @@ from app.chao.services.console import (
 from app.chao.services.data_assets import record_data_asset
 from app.chao.services.events import record_task_event
 from app.chao.services.github_links import normalize_github_link_type, record_github_link
-from app.chao.services.llm_egress_authorizations import record_llm_egress_authorization
+from app.chao.services.llm_egress_authorizations import (
+    list_expired_llm_egress_authorizations,
+    mark_llm_egress_authorizations_expired,
+    record_llm_egress_authorization,
+)
 from app.chao.services.markdown_records import save_task_markdown
 from app.chao.services.store import (
     approve_task,
@@ -726,6 +730,87 @@ def authorize_llm_egress_command(
     )
 
     print_json(data={"task_code": task_code, "authorization": authorization})
+
+
+@app.command("audit-llm-egress-authorizations")
+def audit_llm_egress_authorizations_command(
+    limit: int = typer.Option(
+        100, "--limit", min=1, help="Maximum expired authorizations to audit"
+    ),
+    apply: bool = typer.Option(False, "--apply", help="Mark expired authorizations as EXPIRED"),
+    by: str = typer.Option("xingbu", "--by", help="Auditing agent or user"),
+):
+    try:
+        authorizations = list_expired_llm_egress_authorizations(limit=limit)
+        permission_decisions = [
+            require_tool_permission(
+                agent_name=by,
+                tool_name="cli.audit_llm_egress_authorizations",
+                task_level=authorization["task_level"],
+                required_confirmation=authorization["required_confirmation"],
+                current_status=authorization["task_status"],
+            )
+            for authorization in authorizations
+        ]
+        if apply:
+            mark_llm_egress_authorizations_expired(
+                [authorization["id"] for authorization in authorizations]
+            )
+            authorizations = [
+                {**authorization, "status": "EXPIRED"} for authorization in authorizations
+            ]
+    except (PermissionError, RuntimeError) as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    result = {
+        "dry_run": not apply,
+        "expired_count": len(authorizations),
+        "authorizations": authorizations,
+    }
+    event_type = (
+        "llm_egress_authorization_expired" if apply else "llm_egress_authorization_expiry_detected"
+    )
+    tool_status = "success" if apply else "dry_run"
+
+    for authorization, permission_decision in zip(
+        result["authorizations"],
+        permission_decisions,
+        strict=True,
+    ):
+        record_task_event(
+            task_id=authorization["task_id"],
+            event_type=event_type,
+            from_status=authorization["task_status"],
+            to_status=authorization["task_status"],
+            summary=(
+                f"LLM egress authorization {authorization['id']} "
+                f"for {authorization['provider']}/{authorization['model']} "
+                f"expired at {authorization['expires_at']}"
+            ),
+            created_by=by,
+        )
+        record_tool_call(
+            task_id=authorization["task_id"],
+            agent_name=by,
+            tool_name="cli.audit_llm_egress_authorizations",
+            arguments_summary=(
+                f"authorization_id={authorization['id']}; "
+                f"provider={authorization['provider']}; model={authorization['model']}; "
+                f"data_classification={authorization['data_classification']}; apply={apply}"
+            ),
+            permission_policy=permission_decision["permission_policy"],
+            result_status=tool_status,
+            permission_decision=permission_decision,
+            output_summary=(
+                f"task_code={authorization['task_code']}; "
+                f"authorization_status={authorization['status']}; "
+                f"expires_at={authorization['expires_at']}"
+            ),
+            risk_flag=permission_decision["risk_flag"],
+        )
+
+    print_json(data=result)
 
 
 @app.command("llm-chat")

@@ -329,6 +329,92 @@ def test_authorize_llm_egress_requires_a_approval(monkeypatch):
     assert "A-level APPROVED confirmation is required" in result.output
 
 
+def test_audit_llm_egress_authorizations_marks_expired_rows(monkeypatch):
+    calls = {"events": [], "tools": [], "marked": []}
+    authorizations = [
+        {
+            "id": "auth-1",
+            "task_id": "task-1",
+            "task_code": "TASK-1",
+            "task_level": "L3",
+            "task_status": "DESIGNING",
+            "required_confirmation": "A",
+            "provider": "deepseek",
+            "model": "deepseek-chat",
+            "data_classification": "D1",
+            "status": "APPROVED",
+            "authorized_by": "emperor",
+            "reason": "test",
+            "expires_at": "2026-05-20 00:00:00+00",
+            "created_at": "2026-05-19 00:00:00+00",
+        }
+    ]
+
+    monkeypatch.setattr(
+        cli,
+        "list_expired_llm_egress_authorizations",
+        lambda **_kwargs: authorizations,
+    )
+    monkeypatch.setattr(
+        cli,
+        "mark_llm_egress_authorizations_expired",
+        lambda authorization_ids: calls["marked"].append(authorization_ids),
+    )
+    monkeypatch.setattr(cli, "record_task_event", lambda **kwargs: calls["events"].append(kwargs))
+    monkeypatch.setattr(cli, "record_tool_call", lambda **kwargs: calls["tools"].append(kwargs))
+
+    result = CliRunner().invoke(cli.app, ["audit-llm-egress-authorizations", "--apply"])
+
+    assert result.exit_code == 0
+    assert calls["marked"] == [["auth-1"]]
+    assert calls["events"][0]["event_type"] == "llm_egress_authorization_expired"
+    assert calls["tools"][0]["tool_name"] == "cli.audit_llm_egress_authorizations"
+    assert calls["tools"][0]["permission_policy"] == "governed-llm-egress-expiry-audit"
+    assert calls["tools"][0]["result_status"] == "success"
+    assert '"expired_count": 1' in result.output
+
+
+def test_audit_llm_egress_authorizations_checks_permission_before_marking(monkeypatch):
+    calls = {"marked": []}
+    authorizations = [
+        {
+            "id": "auth-1",
+            "task_id": "task-1",
+            "task_code": "TASK-1",
+            "task_level": "L3",
+            "task_status": "DESIGNING",
+            "required_confirmation": "A",
+            "provider": "deepseek",
+            "model": "deepseek-chat",
+            "data_classification": "D1",
+            "status": "APPROVED",
+            "authorized_by": "emperor",
+            "reason": "test",
+            "expires_at": "2026-05-20 00:00:00+00",
+            "created_at": "2026-05-19 00:00:00+00",
+        }
+    ]
+
+    monkeypatch.setattr(
+        cli,
+        "list_expired_llm_egress_authorizations",
+        lambda **_kwargs: authorizations,
+    )
+    monkeypatch.setattr(
+        cli,
+        "mark_llm_egress_authorizations_expired",
+        lambda authorization_ids: calls["marked"].append(authorization_ids),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        ["audit-llm-egress-authorizations", "--apply", "--by", "hubu"],
+    )
+
+    assert result.exit_code == 1
+    assert calls["marked"] == []
+
+
 def test_llm_chat_requires_existing_task(monkeypatch):
     monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: None)
 

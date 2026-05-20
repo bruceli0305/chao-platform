@@ -51,6 +51,8 @@ uv run python main.py llm-chat TASK-xxxx "summarize this task" --execute
 uv run python main.py llm-chat TASK-xxxx "summarize this task" --data-classification D1 --execute
 uv run python main.py authorize-llm-egress TASK-xxxx --provider deepseek --model deepseek-chat --ttl-hours 24
 uv run python main.py llm-chat TASK-xxxx "summarize this task" --execute --allow-governed-egress
+uv run python main.py audit-llm-egress-authorizations
+uv run python main.py audit-llm-egress-authorizations --apply
 ```
 
 `llm-chat` 会根据 `TASK_CODE` 读取任务详情，并将任务标题、原始需求、路由、
@@ -128,5 +130,5 @@ anthropic / claude-3-5-sonnet-latest。
 ## 6. 后续
 
 ```text
-将 llm_egress_authorizations 接入定期过期审计任务。
+将 audit-llm-egress-authorizations 接入 GitHub Actions / cron 的定期执行。
 ```

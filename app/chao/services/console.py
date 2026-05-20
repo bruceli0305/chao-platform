@@ -645,7 +645,7 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
                     lea.authorized_by
                 from llm_egress_authorizations lea
                 join tasks t on t.id = lea.task_id
-                where lea.status = 'APPROVED'
+                where lea.status in ('APPROVED', 'EXPIRED')
                   and lea.expires_at <= now()
                 order by lea.expires_at desc
                 limit %s

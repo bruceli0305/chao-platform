@@ -11,6 +11,7 @@ def test_tool_registry_contains_first_batch():
     assert set(TOOL_REGISTRY) == {
         "cli.new",
         "cli.approve",
+        "cli.audit_llm_egress_authorizations",
         "cli.authorize_llm_egress",
         "cli.bind_github",
         "cli.runner_branch",
@@ -126,6 +127,20 @@ def test_xingbu_can_run_controlled_runner_validation():
 
     assert decision["allowed"] is True
     assert decision["permission_policy"] == "controlled-runner-validation"
+    assert decision["risk_flag"] is None
+
+
+def test_xingbu_can_audit_llm_egress_authorization_expiry():
+    decision = evaluate_tool_permission(
+        agent_name="xingbu",
+        tool_name="cli.audit_llm_egress_authorizations",
+        task_level="L3",
+        required_confirmation="A",
+        current_status="DESIGNING",
+    )
+
+    assert decision["allowed"] is True
+    assert decision["permission_policy"] == "governed-llm-egress-expiry-audit"
     assert decision["risk_flag"] is None
 
 

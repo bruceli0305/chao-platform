@@ -106,6 +106,13 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         "description": "Create a time-limited authorization for governed LLM egress.",
         "permission_policy": "governed-llm-egress-authorization",
     },
+    "cli.audit_llm_egress_authorizations": {
+        "name": "cli.audit_llm_egress_authorizations",
+        "category": "llm.governance",
+        "risk": "medium",
+        "description": "Audit expired governed LLM egress authorizations.",
+        "permission_policy": "governed-llm-egress-expiry-audit",
+    },
 }
 
 ROLE_ALLOWED_TOOLS: dict[str, set[str]] = {
@@ -117,7 +124,12 @@ ROLE_ALLOWED_TOOLS: dict[str, set[str]] = {
         "cli.runner_sandbox",
         "cli.runner_workspace",
     },
-    "xingbu": {"schema_check", "data_boundary_check", "cli.runner_validate"},
+    "xingbu": {
+        "schema_check",
+        "data_boundary_check",
+        "cli.runner_validate",
+        "cli.audit_llm_egress_authorizations",
+    },
     "hubu": {"data_boundary_check"},
     "menxia": {"schema_check", "data_boundary_check"},
     "zhongshu": {"llm.chat_completion"},
