@@ -170,6 +170,7 @@ LLM egress 独立授权记录已定义，authorize-llm-egress 会写入 llm_egre
 LLM egress 授权过期审计命令已接入，audit-llm-egress-authorizations 可 dry-run 检测并可用 --apply 标记 EXPIRED；
 LLM egress 授权过期审计 GitHub Actions 已接入，支持 schedule / workflow_dispatch，并可通过 CHAO_AUDIT_DATABASE_URL 指向外部审计库；
 LLM egress 授权过期审计 Issue 回流已接入，审计失败或发现过期授权时会创建 / 追加 GitHub Issue；
+GitHub Task Sync workflow 已接入 Issue / PR / workflow_run 事件，可通过 CHAO_SYNC_DATABASE_URL 将 GitHub 链接回写 task；
 LLM egress 授权 Console 可见性已定义，Console 总览、审计链、任务详情和风险视图可展示活跃/过期授权；
 Console 只读总览已定义，CLI 可输出任务、artifact、data_asset 和工具调用概览；
 Console 只读任务详情已定义，CLI 可输出单任务审计链摘要；
@@ -287,7 +288,7 @@ Markdown 史官记录生成。
 
 ```text
 官方 MCP SDK 客户端联调；
-为 GitHub Issue / PR / Commit / CI 结果补齐更完整的自动双向同步；
+为 GitHub Task Sync 补充真实运行告警和 Console 可见性增强；
 Skills 自动读取、执行和交付记录闭环；
 GitHub Issue / PR / Commit / CI 结果与 task 的自动双向同步；
 Docker Sandbox 的镜像固化、缓存策略和真实流水线接入；
@@ -312,7 +313,7 @@ Web Console 的审批操作和产品化 UI。
 
 ```text
 1. 完成真实 MCP 客户端联调；
-2. 为 GitHub Issue / PR / Commit / CI 结果补齐更完整的自动双向同步；
+2. 为 GitHub Task Sync 补充真实运行告警和 Console 可见性增强；
 3. Skills 自动读取、执行和交付记录闭环；
 4. 持续使用 Ubuntu + Docker 作为最终验证环境，数据库变更统一通过 Docker psql 执行。
 ```
