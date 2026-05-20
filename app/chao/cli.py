@@ -83,7 +83,10 @@ def _display_value(value: object) -> str:
     return str(value)
 
 
-def _resolve_task_validation_gates(task: dict[str, object], gates: list[str] | None) -> list[str]:
+def _resolve_task_validation_gates(
+    task: dict[str, object],
+    gates: list[str] | tuple[str, ...] | None,
+) -> list[str]:
     if gates:
         return [str(gate) for gate in gates]
 
@@ -1485,9 +1488,9 @@ def runner_workspace_command(
 def runner_sandbox_command(
     task_code: str,
     gate: Annotated[
-        list[str],
+        list[str] | None,
         typer.Option("--gate", help="Validation gate to run in Docker sandbox"),
-    ],
+    ] = None,
     workspace_path: str = typer.Option(".", "--workspace-path", help="Workspace path to mount"),
     image: str = typer.Option(DEFAULT_SANDBOX_IMAGE, "--image", help="Docker image"),
     apply: bool = typer.Option(False, "--apply", help="Run the sandbox commands"),
@@ -1511,8 +1514,9 @@ def runner_sandbox_command(
             ),
             current_status=task["status"],
         )
+        sandbox_gates = _resolve_task_validation_gates(task, gate)
         sandbox_result = execute_runner_sandbox_commands(
-            gate,
+            sandbox_gates,
             workspace_path=workspace_path,
             image=image,
             dry_run=not apply,
@@ -1544,7 +1548,7 @@ def runner_sandbox_command(
         agent_name=by,
         tool_name="cli.runner_sandbox",
         arguments_summary=(
-            f"task_code={task_code}; gates={gate}; workspace_path={workspace_path}; "
+            f"task_code={task_code}; gates={sandbox_gates}; workspace_path={workspace_path}; "
             f"image={image}; apply={apply}"
         ),
         permission_policy=permission_decision["permission_policy"],
@@ -1719,9 +1723,9 @@ def runner_attempt_command(
     task_code: str,
     path: str,
     gate: Annotated[
-        list[str],
+        list[str] | None,
         typer.Option("--gate", help="Validation gate to execute after patch"),
-    ],
+    ] = None,
     old_text: str = typer.Option(..., "--old-text", help="Text that must match once"),
     new_text: str = typer.Option(..., "--new-text", help="Replacement text"),
     apply: bool = typer.Option(False, "--apply", help="Write the patch before validation"),
@@ -1770,8 +1774,9 @@ def runner_attempt_command(
             ],
             dry_run=not apply,
         )
+        validation_gates = _resolve_task_validation_gates(task, gate)
         validation_result = execute_runner_validation_commands(
-            gate,
+            validation_gates,
             timeout_seconds=timeout_seconds,
         )
     except (PermissionError, ValueError, FileNotFoundError) as exc:
@@ -1831,7 +1836,9 @@ def runner_attempt_command(
         event_type=event_type,
         from_status=task["status"],
         to_status=next_status if apply else task["status"],
-        summary=f"Runner attempt {'applied' if apply else 'dry-run'}: {', '.join(gate)}",
+        summary=(
+            f"Runner attempt {'applied' if apply else 'dry-run'}: {', '.join(validation_gates)}"
+        ),
         created_by=patch_by,
     )
     record_tool_call(
@@ -1852,7 +1859,7 @@ def runner_attempt_command(
         task_id=task["id"],
         agent_name=validate_by,
         tool_name="cli.runner_validate",
-        arguments_summary=f"task_code={task_code}; gates={gate}",
+        arguments_summary=f"task_code={task_code}; gates={validation_gates}",
         permission_policy=validation_permission["permission_policy"],
         result_status="success" if delivered else "failed",
         permission_decision=validation_permission,

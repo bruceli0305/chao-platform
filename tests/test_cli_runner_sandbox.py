@@ -15,6 +15,16 @@ def _task():
     }
 
 
+def _task_with_skill_gates():
+    task = _task()
+    task["skill_execution_plan"] = {
+        "status": "ready",
+        "combined_gates": ["manual_validation", "lint", "test"],
+        "skills": [],
+    }
+    return task
+
+
 def _sandbox_result(*, dry_run: bool, deliverable: bool = False):
     return {
         "workspace_path": ".",
@@ -126,3 +136,38 @@ def test_runner_sandbox_apply_exits_nonzero_for_failed_gate(monkeypatch):
     assert result.exit_code == 1
     assert calls["events"][0]["event_type"] == "runner_sandbox_failed"
     assert calls["tool_calls"][0]["result_status"] == "failed"
+
+
+def test_runner_sandbox_uses_skill_execution_plan_when_gate_omitted(monkeypatch):
+    calls = {
+        "events": [],
+        "tool_calls": [],
+        "sandbox_gates": [],
+    }
+
+    def execute_sandbox(gates, **kwargs):
+        calls["sandbox_gates"].extend(gates)
+        return _sandbox_result(dry_run=kwargs["dry_run"])
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task_with_skill_gates())
+    monkeypatch.setattr(cli, "execute_runner_sandbox_commands", execute_sandbox)
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+
+    result = CliRunner().invoke(cli.app, ["runner-sandbox", "TASK-1"])
+
+    assert result.exit_code == 0
+    assert calls["sandbox_gates"] == ["manual_validation", "lint", "test"]
+    assert calls["events"][0]["event_type"] == "runner_sandbox_dry_run"
+    assert calls["tool_calls"][0]["arguments_summary"] == (
+        "task_code=TASK-1; gates=['manual_validation', 'lint', 'test']; "
+        "workspace_path=.; image=python:3.12-slim; apply=False"
+    )

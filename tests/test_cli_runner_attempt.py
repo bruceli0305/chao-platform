@@ -14,6 +14,16 @@ def _task():
     }
 
 
+def _task_with_skill_gates():
+    task = _task()
+    task["skill_execution_plan"] = {
+        "status": "ready",
+        "combined_gates": ["manual_validation", "lint", "test"],
+        "skills": [],
+    }
+    return task
+
+
 def _execution_result(applied: bool):
     return {
         "summary": "Applied 1 controlled text patch operation(s).",
@@ -248,3 +258,55 @@ def test_runner_attempt_dry_run_skips_artifact_recording(monkeypatch):
     assert calls["status_updates"] == []
     assert calls["events"][0]["to_status"] == "DELIVERED"
     assert '"artifact_type": null' in result.output
+
+
+def test_runner_attempt_uses_skill_execution_plan_when_gate_omitted(monkeypatch):
+    calls = {
+        "events": [],
+        "tool_calls": [],
+        "validation_gates": [],
+    }
+
+    def execute_validation(gates, timeout_seconds=120):
+        calls["validation_gates"].extend(gates)
+        return _validation_result(deliverable=True)
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task_with_skill_gates())
+    monkeypatch.setattr(
+        cli,
+        "apply_text_patch_operations",
+        lambda operations, dry_run=True: _execution_result(applied=not dry_run),
+    )
+    monkeypatch.setattr(cli, "execute_runner_validation_commands", execute_validation)
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "runner-attempt",
+            "TASK-1",
+            "app/chao/demo.txt",
+            "--old-text",
+            "old",
+            "--new-text",
+            "new",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert calls["validation_gates"] == ["manual_validation", "lint", "test"]
+    assert calls["events"][0]["summary"] == (
+        "Runner attempt dry-run: manual_validation, lint, test"
+    )
+    assert calls["tool_calls"][1]["arguments_summary"] == (
+        "task_code=TASK-1; gates=['manual_validation', 'lint', 'test']"
+    )
