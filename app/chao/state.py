@@ -18,6 +18,7 @@ class ChaoState(TypedDict, total=False):
     required_skills: list[str]
     required_skill_paths: list[str]
     required_skill_details: list[dict[str, Any]]
+    skill_usage: list[dict[str, Any]]
 
     status: str
     route_result: dict[str, Any]

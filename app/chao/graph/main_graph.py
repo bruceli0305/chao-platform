@@ -4,6 +4,7 @@ from app.chao.nodes.gongbu import gongbu_execute
 from app.chao.nodes.historian import historian_record_raw, historian_record_result
 from app.chao.nodes.router import task_router
 from app.chao.nodes.xingbu import xingbu_validate
+from app.chao.skill_runtime import prepare_required_skills
 from app.chao.state import ChaoState
 
 
@@ -25,6 +26,7 @@ def build_graph():
 
     builder.add_node("historian_record_raw", historian_record_raw)
     builder.add_node("task_router", task_router)
+    builder.add_node("prepare_required_skills", prepare_required_skills)
     builder.add_node("need_confirmation", need_confirmation)
     builder.add_node("gongbu_execute", gongbu_execute)
     builder.add_node("xingbu_validate", xingbu_validate)
@@ -33,8 +35,10 @@ def build_graph():
     builder.add_edge(START, "historian_record_raw")
     builder.add_edge("historian_record_raw", "task_router")
 
+    builder.add_edge("task_router", "prepare_required_skills")
+
     builder.add_conditional_edges(
-        "task_router",
+        "prepare_required_skills",
         route_by_level,
         {
             "gongbu_execute": "gongbu_execute",

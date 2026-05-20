@@ -114,3 +114,33 @@ def execute_tool_gateway_request(
             output_summary=str(output)[:500],
         ),
     }
+
+
+def persist_tool_gateway_audit(
+    audit: dict[str, Any],
+    *,
+    recorder: Callable[..., None] | None = None,
+) -> bool:
+    task_id = audit.get("task_id")
+
+    if not task_id:
+        return False
+
+    if recorder is None:
+        from app.chao.services.tool_calls import record_tool_call
+
+        recorder = record_tool_call
+
+    recorder(
+        task_id=str(task_id),
+        agent_name=str(audit["agent_name"]),
+        tool_name=str(audit["tool_name"]),
+        arguments_summary=audit.get("arguments_summary"),
+        permission_policy=audit.get("permission_policy"),
+        result_status=str(audit["result_status"]),
+        permission_decision=audit.get("permission_decision"),
+        output_summary=audit.get("output_summary"),
+        risk_flag=audit.get("risk_flag"),
+    )
+
+    return True

@@ -21,6 +21,20 @@ def _format_skill_details(skills: list[dict[str, Any]]) -> str:
     return "\n".join(f"- {skill['name']}：{skill['path']}" for skill in skills)
 
 
+def _format_skill_usage(skill_usage: list[dict[str, Any]]) -> str:
+    if not skill_usage:
+        return "- none"
+
+    lines = []
+    for skill in skill_usage:
+        lines.append(
+            f"- {skill.get('name', '')}: {skill.get('path', '')}; "
+            f"status={skill.get('status', '')}; "
+            f"sha256={skill.get('content_sha256', '')}"
+        )
+    return "\n".join(lines)
+
+
 def save_task_markdown(result: dict[str, Any]) -> Path:
     TASK_RECORDS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -88,6 +102,10 @@ def save_task_markdown(result: dict[str, Any]) -> Path:
         "## Skills",
         "",
         _format_skill_details(result.get("required_skill_details", [])),
+        "",
+        "## Skill Usage",
+        "",
+        _format_skill_usage(result.get("skill_usage", [])),
         "",
         "## 路由结果",
         "",

@@ -16,7 +16,9 @@ def test_graph_l1_delivered():
 
     assert result["task_level"] == "L1"
     assert result["status"] == "DELIVERED"
-    assert len(result["historian_records"]) == 2
+    assert len(result["historian_records"]) == 3
+    assert result["skill_usage"][0]["name"] == "bugfix"
+    assert result["historian_records"][1]["type"] == "skill_usage"
 
 
 def test_graph_l2_delivered():
@@ -37,6 +39,7 @@ def test_graph_l2_delivered():
     assert "validation_result" in result
     assert result["validation_result"]["deliverable"] is True
     assert result["validation_result"]["plan"]
+    assert result["skill_usage"]
 
 
 def test_graph_l3_needs_confirmation():
@@ -55,6 +58,7 @@ def test_graph_l3_needs_confirmation():
     assert result["task_level"] == "L3"
     assert result["status"] == "NEED_CONFIRMATION"
     assert result["required_confirmation"] == "A"
+    assert result["skill_usage"][0]["name"] == "database-migration"
 
 
 def test_graph_l4_needs_confirmation_without_execution():

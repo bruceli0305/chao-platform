@@ -241,6 +241,7 @@ def console_task_command(
         "tool_calls",
         "artifacts",
         "data_assets",
+        "skill_usage",
         "llm_egress_authorizations",
         "github_links",
         "historian_records",

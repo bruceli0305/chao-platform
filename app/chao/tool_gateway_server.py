@@ -6,6 +6,7 @@ from app.chao.tool_gateway import (
     ToolGatewayRequest,
     evaluate_tool_gateway_request,
     execute_tool_gateway_request,
+    persist_tool_gateway_audit,
 )
 from app.chao.tool_gateway_handlers import (
     execute_registered_tool_handler,
@@ -52,6 +53,15 @@ def _request_from_params(params: dict[str, Any]) -> ToolGatewayRequest:
     }
 
 
+def _execute_and_persist_tool_gateway_request(
+    request: ToolGatewayRequest,
+    handler,
+) -> dict[str, Any]:
+    result = execute_tool_gateway_request(request, handler)
+    result["audit_persisted"] = persist_tool_gateway_audit(result["audit"])
+    return result
+
+
 def handle_tool_gateway_message(message: dict[str, Any]) -> dict[str, Any]:
     message_id = message.get("id")
     method = message.get("method")
@@ -78,7 +88,7 @@ def handle_tool_gateway_message(message: dict[str, Any]) -> dict[str, Any]:
                 return _error(message_id, "invalid_params", "arguments must be an object")
             return _success(
                 message_id,
-                execute_tool_gateway_request(
+                _execute_and_persist_tool_gateway_request(
                     request,
                     lambda: execute_registered_tool_handler(
                         request["tool_name"],
@@ -92,7 +102,7 @@ def handle_tool_gateway_message(message: dict[str, Any]) -> dict[str, Any]:
             payload = params.get("payload")
             return _success(
                 message_id,
-                execute_tool_gateway_request(
+                _execute_and_persist_tool_gateway_request(
                     request,
                     lambda: {"echo": payload},
                 ),

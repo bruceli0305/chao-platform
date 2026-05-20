@@ -62,6 +62,8 @@ def test_handle_tool_gateway_message_lists_registered_handlers():
 
 
 def test_handle_tool_gateway_message_executes_registered_handler(monkeypatch):
+    audits = []
+
     def fake_execute(tool_name, arguments):
         return {
             "tool_name": tool_name,
@@ -74,6 +76,10 @@ def test_handle_tool_gateway_message_executes_registered_handler(monkeypatch):
     monkeypatch.setattr(
         "app.chao.tool_gateway_server.execute_registered_tool_handler",
         fake_execute,
+    )
+    monkeypatch.setattr(
+        "app.chao.tool_gateway_server.persist_tool_gateway_audit",
+        lambda audit: audits.append(audit) or True,
     )
 
     response = handle_tool_gateway_message(
@@ -92,8 +98,10 @@ def test_handle_tool_gateway_message_executes_registered_handler(monkeypatch):
 
     assert result["allowed"] is True
     assert result["result_status"] == "success"
+    assert result["audit_persisted"] is True
     assert result["output"]["tool_name"] == "data_boundary_check"
     assert result["output"]["arguments"] == {"pretty": True}
+    assert audits[0]["tool_name"] == "data_boundary_check"
 
 
 def test_handle_tool_gateway_message_rejects_non_object_arguments():
@@ -112,7 +120,12 @@ def test_handle_tool_gateway_message_rejects_non_object_arguments():
     assert response["error"]["code"] == "invalid_params"
 
 
-def test_handle_tool_gateway_message_reports_unregistered_allowed_handler():
+def test_handle_tool_gateway_message_reports_unregistered_allowed_handler(monkeypatch):
+    monkeypatch.setattr(
+        "app.chao.tool_gateway_server.persist_tool_gateway_audit",
+        lambda _audit: True,
+    )
+
     response = handle_tool_gateway_message(
         {
             "jsonrpc": "2.0",
@@ -135,7 +148,38 @@ def test_handle_tool_gateway_message_reports_unregistered_allowed_handler():
     assert result["error"] == "no handler registered for tool: cli.runner_patch"
 
 
-def test_handle_tool_gateway_message_execute_echo_blocks_denied_request():
+def test_handle_tool_gateway_message_persists_denied_execute(monkeypatch):
+    audits = []
+    monkeypatch.setattr(
+        "app.chao.tool_gateway_server.persist_tool_gateway_audit",
+        lambda audit: audits.append(audit) or True,
+    )
+
+    response = handle_tool_gateway_message(
+        {
+            "jsonrpc": "2.0",
+            "id": "deny-persist",
+            "method": "tool.execute.echo",
+            "params": {
+                "request": _request(agent_name="gongbu"),
+                "payload": {"should_not_execute": True},
+            },
+        }
+    )
+
+    result = response["result"]
+
+    assert result["result_status"] == "denied"
+    assert result["audit_persisted"] is True
+    assert audits[0]["result_status"] == "denied"
+
+
+def test_handle_tool_gateway_message_execute_echo_blocks_denied_request(monkeypatch):
+    monkeypatch.setattr(
+        "app.chao.tool_gateway_server.persist_tool_gateway_audit",
+        lambda _audit: True,
+    )
+
     response = handle_tool_gateway_message(
         {
             "jsonrpc": "2.0",

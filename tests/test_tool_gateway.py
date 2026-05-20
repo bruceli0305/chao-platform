@@ -2,6 +2,7 @@ from app.chao.tool_gateway import (
     ToolGatewayRequest,
     evaluate_tool_gateway_request,
     execute_tool_gateway_request,
+    persist_tool_gateway_audit,
 )
 
 
@@ -73,3 +74,39 @@ def test_execute_tool_gateway_request_reports_handler_failure():
     assert response["error"] == "tool failed"
     assert response["audit"]["result_status"] == "failed"
     assert response["audit"]["output_summary"] == "tool failed"
+
+
+def test_persist_tool_gateway_audit_records_tool_call():
+    calls = []
+    response = execute_tool_gateway_request(
+        _request(),
+        lambda: {"ok": True},
+    )
+
+    persisted = persist_tool_gateway_audit(
+        response["audit"],
+        recorder=lambda **kwargs: calls.append(kwargs),
+    )
+
+    assert persisted is True
+    assert calls[0]["task_id"] == "task-1"
+    assert calls[0]["tool_name"] == "cli.runner_patch"
+    assert calls[0]["permission_policy"] == "controlled-runner-text-patch"
+    assert calls[0]["result_status"] == "success"
+    assert calls[0]["permission_decision"]["allowed"] is True
+
+
+def test_persist_tool_gateway_audit_skips_missing_task_id():
+    calls = []
+    response = execute_tool_gateway_request(
+        _request(task_id=None),
+        lambda: {"ok": True},
+    )
+
+    persisted = persist_tool_gateway_audit(
+        response["audit"],
+        recorder=lambda **kwargs: calls.append(kwargs),
+    )
+
+    assert persisted is False
+    assert calls == []

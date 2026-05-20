@@ -212,6 +212,20 @@ def save_task_result(result: dict[str, Any]) -> None:
         created_by="shangshu",
     )
 
+    skill_usage = result.get("skill_usage") or []
+    if skill_usage:
+        record_task_event(
+            task_id=task_id,
+            event_type="skills_prepared",
+            from_status=result.get("status", "UNKNOWN"),
+            to_status=result.get("status", "UNKNOWN"),
+            summary=(
+                "Loaded required skills: "
+                + ", ".join(skill.get("name", "") for skill in skill_usage)
+            ),
+            created_by="shangshu",
+        )
+
     permission_decision = require_tool_permission(
         agent_name="shangshu",
         tool_name="cli.new",
@@ -371,6 +385,7 @@ def get_task_detail(task_code: str) -> dict[str, Any] | None:
         "required_skills": route_result.get("required_skills", []),
         "required_skill_paths": route_result.get("required_skill_paths", []),
         "required_skill_details": route_result.get("required_skill_details", []),
+        "skill_usage": route_result.get("skill_usage", []),
         "events": list_task_events(task[0]),
         "tool_calls": list_tool_calls(task[0]),
         "artifacts": list_artifacts(task[0]),

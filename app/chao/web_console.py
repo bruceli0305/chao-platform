@@ -451,6 +451,7 @@ def build_console_index_html() -> str:
         tool_calls: (task.tool_calls ?? []).length,
         artifacts: (task.artifacts ?? []).length,
         data_assets: (task.data_assets ?? []).length,
+        skill_usage: (task.skill_usage ?? []).length,
         llm_egress_authorizations: (task.llm_egress_authorizations ?? []).length,
         github_links: (task.github_links ?? []).length,
         gate_results: (task.gate_results ?? []).length
@@ -499,6 +500,13 @@ def build_console_index_html() -> str:
           { key: "classification", label: "Class" },
           { key: "owner", label: "Owner" },
           { key: "primary_storage", label: "Storage" }
+        ]),
+        renderRiskTable("Task Skill Usage", task.skill_usage ?? [
+        ], [
+          { key: "name", label: "Skill" },
+          { key: "path", label: "Path" },
+          { key: "status", label: "Status" },
+          { key: "content_sha256", label: "SHA256" }
         ]),
         renderRiskTable("Task GitHub Links", task.github_links ?? [
         ], [

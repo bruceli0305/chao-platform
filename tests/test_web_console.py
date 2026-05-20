@@ -50,6 +50,7 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "renderTaskDetailTables" in html
     assert "Task Tool Calls" in html
     assert "Task Gate Results" in html
+    assert "Task Skill Usage" in html
     assert "Task LLM Egress Authorizations" in html
     assert "Recent LLM Egress Authorizations" in html
     assert "Expired LLM Egress Authorizations" in html
@@ -171,6 +172,7 @@ def test_build_console_response_returns_task_detail(monkeypatch):
                 "tool_calls": [],
                 "artifacts": [],
                 "data_assets": [],
+                "skill_usage": [],
                 "llm_egress_authorizations": [],
             }
         ),
