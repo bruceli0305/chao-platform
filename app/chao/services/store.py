@@ -345,6 +345,17 @@ def get_task_detail(task_code: str) -> dict[str, Any] | None:
             route = cur.fetchone()
             route_result = route[0] if route else {}
 
+            cur.execute(
+                """
+                select confirmation_level, status, confirmed_by, note, created_at::text
+                from confirmations
+                where task_id = %s
+                order by created_at asc
+                """,
+                (task_id,),
+            )
+            confirmations = cur.fetchall()
+
     return {
         "id": task[0],
         "task_code": task[1],
@@ -364,6 +375,16 @@ def get_task_detail(task_code: str) -> dict[str, Any] | None:
         "artifacts": list_artifacts(task[0]),
         "data_assets": list_task_data_assets(task[0]),
         "github_links": list_task_github_links(task[0]),
+        "confirmations": [
+            {
+                "confirmation_level": confirmation[0],
+                "status": confirmation[1],
+                "confirmed_by": confirmation[2],
+                "note": confirmation[3],
+                "created_at": confirmation[4],
+            }
+            for confirmation in confirmations
+        ],
         "historian_records": [
             {
                 "record_type": r[0],

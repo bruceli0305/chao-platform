@@ -599,6 +599,11 @@ def llm_chat_command(
     temperature: float = typer.Option(0.2, "--temperature", min=0.0, max=2.0),
     max_tokens: int = typer.Option(1024, "--max-tokens", min=1),
     execute: bool = typer.Option(False, "--execute", help="Call the external provider"),
+    allow_governed_egress: bool = typer.Option(
+        False,
+        "--allow-governed-egress",
+        help="Allow L3/L4 egress only when an A-level approval exists",
+    ),
 ):
     task = get_task_detail(task_code)
 
@@ -626,6 +631,7 @@ def llm_chat_command(
             provider=provider_config.name,
             model=provider_config.model,
             execute=execute,
+            governed_egress_approved=(allow_governed_egress and _has_approved_a_confirmation(task)),
         )
         if egress_decision.allowed:
             result = execute_llm_chat_completion(
@@ -672,7 +678,7 @@ def llm_chat_command(
             f"task_code={task_code}; provider={provider_config.name}; "
             f"model={provider_config.model}; user_prompt_chars={len(prompt)}; "
             f"llm_prompt_chars={len(llm_prompt)}; data_classification={resolved_classification}; "
-            f"execute={execute}"
+            f"execute={execute}; allow_governed_egress={allow_governed_egress}"
         ),
         permission_policy=permission_decision["permission_policy"],
         result_status=result_status,
@@ -688,6 +694,18 @@ def llm_chat_command(
 
     if result_status != "success":
         raise typer.Exit(code=1)
+
+
+def _has_approved_a_confirmation(task: dict[str, object]) -> bool:
+    for confirmation in task.get("confirmations", []) or []:
+        if (
+            isinstance(confirmation, dict)
+            and confirmation.get("confirmation_level") == "A"
+            and confirmation.get("status") == "APPROVED"
+        ):
+            return True
+
+    return False
 
 
 @app.command("runner-branch")

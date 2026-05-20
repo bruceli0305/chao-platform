@@ -49,6 +49,7 @@ uv run python main.py llm-providers --provider openai-compatible
 uv run python main.py llm-chat TASK-xxxx "summarize this task"
 uv run python main.py llm-chat TASK-xxxx "summarize this task" --execute
 uv run python main.py llm-chat TASK-xxxx "summarize this task" --data-classification D1 --execute
+uv run python main.py llm-chat TASK-xxxx "summarize this task" --execute --allow-governed-egress
 ```
 
 `llm-chat` 会根据 `TASK_CODE` 读取任务详情，并将任务标题、原始需求、路由、
@@ -108,8 +109,9 @@ dry-run：允许，不调用外部 Provider；
 --execute：仅允许 L1 / L2 任务；
 --execute：仅允许 D0 / D1 数据；
 --execute：仅允许已登记的 provider / model 组合；
+L3 / L4：必须显式传入 --allow-governed-egress，且任务已有 A 级 APPROVED confirmation；
 任务 data_assets 中出现更高分级时，以最高分级为准；
-D2 / D3 / D4、L3 / L4、未知分级或未登记模型会被拒绝外发，并写入 tool_calls 审计。
+D2 / D3 / D4、未批准的 L3 / L4、未知分级或未登记模型会被拒绝外发，并写入 tool_calls 审计。
 ```
 
 当前真实外发 allowlist：
@@ -125,5 +127,5 @@ anthropic / claude-3-5-sonnet-latest。
 ## 6. 后续
 
 ```text
-为 L3 / L4 增加人工确认后的临时外发授权流程。
+将 L3 / L4 外发授权从命令参数升级为独立有效期授权记录。
 ```

@@ -158,6 +158,101 @@ def test_llm_chat_execute_denies_l3_task(monkeypatch):
     assert "L3 tasks cannot call external LLM providers" in result.output
 
 
+def test_llm_chat_execute_allows_l3_with_governed_approval(monkeypatch):
+    calls = []
+    prompts = []
+    task = {
+        "id": "task-1",
+        "task_code": "TASK-1",
+        "title": "Governed task",
+        "raw_request": "Summarize governed task.",
+        "task_level": "L3",
+        "status": "DESIGNING",
+        "route_result": {"required_confirmation": "A"},
+        "confirmations": [
+            {
+                "confirmation_level": "A",
+                "status": "APPROVED",
+                "confirmed_by": "emperor",
+            }
+        ],
+    }
+
+    def fake_execute(_config, prompt, **_kwargs):
+        prompts.append(prompt)
+
+        class Result:
+            status = "success"
+            dry_run = False
+            error = None
+
+            def to_safe_dict(self):
+                return {
+                    "provider": "deepseek",
+                    "model": "deepseek-chat",
+                    "status": "success",
+                    "dry_run": False,
+                    "request": {},
+                    "response": {"choices": []},
+                    "error": None,
+                }
+
+        return Result()
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: task)
+    monkeypatch.setattr(cli, "execute_llm_chat_completion", fake_execute)
+    monkeypatch.setattr(cli, "record_tool_call", lambda **kwargs: calls.append(kwargs))
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "llm-chat",
+            "TASK-1",
+            "summarize the task",
+            "--execute",
+            "--allow-governed-egress",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Summarize governed task." in prompts[0]
+    assert calls[0]["result_status"] == "success"
+    assert calls[0]["permission_decision"]["egress_policy"]["task_level"] == "L3"
+    assert calls[0]["permission_decision"]["egress_policy"]["governed_egress_approved"] is True
+
+
+def test_llm_chat_execute_denies_l3_without_a_approval_even_with_flag(monkeypatch):
+    calls = []
+    task = {
+        "id": "task-1",
+        "task_code": "TASK-1",
+        "title": "Governed task",
+        "raw_request": "Summarize governed task.",
+        "task_level": "L3",
+        "status": "DESIGNING",
+        "route_result": {"required_confirmation": "A"},
+        "confirmations": [{"confirmation_level": "A", "status": "PENDING"}],
+    }
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: task)
+    monkeypatch.setattr(cli, "record_tool_call", lambda **kwargs: calls.append(kwargs))
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "llm-chat",
+            "TASK-1",
+            "summarize the task",
+            "--execute",
+            "--allow-governed-egress",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert calls[0]["result_status"] == "denied"
+    assert calls[0]["permission_decision"]["egress_policy"]["governed_egress_approved"] is False
+
+
 def test_llm_chat_requires_existing_task(monkeypatch):
     monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: None)
 

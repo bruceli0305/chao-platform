@@ -42,6 +42,21 @@ def test_llm_egress_policy_denies_l3_execute():
     assert decision.reason == "L3 tasks cannot call external LLM providers"
 
 
+def test_llm_egress_policy_allows_l3_execute_with_governed_approval():
+    decision = evaluate_llm_egress_policy(
+        task_level="L3",
+        data_classification="D1",
+        provider="deepseek",
+        model="deepseek-chat",
+        execute=True,
+        governed_egress_approved=True,
+    )
+
+    assert decision.allowed is True
+    assert decision.reason == "external LLM egress allowed by governed approval"
+    assert decision.to_dict()["governed_egress_approved"] is True
+
+
 def test_llm_egress_policy_denies_d2_execute():
     decision = evaluate_llm_egress_policy(
         task_level="L2",

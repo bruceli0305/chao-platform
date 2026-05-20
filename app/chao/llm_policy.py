@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 
 ALLOWED_EXECUTE_TASK_LEVELS = {"L1", "L2"}
+GOVERNED_EXECUTE_TASK_LEVELS = {"L3", "L4"}
 ALLOWED_EXECUTE_DATA_CLASSIFICATIONS = {"D0", "D1"}
 ALLOWED_EXECUTE_PROVIDER_MODELS = {
     "anthropic": {"claude-3-5-sonnet-latest"},
@@ -20,6 +21,7 @@ class LLMEgressDecision:
     provider: str
     model: str
     execute: bool
+    governed_egress_approved: bool
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -30,6 +32,7 @@ class LLMEgressDecision:
             "provider": self.provider,
             "model": self.model,
             "execute": self.execute,
+            "governed_egress_approved": self.governed_egress_approved,
         }
 
 
@@ -54,6 +57,7 @@ def evaluate_llm_egress_policy(
     provider: str,
     model: str,
     execute: bool,
+    governed_egress_approved: bool = False,
 ) -> LLMEgressDecision:
     normalized_level = normalize_task_level(task_level)
     normalized_classification = normalize_data_classification(data_classification)
@@ -69,6 +73,7 @@ def evaluate_llm_egress_policy(
             provider=normalized_provider,
             model=normalized_model,
             execute=False,
+            governed_egress_approved=governed_egress_approved,
         )
 
     if normalized_model not in ALLOWED_EXECUTE_PROVIDER_MODELS.get(normalized_provider, set()):
@@ -83,9 +88,13 @@ def evaluate_llm_egress_policy(
             provider=normalized_provider,
             model=normalized_model,
             execute=True,
+            governed_egress_approved=governed_egress_approved,
         )
 
-    if normalized_level not in ALLOWED_EXECUTE_TASK_LEVELS:
+    governed_level_allowed = (
+        governed_egress_approved and normalized_level in GOVERNED_EXECUTE_TASK_LEVELS
+    )
+    if normalized_level not in ALLOWED_EXECUTE_TASK_LEVELS and not governed_level_allowed:
         return LLMEgressDecision(
             allowed=False,
             reason=f"{normalized_level} tasks cannot call external LLM providers",
@@ -94,6 +103,7 @@ def evaluate_llm_egress_policy(
             provider=normalized_provider,
             model=normalized_model,
             execute=True,
+            governed_egress_approved=governed_egress_approved,
         )
 
     if normalized_classification not in ALLOWED_EXECUTE_DATA_CLASSIFICATIONS:
@@ -105,16 +115,22 @@ def evaluate_llm_egress_policy(
             provider=normalized_provider,
             model=normalized_model,
             execute=True,
+            governed_egress_approved=governed_egress_approved,
         )
 
     return LLMEgressDecision(
         allowed=True,
-        reason="external LLM egress allowed",
+        reason=(
+            "external LLM egress allowed by governed approval"
+            if governed_level_allowed
+            else "external LLM egress allowed"
+        ),
         task_level=normalized_level,
         data_classification=normalized_classification,
         provider=normalized_provider,
         model=normalized_model,
         execute=True,
+        governed_egress_approved=governed_egress_approved,
     )
 
 
