@@ -419,6 +419,20 @@ def get_console_github_sync(limit: int = 20) -> dict[str, Any]:
 
             cur.execute(
                 """
+                select count(*)
+                from tasks t
+                where t.status = 'DELIVERED'
+                  and not exists (
+                      select 1
+                      from github_links gl
+                      where gl.task_id = t.id
+                  )
+                """
+            )
+            unlinked_delivered_task_count = cur.fetchone()[0]
+
+            cur.execute(
+                """
                 select link_type, count(*)
                 from github_links
                 group by link_type
@@ -494,12 +508,36 @@ def get_console_github_sync(limit: int = 20) -> dict[str, Any]:
             )
             failed_link_rows = cur.fetchall()
 
+            cur.execute(
+                """
+                select
+                    t.task_code,
+                    t.title,
+                    t.task_level,
+                    t.status,
+                    t.owner,
+                    t.created_at::text
+                from tasks t
+                where t.status = 'DELIVERED'
+                  and not exists (
+                      select 1
+                      from github_links gl
+                      where gl.task_id = t.id
+                  )
+                order by t.created_at desc
+                limit %s
+                """,
+                (limit,),
+            )
+            unlinked_task_rows = cur.fetchall()
+
     return {
         "summary": {
             "github_link_count": github_link_count,
             "linked_task_count": linked_task_count,
             "github_delivery_event_count": github_delivery_event_count,
             "failed_github_link_count": failed_github_link_count,
+            "unlinked_delivered_task_count": unlinked_delivered_task_count,
         },
         "link_type_counts": _rows_to_counts(link_type_rows),
         "status_counts": _rows_to_counts(status_rows),
@@ -536,6 +574,17 @@ def get_console_github_sync(limit: int = 20) -> dict[str, Any]:
                 "created_at": row[6],
             }
             for row in failed_link_rows
+        ],
+        "recent_unlinked_delivered_tasks": [
+            {
+                "task_code": row[0],
+                "title": row[1],
+                "task_level": row[2],
+                "status": row[3],
+                "owner": row[4],
+                "created_at": row[5],
+            }
+            for row in unlinked_task_rows
         ],
         "failed_statuses": list(failed_statuses),
     }

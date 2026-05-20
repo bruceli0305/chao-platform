@@ -711,6 +711,20 @@ def console_github_sync_command(
         )
     console.print(delivery_events)
 
+    unlinked_tasks = Table(title="Unlinked Delivered Tasks")
+    unlinked_tasks.add_column("Task")
+    unlinked_tasks.add_column("Title")
+    unlinked_tasks.add_column("Level")
+    unlinked_tasks.add_column("Owner")
+    for task in github_sync["recent_unlinked_delivered_tasks"]:
+        unlinked_tasks.add_row(
+            _display_value(task.get("task_code")),
+            _display_value(task.get("title")),
+            _display_value(task.get("task_level")),
+            _display_value(task.get("owner")),
+        )
+    console.print(unlinked_tasks)
+
     failed_links = Table(title="Failed GitHub Sync Links")
     failed_links.add_column("Task")
     failed_links.add_column("Type")

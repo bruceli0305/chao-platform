@@ -67,6 +67,7 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "Pending Tool Calls" in html
     assert "Recent GitHub Sync Links" in html
     assert "Recent GitHub Delivery Events" in html
+    assert "Unlinked Delivered Tasks" in html
     assert "Failed GitHub Sync Links" in html
     assert "github-sync-details" in html
     assert "data-task-code" in html

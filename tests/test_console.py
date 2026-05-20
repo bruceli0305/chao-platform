@@ -262,6 +262,7 @@ def test_get_console_github_sync_returns_sync_summary(monkeypatch):
         [(2,)],
         [(3,)],
         [(1,)],
+        [(1,)],
         [("ci_run", 2), ("pull_request", 3)],
         [("failed", 1), ("success", 4)],
         [
@@ -293,6 +294,16 @@ def test_get_console_github_sync_returns_sync_summary(monkeypatch):
                 "https://github.com/example/repo/actions/runs/99",
                 "failed",
                 "2026-05-20 00:00:02",
+            )
+        ],
+        [
+            (
+                "TASK-UNLINKED",
+                "Delivered without GitHub link",
+                "L2",
+                "DELIVERED",
+                "shangshu",
+                "2026-05-20 00:00:03",
             )
         ],
     ]
@@ -336,12 +347,14 @@ def test_get_console_github_sync_returns_sync_summary(monkeypatch):
         "linked_task_count": 2,
         "github_delivery_event_count": 3,
         "failed_github_link_count": 1,
+        "unlinked_delivered_task_count": 1,
     }
     assert github_sync["link_type_counts"] == {"ci_run": 2, "pull_request": 3}
     assert github_sync["status_counts"] == {"failed": 1, "success": 4}
     assert github_sync["recent_links"][0]["external_id"] == "42"
     assert github_sync["recent_delivery_events"][0]["task_code"] == "TASK-PR"
     assert github_sync["failed_links"][0]["status"] == "failed"
+    assert github_sync["recent_unlinked_delivered_tasks"][0]["task_code"] == "TASK-UNLINKED"
     assert queries[-1][1] == (5,)
 
 
@@ -725,6 +738,7 @@ def test_console_github_sync_renders_sync_summary(monkeypatch):
             "linked_task_count": 1,
             "github_delivery_event_count": 1,
             "failed_github_link_count": 1,
+            "unlinked_delivered_task_count": 1,
         },
         "link_type_counts": {"pull_request": 1, "ci_run": 1},
         "status_counts": {"open": 1, "failed": 1},
@@ -753,6 +767,14 @@ def test_console_github_sync_renders_sync_summary(monkeypatch):
                 "status": "failed",
             }
         ],
+        "recent_unlinked_delivered_tasks": [
+            {
+                "task_code": "TASK-UNLINKED",
+                "title": "Delivered without GitHub link",
+                "task_level": "L2",
+                "owner": "shangshu",
+            }
+        ],
         "failed_statuses": ["failure", "failed", "error", "cancelled"],
     }
 
@@ -764,9 +786,11 @@ def test_console_github_sync_renders_sync_summary(monkeypatch):
     assert "GitHub Task Sync Summary" in result.output
     assert "Recent GitHub Sync Links" in result.output
     assert "Recent GitHub Delivery Events" in result.output
+    assert "Unlinked Delivered Tasks" in result.output
     assert "Failed GitHub Sync Links" in result.output
     assert "TASK-PR" in result.output
     assert "TASK-CI" in result.output
+    assert "TASK-UNLINKED" in result.output
 
 
 def test_tool_gateway_tools_renders_policy_metadata(monkeypatch):

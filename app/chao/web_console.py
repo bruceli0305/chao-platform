@@ -386,6 +386,16 @@ def build_console_index_html() -> str:
           { key: "created_by", label: "By" },
           { key: "created_at", label: "Created" }
         ])}
+        ${renderRiskTable(
+          "Unlinked Delivered Tasks",
+          githubSync.recent_unlinked_delivered_tasks ?? [],
+          [
+            { key: "task_code", label: "Task" },
+            { key: "title", label: "Title" },
+            { key: "task_level", label: "Level" },
+            { key: "owner", label: "Owner" }
+          ]
+        )}
         ${renderRiskTable("Failed GitHub Sync Links", githubSync.failed_links ?? [
         ], [
           { key: "task_code", label: "Task" },
