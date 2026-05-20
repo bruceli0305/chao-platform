@@ -16,6 +16,10 @@ from app.chao.services.store import get_task_detail
 from scripts.check_pr_task_binding import extract_task_codes
 
 
+def unique_task_codes(task_codes: list[str]) -> list[str]:
+    return list(dict.fromkeys(task_codes))
+
+
 def load_event(path: str | None) -> dict[str, Any]:
     if not path:
         return {}
@@ -38,45 +42,48 @@ def build_repo_url(env: dict[str, str]) -> str | None:
     return f"{server_url}/{repository}"
 
 
-def extract_task_code(event: dict[str, Any]) -> str | None:
+def extract_task_codes_from_event(event: dict[str, Any]) -> list[str]:
     pull_request = event.get("pull_request")
 
     if pull_request:
-        task_codes = extract_task_codes(
-            "\n".join(
-                [
-                    pull_request.get("title") or "",
-                    pull_request.get("body") or "",
-                ]
+        return unique_task_codes(
+            extract_task_codes(
+                "\n".join(
+                    [
+                        pull_request.get("title") or "",
+                        pull_request.get("body") or "",
+                    ]
+                )
             )
         )
-        return task_codes[0] if task_codes else None
 
     issue = event.get("issue")
 
     if issue:
-        task_codes = extract_task_codes(
-            "\n".join(
-                [
-                    issue.get("title") or "",
-                    issue.get("body") or "",
-                ]
+        return unique_task_codes(
+            extract_task_codes(
+                "\n".join(
+                    [
+                        issue.get("title") or "",
+                        issue.get("body") or "",
+                    ]
+                )
             )
         )
-        return task_codes[0] if task_codes else None
 
     workflow_run = event.get("workflow_run")
 
     if workflow_run:
-        task_codes = extract_task_codes(
-            "\n".join(
-                [
-                    workflow_run.get("display_title") or "",
-                    (workflow_run.get("head_commit") or {}).get("message") or "",
-                ]
+        return unique_task_codes(
+            extract_task_codes(
+                "\n".join(
+                    [
+                        workflow_run.get("display_title") or "",
+                        (workflow_run.get("head_commit") or {}).get("message") or "",
+                    ]
+                )
             )
         )
-        return task_codes[0] if task_codes else None
 
     candidate_text = "\n".join(
         [
@@ -84,9 +91,23 @@ def extract_task_code(event: dict[str, Any]) -> str | None:
             *[commit.get("message") or "" for commit in event.get("commits", [])],
         ]
     )
-    task_codes = extract_task_codes(candidate_text)
+    return unique_task_codes(extract_task_codes(candidate_text))
+
+
+def extract_task_code(event: dict[str, Any]) -> str | None:
+    task_codes = extract_task_codes_from_event(event)
 
     return task_codes[0] if task_codes else None
+
+
+def resolve_task_codes(event: dict[str, Any], env: dict[str, str]) -> list[str]:
+    explicit_task_code = env.get("CHAO_TASK_CODE")
+
+    if explicit_task_code:
+        parsed_task_codes = extract_task_codes(explicit_task_code)
+        return unique_task_codes(parsed_task_codes or [explicit_task_code])
+
+    return extract_task_codes_from_event(event)
 
 
 def build_delivery_links(event: dict[str, Any], env: dict[str, str]) -> list[dict[str, Any]]:
@@ -231,24 +252,27 @@ def record_delivery_context(
 
 def main() -> int:
     event = load_event(os.getenv("GITHUB_EVENT_PATH"))
-    task_code = os.getenv("CHAO_TASK_CODE") or extract_task_code(event)
+    env = dict(os.environ)
+    task_codes = resolve_task_codes(event, env)
 
-    if not task_code:
+    if not task_codes:
         print("GitHub delivery record skipped: no Task Code found")
         return 0
 
-    links = build_delivery_links(event, dict(os.environ))
+    links = build_delivery_links(event, env)
 
     if not links:
         print("GitHub delivery record skipped: no GitHub links found")
         return 0
 
-    record_delivery_context(
-        task_code=task_code,
-        links=links,
-        created_by=os.getenv("GITHUB_ACTOR", "github-actions"),
-        allow_missing_task=True,
-    )
+    for task_code in task_codes:
+        record_delivery_context(
+            task_code=task_code,
+            links=links,
+            created_by=os.getenv("GITHUB_ACTOR", "github-actions"),
+            allow_missing_task=True,
+        )
+
     return 0
 
 

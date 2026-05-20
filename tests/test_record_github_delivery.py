@@ -14,6 +14,36 @@ def test_extract_task_code_from_pull_request_body():
     )
 
 
+def test_extract_task_codes_from_pull_request_deduplicates_all_matches():
+    assert record_github_delivery.extract_task_codes_from_event(
+        {
+            "pull_request": {
+                "title": "Bind TASK-20260511-120000-123456",
+                "body": (
+                    "Task Code: TASK-20260511-120000-123456\nRelated: TASK-20260511-130000-654321"
+                ),
+            }
+        }
+    ) == [
+        "TASK-20260511-120000-123456",
+        "TASK-20260511-130000-654321",
+    ]
+
+
+def test_resolve_task_codes_prefers_explicit_env_and_accepts_multiple_codes():
+    assert record_github_delivery.resolve_task_codes(
+        {
+            "pull_request": {
+                "body": "Task Code: TASK-20260511-120000-123456",
+            }
+        },
+        {"CHAO_TASK_CODE": ("TASK-20260511-130000-654321 TASK-20260511-140000-111111")},
+    ) == [
+        "TASK-20260511-130000-654321",
+        "TASK-20260511-140000-111111",
+    ]
+
+
 def test_extract_task_code_from_issue_title():
     assert (
         record_github_delivery.extract_task_code(
@@ -216,3 +246,43 @@ def test_record_delivery_context_skips_missing_task_when_allowed(monkeypatch):
         )
         is False
     )
+
+
+def test_main_records_delivery_context_for_all_task_codes(monkeypatch):
+    calls = []
+    monkeypatch.delenv("CHAO_TASK_CODE", raising=False)
+    monkeypatch.setenv("GITHUB_EVENT_PATH", "/tmp/event.json")
+    monkeypatch.setenv("GITHUB_ACTOR", "github-actions")
+    monkeypatch.setattr(
+        record_github_delivery,
+        "load_event",
+        lambda _path: {
+            "pull_request": {
+                "title": "Bind TASK-20260511-120000-123456",
+                "body": "Related: TASK-20260511-130000-654321",
+            }
+        },
+    )
+    monkeypatch.setattr(
+        record_github_delivery,
+        "build_delivery_links",
+        lambda event, env: [
+            {
+                "link_type": "pull_request",
+                "external_id": "42",
+                "url": "https://github.com/example/repo/pull/42",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        record_github_delivery,
+        "record_delivery_context",
+        lambda **kwargs: calls.append(kwargs) or True,
+    )
+
+    assert record_github_delivery.main() == 0
+    assert [call["task_code"] for call in calls] == [
+        "TASK-20260511-120000-123456",
+        "TASK-20260511-130000-654321",
+    ]
+    assert calls[0]["created_by"] == "github-actions"
