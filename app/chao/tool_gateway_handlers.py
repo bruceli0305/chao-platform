@@ -4,6 +4,8 @@ from collections.abc import Callable
 from io import StringIO
 from typing import Any, TypedDict
 
+from app.chao.runner_validation import execute_runner_validation_commands
+
 
 class ToolHandlerDefinition(TypedDict):
     tool_name: str
@@ -34,6 +36,26 @@ def _run_data_boundary_check(_arguments: dict[str, Any]) -> dict[str, Any]:
     return _run_script_main("scripts.data_boundary_check")
 
 
+def _coerce_string_list(value: Any, *, name: str) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return value
+
+    raise ValueError(f"{name} must be a string or list of strings")
+
+
+def _run_runner_validate(arguments: dict[str, Any]) -> dict[str, Any]:
+    gates = _coerce_string_list(arguments.get("gates") or arguments.get("gate"), name="gates")
+    timeout_seconds = int(arguments.get("timeout_seconds", 120))
+
+    return execute_runner_validation_commands(
+        gates,
+        timeout_seconds=timeout_seconds,
+    )
+
+
 TOOL_HANDLER_REGISTRY: dict[str, ToolHandlerDefinition] = {
     "schema_check": {
         "tool_name": "schema_check",
@@ -44,6 +66,11 @@ TOOL_HANDLER_REGISTRY: dict[str, ToolHandlerDefinition] = {
         "tool_name": "data_boundary_check",
         "description": "Run the data-boundary gate in-process and return captured output.",
         "handler": _run_data_boundary_check,
+    },
+    "cli.runner_validate": {
+        "tool_name": "cli.runner_validate",
+        "description": "Run allowlisted Agent Runner validation gates.",
+        "handler": _run_runner_validate,
     },
 }
 

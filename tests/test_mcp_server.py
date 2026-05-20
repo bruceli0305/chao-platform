@@ -59,6 +59,7 @@ def test_handle_mcp_message_tools_list():
     assert {tool["name"] for tool in response["result"]["tools"]} >= {
         "schema_check",
         "data_boundary_check",
+        "cli.runner_validate",
     }
 
 

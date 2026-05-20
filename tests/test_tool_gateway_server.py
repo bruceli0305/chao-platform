@@ -58,7 +58,7 @@ def test_handle_tool_gateway_message_lists_registered_handlers():
     response = handle_tool_gateway_message({"jsonrpc": "2.0", "id": 2, "method": "tools.list"})
 
     tool_names = {tool["tool_name"] for tool in response["result"]["tools"]}
-    assert {"schema_check", "data_boundary_check"} <= tool_names
+    assert {"schema_check", "data_boundary_check", "cli.runner_validate"} <= tool_names
 
 
 def test_handle_tool_gateway_message_executes_registered_handler(monkeypatch):

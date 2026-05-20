@@ -11,7 +11,7 @@ from app.chao.tool_gateway_handlers import (
 def test_list_tool_handlers_exposes_safe_gate_handlers():
     tool_names = {tool["tool_name"] for tool in list_tool_handlers()}
 
-    assert {"schema_check", "data_boundary_check"} <= tool_names
+    assert {"schema_check", "data_boundary_check", "cli.runner_validate"} <= tool_names
 
 
 def test_execute_registered_tool_handler_reports_unknown_tool():
@@ -39,3 +39,41 @@ def test_run_script_main_captures_output(monkeypatch):
         "stdout": "gate passed\n",
         "stderr": "",
     }
+
+
+def test_execute_registered_tool_handler_runs_runner_validate(monkeypatch):
+    calls = []
+
+    def fake_validate(gates, *, timeout_seconds):
+        calls.append((gates, timeout_seconds))
+        return {
+            "quality": "ok",
+            "checks": gates,
+            "plan": [],
+            "command_results": [],
+            "deliverable": True,
+            "note": "validated",
+        }
+
+    monkeypatch.setattr(
+        tool_gateway_handlers,
+        "execute_runner_validation_commands",
+        fake_validate,
+    )
+
+    result = execute_registered_tool_handler(
+        "cli.runner_validate",
+        {"gate": "lint", "timeout_seconds": 30},
+    )
+
+    assert calls == [(["lint"], 30)]
+    assert result["deliverable"] is True
+
+
+def test_execute_registered_tool_handler_rejects_invalid_runner_validate_gates():
+    try:
+        execute_registered_tool_handler("cli.runner_validate", {"gates": [123]})
+    except ValueError as exc:
+        assert str(exc) == "gates must be a string or list of strings"
+    else:
+        raise AssertionError("expected invalid gates to raise ValueError")
