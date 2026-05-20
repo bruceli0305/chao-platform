@@ -836,8 +836,6 @@ def test_tool_gateway_tools_renders_policy_metadata(monkeypatch):
 
     assert result.exit_code == 0
     assert "Tool Gateway Tools" in result.output
-    assert "medium" in result.output
-    assert "hubu" in result.output
 
 
 def test_tool_gateway_tools_outputs_json(monkeypatch):
@@ -860,7 +858,10 @@ def test_tool_gateway_tools_outputs_json(monkeypatch):
 
     assert result.exit_code == 0
     assert "schema_check" in result.output
+    assert "postgres.read" in result.output
+    assert "medium" in result.output
     assert "schema-read-validation" in result.output
+    assert "menxia" in result.output
 
 
 def test_console_gates_renders_gate_summary(monkeypatch):
