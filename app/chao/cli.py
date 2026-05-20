@@ -789,11 +789,11 @@ def tool_gateway_tools_command(
         return
 
     table = Table(title="Tool Gateway Tools")
-    table.add_column("Tool")
-    table.add_column("Category")
+    table.add_column("Tool", no_wrap=True)
+    table.add_column("Category", no_wrap=True)
     table.add_column("Risk")
-    table.add_column("Policy")
-    table.add_column("Roles")
+    table.add_column("Policy", no_wrap=True)
+    table.add_column("Roles", no_wrap=True)
     table.add_column("Description")
 
     for tool in tools:
