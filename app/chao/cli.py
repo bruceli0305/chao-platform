@@ -167,6 +167,10 @@ def console_command(
     summary.add_row("Artifacts", str(overview["artifact_count"]))
     summary.add_row("Data Assets", str(overview["data_asset_count"]))
     summary.add_row("Approved Confirmations", str(overview["approved_confirmations"]))
+    summary.add_row(
+        "Active LLM Egress Authorizations",
+        str(overview["active_llm_egress_authorization_count"]),
+    )
     summary.add_row("Failed Tool Calls", str(overview["failed_tool_call_count"]))
     console.print(summary)
 
@@ -232,6 +236,7 @@ def console_task_command(
         "tool_calls",
         "artifacts",
         "data_assets",
+        "llm_egress_authorizations",
         "github_links",
         "historian_records",
         "gate_results",
@@ -264,6 +269,22 @@ def console_task_command(
             _display_value(asset.get("primary_storage")),
         )
     console.print(data_assets)
+
+    llm_authorizations = Table(title="LLM Egress Authorizations")
+    llm_authorizations.add_column("Provider")
+    llm_authorizations.add_column("Model")
+    llm_authorizations.add_column("Class")
+    llm_authorizations.add_column("Status")
+    llm_authorizations.add_column("Active")
+    for authorization in task.get("llm_egress_authorizations", []):
+        llm_authorizations.add_row(
+            _display_value(authorization.get("provider")),
+            _display_value(authorization.get("model")),
+            _display_value(authorization.get("data_classification")),
+            _display_value(authorization.get("status")),
+            _display_value(authorization.get("active")),
+        )
+    console.print(llm_authorizations)
 
     events = Table(title="Events")
     events.add_column("Type")
@@ -409,6 +430,22 @@ def console_audit_command(
         )
     console.print(github_links)
 
+    llm_authorizations = Table(title="Recent LLM Egress Authorizations")
+    llm_authorizations.add_column("Task")
+    llm_authorizations.add_column("Provider")
+    llm_authorizations.add_column("Model")
+    llm_authorizations.add_column("Class")
+    llm_authorizations.add_column("Active")
+    for authorization in audit["llm_egress_authorizations"]:
+        llm_authorizations.add_row(
+            _display_value(authorization.get("task_code")),
+            _display_value(authorization.get("provider")),
+            _display_value(authorization.get("model")),
+            _display_value(authorization.get("data_classification")),
+            _display_value(authorization.get("active")),
+        )
+    console.print(llm_authorizations)
+
 
 @app.command("console-gates")
 def console_gates_command(
@@ -549,6 +586,20 @@ def console_risks_command(
             _display_value(link.get("status")),
         )
     console.print(github)
+
+    llm_authorizations = Table(title="Expired LLM Egress Authorizations")
+    llm_authorizations.add_column("Task")
+    llm_authorizations.add_column("Provider")
+    llm_authorizations.add_column("Model")
+    llm_authorizations.add_column("Expires At")
+    for authorization in risks["expired_llm_egress_authorizations"]:
+        llm_authorizations.add_row(
+            _display_value(authorization.get("task_code")),
+            _display_value(authorization.get("provider")),
+            _display_value(authorization.get("model")),
+            _display_value(authorization.get("expires_at")),
+        )
+    console.print(llm_authorizations)
 
 
 @app.command("web-console")

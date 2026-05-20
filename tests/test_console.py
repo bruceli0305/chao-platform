@@ -19,6 +19,7 @@ def test_get_console_overview_returns_dashboard_shape(monkeypatch):
         [(1,)],
         [(3,)],
         [(4,)],
+        [(2,)],
         [(0,)],
         [
             (
@@ -74,6 +75,7 @@ def test_get_console_overview_returns_dashboard_shape(monkeypatch):
     assert overview["approved_confirmations"] == 1
     assert overview["artifact_count"] == 3
     assert overview["data_asset_count"] == 4
+    assert overview["active_llm_egress_authorization_count"] == 2
     assert overview["failed_tool_call_count"] == 0
     assert overview["recent_tasks"][0]["task_code"] == "TASK-TEST"
     assert queries[-1][1] == (1,)
@@ -198,6 +200,19 @@ def test_get_console_audit_returns_recent_records(monkeypatch):
                 "2026-05-14 00:00:04",
             )
         ],
+        [
+            (
+                "TASK-1",
+                "deepseek",
+                "deepseek-chat",
+                "D1",
+                "APPROVED",
+                "emperor",
+                "2026-05-15 00:00:00",
+                True,
+                "2026-05-14 00:00:05",
+            )
+        ],
     ]
 
     class FakeCursor:
@@ -236,6 +251,7 @@ def test_get_console_audit_returns_recent_records(monkeypatch):
     assert audit["artifacts"][0]["artifact_type"] == "runner_patch"
     assert audit["data_assets"][0]["classification"] == "D1"
     assert audit["github_links"][0]["external_id"] == "42"
+    assert audit["llm_egress_authorizations"][0]["active"] is True
     assert queries[-1][1] == (3,)
 
 
@@ -349,6 +365,17 @@ def test_get_console_risks_returns_risk_summary(monkeypatch):
                 "2026-05-14 00:00:03",
             )
         ],
+        [
+            (
+                "TASK-L3",
+                "deepseek",
+                "deepseek-chat",
+                "D1",
+                "APPROVED",
+                "2026-05-13 00:00:00",
+                "emperor",
+            )
+        ],
     ]
 
     class FakeCursor:
@@ -395,6 +422,7 @@ def test_get_console_risks_returns_risk_summary(monkeypatch):
         "unredacted_ingest_allowed_count": 3,
     }
     assert risks["github_risks"][0]["status"] == "failed"
+    assert risks["expired_llm_egress_authorizations"][0]["task_code"] == "TASK-L3"
     assert risks["summary"] == {
         "blocked_task_count": 1,
         "failed_gate_count": 1,
@@ -402,6 +430,7 @@ def test_get_console_risks_returns_risk_summary(monkeypatch):
         "tool_risk_count": 1,
         "data_boundary_risk_count": 6,
         "github_risk_count": 1,
+        "expired_llm_egress_authorization_count": 1,
     }
     assert queries[0][1] == (4,)
     assert queries[-1][1] == (4,)
@@ -447,6 +476,15 @@ def test_console_task_renders_task_detail(monkeypatch):
                 "primary_storage": "Git / Markdown",
             }
         ],
+        "llm_egress_authorizations": [
+            {
+                "provider": "deepseek",
+                "model": "deepseek-chat",
+                "data_classification": "D1",
+                "status": "APPROVED",
+                "active": True,
+            }
+        ],
         "github_links": [],
         "historian_records": [],
         "gate_results": [],
@@ -460,6 +498,7 @@ def test_console_task_renders_task_detail(monkeypatch):
     assert "Task Detail" in result.output
     assert "TASK-TEST" in result.output
     assert "runner_patch" in result.output
+    assert "deepseek-chat" in result.output
 
 
 def test_console_task_rejects_missing_task(monkeypatch):
@@ -537,6 +576,15 @@ def test_console_audit_renders_recent_records(monkeypatch):
                 "status": "open",
             }
         ],
+        "llm_egress_authorizations": [
+            {
+                "task_code": "TASK-1",
+                "provider": "deepseek",
+                "model": "deepseek-chat",
+                "data_classification": "D1",
+                "active": True,
+            }
+        ],
     }
 
     monkeypatch.setattr(cli, "get_console_audit", lambda limit=20: audit)
@@ -548,6 +596,7 @@ def test_console_audit_renders_recent_records(monkeypatch):
     assert "cli.new" in result.output
     assert "runner_patch" in result.output
     assert "pull_request" in result.output
+    assert "deepseek-chat" in result.output
 
 
 def test_console_gates_renders_gate_summary(monkeypatch):
@@ -631,6 +680,14 @@ def test_console_risks_renders_risk_summary(monkeypatch):
                 "status": "failed",
             }
         ],
+        "expired_llm_egress_authorizations": [
+            {
+                "task_code": "TASK-L3",
+                "provider": "deepseek",
+                "model": "deepseek-chat",
+                "expires_at": "2026-05-13 00:00:00",
+            }
+        ],
         "summary": {
             "blocked_task_count": 1,
             "failed_gate_count": 1,
@@ -638,6 +695,7 @@ def test_console_risks_renders_risk_summary(monkeypatch):
             "tool_risk_count": 1,
             "data_boundary_risk_count": 0,
             "github_risk_count": 1,
+            "expired_llm_egress_authorization_count": 1,
         },
     }
 
@@ -652,3 +710,4 @@ def test_console_risks_renders_risk_summary(monkeypatch):
     assert "runner_failure_feedback" in result.output
     assert "pytest" in result.output
     assert "ci_run" in result.output
+    assert "Expired LLM Egress Authorizations" in result.output

@@ -83,6 +83,16 @@ def get_console_overview(
             cur.execute(
                 """
                 select count(*)
+                from llm_egress_authorizations
+                where status = 'APPROVED'
+                  and expires_at > now()
+                """
+            )
+            active_llm_egress_authorization_count = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                select count(*)
                 from tool_calls
                 where result_status <> 'success'
                 """
@@ -118,6 +128,7 @@ def get_console_overview(
         "approved_confirmations": approved_confirmations,
         "artifact_count": artifact_count,
         "data_asset_count": data_asset_count,
+        "active_llm_egress_authorization_count": active_llm_egress_authorization_count,
         "failed_tool_call_count": failed_tool_call_count,
         "recent_tasks": [
             {
@@ -274,6 +285,27 @@ def get_console_audit(limit: int = 20) -> dict[str, list[dict[str, Any]]]:
             )
             github_link_rows = cur.fetchall()
 
+            cur.execute(
+                """
+                select
+                    t.task_code,
+                    lea.provider,
+                    lea.model,
+                    lea.data_classification,
+                    lea.status,
+                    lea.authorized_by,
+                    lea.expires_at::text,
+                    (lea.status = 'APPROVED' and lea.expires_at > now()) as active,
+                    lea.created_at::text
+                from llm_egress_authorizations lea
+                join tasks t on t.id = lea.task_id
+                order by lea.created_at desc
+                limit %s
+                """,
+                (limit,),
+            )
+            llm_egress_authorization_rows = cur.fetchall()
+
     return {
         "events": [
             {
@@ -332,6 +364,20 @@ def get_console_audit(limit: int = 20) -> dict[str, list[dict[str, Any]]]:
                 "created_at": row[6],
             }
             for row in github_link_rows
+        ],
+        "llm_egress_authorizations": [
+            {
+                "task_code": row[0],
+                "provider": row[1],
+                "model": row[2],
+                "data_classification": row[3],
+                "status": row[4],
+                "authorized_by": row[5],
+                "expires_at": row[6],
+                "active": row[7],
+                "created_at": row[8],
+            }
+            for row in llm_egress_authorization_rows
         ],
     }
 
@@ -587,6 +633,27 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
             )
             github_risk_rows = cur.fetchall()
 
+            cur.execute(
+                """
+                select
+                    t.task_code,
+                    lea.provider,
+                    lea.model,
+                    lea.data_classification,
+                    lea.status,
+                    lea.expires_at::text,
+                    lea.authorized_by
+                from llm_egress_authorizations lea
+                join tasks t on t.id = lea.task_id
+                where lea.status = 'APPROVED'
+                  and lea.expires_at <= now()
+                order by lea.expires_at desc
+                limit %s
+                """,
+                (limit,),
+            )
+            expired_llm_egress_authorization_rows = cur.fetchall()
+
     data_boundary_risks = {
         "invalid_data_asset_classification_count": invalid_data_asset_classification_count,
         "invalid_context_classification_count": invalid_context_classification_count,
@@ -648,6 +715,18 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
             }
             for row in github_risk_rows
         ],
+        "expired_llm_egress_authorizations": [
+            {
+                "task_code": row[0],
+                "provider": row[1],
+                "model": row[2],
+                "data_classification": row[3],
+                "status": row[4],
+                "expires_at": row[5],
+                "authorized_by": row[6],
+            }
+            for row in expired_llm_egress_authorization_rows
+        ],
         "summary": {
             "blocked_task_count": len(blocked_task_rows),
             "failed_gate_count": len(failed_gate_rows),
@@ -655,5 +734,6 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
             "tool_risk_count": len(tool_risk_rows),
             "data_boundary_risk_count": sum(data_boundary_risks.values()),
             "github_risk_count": len(github_risk_rows),
+            "expired_llm_egress_authorization_count": len(expired_llm_egress_authorization_rows),
         },
     }

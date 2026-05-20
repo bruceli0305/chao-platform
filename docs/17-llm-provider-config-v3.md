@@ -128,5 +128,5 @@ anthropic / claude-3-5-sonnet-latest。
 ## 6. 后续
 
 ```text
-将 llm_egress_authorizations 接入 Web Console 和定期过期审计。
+将 llm_egress_authorizations 接入定期过期审计任务。
 ```

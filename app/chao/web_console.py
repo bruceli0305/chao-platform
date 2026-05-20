@@ -300,7 +300,17 @@ def build_console_index_html() -> str:
           { key: "link_type", label: "Type" },
           { key: "external_id", label: "External ID" },
           { key: "status", label: "Status" }
-        ])
+        ]),
+        renderRiskTable(
+          "Expired LLM Egress Authorizations",
+          risks.expired_llm_egress_authorizations ?? [],
+          [
+            { key: "task_code", label: "Task" },
+            { key: "provider", label: "Provider" },
+            { key: "model", label: "Model" },
+            { key: "expires_at", label: "Expires" }
+          ]
+        )
       ].join("");
     }
 
@@ -366,6 +376,13 @@ def build_console_index_html() -> str:
           { key: "link_type", label: "Type" },
           { key: "external_id", label: "External ID" },
           { key: "status", label: "Status" }
+        ]),
+        renderRiskTable("Recent LLM Egress Authorizations", audit.llm_egress_authorizations ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "provider", label: "Provider" },
+          { key: "model", label: "Model" },
+          { key: "active", label: "Active" }
         ])
       ].join("");
     }
@@ -389,6 +406,7 @@ def build_console_index_html() -> str:
         tool_calls: (task.tool_calls ?? []).length,
         artifacts: (task.artifacts ?? []).length,
         data_assets: (task.data_assets ?? []).length,
+        llm_egress_authorizations: (task.llm_egress_authorizations ?? []).length,
         github_links: (task.github_links ?? []).length,
         gate_results: (task.gate_results ?? []).length
       };
@@ -443,6 +461,13 @@ def build_console_index_html() -> str:
           { key: "external_id", label: "External ID" },
           { key: "status", label: "Status" },
           { key: "url", label: "URL" }
+        ]),
+        renderRiskTable("Task LLM Egress Authorizations", task.llm_egress_authorizations ?? [
+        ], [
+          { key: "provider", label: "Provider" },
+          { key: "model", label: "Model" },
+          { key: "data_classification", label: "Class" },
+          { key: "active", label: "Active" }
         ]),
         renderRiskTable("Task Gate Results", task.gate_results ?? [
         ], [
@@ -560,6 +585,7 @@ def build_console_index_html() -> str:
         const overviewMetrics = {
           artifacts: overview.artifact_count ?? 0,
           data_assets: overview.data_asset_count ?? 0,
+          active_llm_egress_authorizations: overview.active_llm_egress_authorization_count ?? 0,
           failed_tool_calls: overview.failed_tool_call_count ?? 0,
           recent_tasks: (overview.recent_tasks ?? []).length
         };
