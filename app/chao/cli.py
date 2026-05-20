@@ -19,6 +19,7 @@ from app.chao.llm_policy import (
     resolve_task_data_classification,
 )
 from app.chao.llm_providers import build_llm_provider_config, list_llm_provider_defaults
+from app.chao.mcp_sdk import run_mcp_sdk_client_smoke_sync
 from app.chao.mcp_server import serve_mcp
 from app.chao.permissions import require_tool_permission
 from app.chao.runner_artifacts import save_failure_feedback_artifact, save_patch_artifact
@@ -878,6 +879,40 @@ def tool_gateway_reconcile_command(
 @app.command("mcp-serve")
 def mcp_serve_command():
     raise typer.Exit(code=serve_mcp())
+
+
+@app.command("mcp-sdk-smoke")
+def mcp_sdk_smoke_command(
+    call_tool: str | None = typer.Option(
+        None,
+        "--call-tool",
+        help="Optional tool name to call after initialize and tools/list.",
+    ),
+    arguments_json: str = typer.Option(
+        "{}",
+        "--arguments-json",
+        help="Optional MCP tool arguments JSON object.",
+    ),
+):
+    try:
+        tool_arguments = json.loads(arguments_json)
+    except json.JSONDecodeError as exc:
+        print(f"[red]Invalid arguments JSON:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    if not isinstance(tool_arguments, dict):
+        print("[red]MCP tool arguments JSON must be an object.[/red]")
+        raise typer.Exit(code=1)
+
+    result = run_mcp_sdk_client_smoke_sync(
+        call_tool=call_tool,
+        tool_arguments=tool_arguments,
+    )
+
+    print_json(data=result)
+
+    if result["status"] != "success":
+        raise typer.Exit(code=1)
 
 
 @app.command("llm-providers")
