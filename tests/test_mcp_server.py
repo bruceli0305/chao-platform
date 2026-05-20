@@ -51,6 +51,12 @@ def test_list_mcp_tools_exposes_input_schema():
         "current_status",
         "arguments_summary",
     ]
+    assert data_boundary["annotations"] == {
+        "category": "filesystem.read",
+        "risk": "medium",
+        "permissionPolicy": "data-boundary-validation",
+        "allowedRoles": ["hubu", "menxia", "xingbu"],
+    }
 
 
 def test_handle_mcp_message_tools_list():

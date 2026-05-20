@@ -4,6 +4,7 @@ from collections.abc import Callable
 from io import StringIO
 from typing import Any, TypedDict
 
+from app.chao.permissions import ROLE_ALLOWED_TOOLS, get_tool
 from app.chao.runner_validation import execute_runner_validation_commands
 
 
@@ -75,14 +76,27 @@ TOOL_HANDLER_REGISTRY: dict[str, ToolHandlerDefinition] = {
 }
 
 
-def list_tool_handlers() -> list[dict[str, str]]:
-    return [
-        {
-            "tool_name": definition["tool_name"],
-            "description": definition["description"],
-        }
-        for definition in TOOL_HANDLER_REGISTRY.values()
-    ]
+def _allowed_roles_for_tool(tool_name: str) -> list[str]:
+    return sorted(role for role, tools in ROLE_ALLOWED_TOOLS.items() if tool_name in tools)
+
+
+def list_tool_handlers() -> list[dict[str, Any]]:
+    handlers = []
+
+    for definition in TOOL_HANDLER_REGISTRY.values():
+        tool = get_tool(definition["tool_name"])
+        handlers.append(
+            {
+                "tool_name": definition["tool_name"],
+                "description": definition["description"],
+                "category": tool["category"],
+                "risk": tool["risk"],
+                "permission_policy": tool["permission_policy"],
+                "allowed_roles": _allowed_roles_for_tool(definition["tool_name"]),
+            }
+        )
+
+    return handlers
 
 
 def execute_registered_tool_handler(

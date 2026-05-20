@@ -9,9 +9,15 @@ from app.chao.tool_gateway_handlers import (
 
 
 def test_list_tool_handlers_exposes_safe_gate_handlers():
-    tool_names = {tool["tool_name"] for tool in list_tool_handlers()}
+    tools = list_tool_handlers()
+    tool_names = {tool["tool_name"] for tool in tools}
+    runner_validate = next(tool for tool in tools if tool["tool_name"] == "cli.runner_validate")
 
     assert {"schema_check", "data_boundary_check", "cli.runner_validate"} <= tool_names
+    assert runner_validate["category"] == "shell.safe"
+    assert runner_validate["risk"] == "medium"
+    assert runner_validate["permission_policy"] == "controlled-runner-validation"
+    assert runner_validate["allowed_roles"] == ["xingbu"]
 
 
 def test_execute_registered_tool_handler_reports_unknown_tool():

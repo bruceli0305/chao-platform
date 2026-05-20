@@ -66,6 +66,12 @@ def list_mcp_tools() -> list[dict[str, Any]]:
             "name": tool["tool_name"],
             "description": tool["description"],
             "inputSchema": _tool_input_schema(),
+            "annotations": {
+                "category": tool["category"],
+                "risk": tool["risk"],
+                "permissionPolicy": tool["permission_policy"],
+                "allowedRoles": tool["allowed_roles"],
+            },
         }
         for tool in list_tool_handlers()
     ]

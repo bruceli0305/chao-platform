@@ -57,8 +57,15 @@ def test_handle_tool_gateway_message_evaluates_permission():
 def test_handle_tool_gateway_message_lists_registered_handlers():
     response = handle_tool_gateway_message({"jsonrpc": "2.0", "id": 2, "method": "tools.list"})
 
-    tool_names = {tool["tool_name"] for tool in response["result"]["tools"]}
+    tools = response["result"]["tools"]
+    tool_names = {tool["tool_name"] for tool in tools}
+    data_boundary = next(tool for tool in tools if tool["tool_name"] == "data_boundary_check")
+
     assert {"schema_check", "data_boundary_check", "cli.runner_validate"} <= tool_names
+    assert data_boundary["category"] == "filesystem.read"
+    assert data_boundary["risk"] == "medium"
+    assert data_boundary["permission_policy"] == "data-boundary-validation"
+    assert data_boundary["allowed_roles"] == ["hubu", "menxia", "xingbu"]
 
 
 def test_handle_tool_gateway_message_executes_registered_handler(monkeypatch):
