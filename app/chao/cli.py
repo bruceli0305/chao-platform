@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime
 from typing import Annotated
@@ -56,7 +57,12 @@ from app.chao.services.store import (
     update_task_status,
 )
 from app.chao.services.tool_calls import record_tool_call
-from app.chao.tool_gateway_handlers import list_tool_handlers
+from app.chao.tool_gateway import (
+    ToolGatewayRequest,
+    evaluate_tool_gateway_request,
+    execute_audited_tool_gateway_request,
+)
+from app.chao.tool_gateway_handlers import execute_registered_tool_handler, list_tool_handlers
 from app.chao.tool_gateway_server import serve_tool_gateway
 from app.chao.web_console import run_web_console_server
 
@@ -729,6 +735,65 @@ def tool_gateway_tools_command(
         )
 
     console.print(table)
+
+
+@app.command("tool-gateway-call")
+def tool_gateway_call_command(
+    task_code: str,
+    tool_name: str,
+    by: str = typer.Option("xingbu", "--by", help="Agent name"),
+    arguments_json: str = typer.Option("{}", "--arguments-json", help="Handler arguments JSON"),
+    arguments_summary: str | None = typer.Option(
+        None,
+        "--arguments-summary",
+        help="Audit-safe argument summary",
+    ),
+    execute: bool = typer.Option(False, "--execute", help="Execute the registered handler"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    try:
+        arguments = json.loads(arguments_json)
+    except json.JSONDecodeError as exc:
+        print(f"[red]Invalid arguments JSON:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    if not isinstance(arguments, dict):
+        print("[red]Tool arguments JSON must be an object.[/red]")
+        raise typer.Exit(code=1)
+
+    request: ToolGatewayRequest = {
+        "protocol": "cli",
+        "agent_name": by,
+        "tool_name": tool_name,
+        "task_level": task["task_level"],
+        "required_confirmation": task.get("route_result", {}).get(
+            "required_confirmation",
+            "none",
+        ),
+        "current_status": task["status"],
+        "arguments_summary": arguments_summary or f"task_code={task_code}; tool={tool_name}",
+        "task_id": task["id"],
+    }
+
+    if execute:
+        result = execute_audited_tool_gateway_request(
+            request,
+            lambda: execute_registered_tool_handler(tool_name, arguments),
+        )
+    else:
+        result = evaluate_tool_gateway_request(request)
+        result["audit_persisted"] = False
+        result["audit_completed"] = False
+
+    print_json(data=result)
+
+    if execute and result["result_status"] != "success":
+        raise typer.Exit(code=1)
 
 
 @app.command("mcp-serve")
