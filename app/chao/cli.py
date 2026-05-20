@@ -22,6 +22,11 @@ from app.chao.llm_providers import build_llm_provider_config, list_llm_provider_
 from app.chao.mcp_sdk import run_mcp_sdk_client_smoke_sync
 from app.chao.mcp_server import serve_mcp
 from app.chao.permissions import require_tool_permission
+from app.chao.repositories import (
+    get_repository_config,
+    list_repository_configs,
+    validate_repository_configs,
+)
 from app.chao.runner_artifacts import save_failure_feedback_artifact, save_patch_artifact
 from app.chao.runner_branch import create_runner_branch
 from app.chao.runner_executor import (
@@ -1028,6 +1033,77 @@ def skills_validate_command(
             print(f"- {error}")
     else:
         print(f"[green]Skill manifest validation passed:[/green] {payload['skill_count']} skills")
+
+    if errors:
+        raise typer.Exit(code=1)
+
+
+@app.command("repositories-list")
+def repositories_list_command(
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    repositories = [repository.to_safe_dict() for repository in list_repository_configs()]
+
+    if as_json:
+        print_json(data={"repositories": repositories})
+        return
+
+    table = Table(title="Repositories")
+    table.add_column("Name", no_wrap=True)
+    table.add_column("Default Branch", no_wrap=True)
+    table.add_column("Workspace")
+    table.add_column("Sandbox")
+    table.add_column("Branch Prefix", no_wrap=True)
+    table.add_column("Enabled")
+
+    for repository in repositories:
+        table.add_row(
+            str(repository["name"]),
+            str(repository["default_branch"]),
+            str(repository["workspace_path"]),
+            str(repository["sandbox_root"]),
+            str(repository["branch_prefix"]),
+            str(repository["enabled"]),
+        )
+
+    console.print(table)
+
+
+@app.command("repository-show")
+def repository_show_command(
+    repository: str | None = typer.Argument(None, help="Repository name"),
+):
+    try:
+        config = get_repository_config(repository).to_safe_dict()
+    except ValueError as exc:
+        print_json(data={"status": "failed", "error": str(exc)})
+        raise typer.Exit(code=1) from exc
+
+    print_json(data={"repository": config})
+
+
+@app.command("repositories-validate")
+def repositories_validate_command(
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    errors = validate_repository_configs()
+    payload = {
+        "status": "failed" if errors else "success",
+        "errors": errors,
+        "repository_count": len(list_repository_configs()) if not errors else 0,
+    }
+
+    if as_json:
+        print_json(data=payload)
+    elif errors:
+        print("[red]Repository configuration validation failed:[/red]")
+        for error in errors:
+            print(f"- {error}")
+    else:
+        print(
+            f"[green]Repository configuration validation passed:[/green] "
+            f"{payload['repository_count']} repositories"
+        )
 
     if errors:
         raise typer.Exit(code=1)

@@ -1,0 +1,9 @@
+default_repository = "chao-platform"
+
+[repositories.chao-platform]
+enabled = true
+git_url = "git@github.com:bruceli0305/chao-platform.git"
+default_branch = "main"
+workspace_path = "."
+sandbox_root = ".chao/sandboxes"
+branch_prefix = "codex/"
