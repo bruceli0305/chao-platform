@@ -133,6 +133,8 @@ anthropic / claude-3-5-sonnet-latest。
 `.github/workflows/llm-egress-audit.yml` 已支持 schedule / workflow_dispatch。
 如需审计外部数据库，在 GitHub Secrets 中配置 `CHAO_AUDIT_DATABASE_URL`；
 未配置时 workflow 只使用 Actions 内置 pgvector 数据库做安全冒烟。
+审计失败或发现过期授权时，workflow 会创建或追加 GitHub Issue，Issue 中只包含
+运行链接、计数和是否使用外部审计库，不输出数据库连接信息。
 
-下一步：为审计失败或发现异常补充告警 / issue 回流。
+下一步：为 GitHub Issue / PR / Commit / CI 结果补齐更完整的自动双向同步。
 ```

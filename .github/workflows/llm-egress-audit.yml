@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: "17 19 * * *"
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   audit-expired-authorizations:
     name: Audit expired LLM egress authorizations
@@ -68,10 +72,59 @@ jobs:
         run: uv run python scripts/schema_check.py
 
       - name: Run expired LLM egress authorization audit
-        run: uv run python main.py audit-llm-egress-authorizations --apply --by xingbu
+        id: audit
+        run: |
+          set +e
+          uv run python main.py audit-llm-egress-authorizations --apply --by xingbu \
+            | tee llm-egress-audit-result.json
+          AUDIT_EXIT_CODE=${PIPESTATUS[0]}
+          echo "exit_code=$AUDIT_EXIT_CODE" >> "$GITHUB_OUTPUT"
+
+          if [ "$AUDIT_EXIT_CODE" = "0" ]; then
+            EXPIRED_COUNT=$(python -c 'import json; print(json.load(open("llm-egress-audit-result.json", encoding="utf-8"))["expired_count"])')
+          else
+            EXPIRED_COUNT=unknown
+          fi
+
+          echo "expired_count=$EXPIRED_COUNT" >> "$GITHUB_OUTPUT"
+          exit "$AUDIT_EXIT_CODE"
 
       - name: Verify no approved expired authorizations remain
         run: |
           EXPIRED_APPROVED_COUNT=$(psql "$DATABASE_URL" -t -A -c "select count(*) from llm_egress_authorizations where status = 'APPROVED' and expires_at <= now();")
           echo "EXPIRED_APPROVED_COUNT=$EXPIRED_APPROVED_COUNT"
           test "$EXPIRED_APPROVED_COUNT" = "0"
+
+      - name: Create LLM egress audit follow-up issue
+        if: failure() || steps.audit.outputs.expired_count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUDIT_EXIT_CODE: ${{ steps.audit.outputs.exit_code }}
+          EXPIRED_COUNT: ${{ steps.audit.outputs.expired_count }}
+          USING_EXTERNAL_AUDIT_DATABASE: ${{ env.USING_EXTERNAL_AUDIT_DATABASE }}
+        run: |
+          TITLE="LLM egress authorization audit requires attention"
+          BODY_FILE=$(mktemp)
+          cat > "$BODY_FILE" <<EOF
+          LLM egress authorization audit requires follow-up.
+
+          - Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          - Audit exit code: ${AUDIT_EXIT_CODE:-unknown}
+          - Expired authorizations detected: ${EXPIRED_COUNT:-unknown}
+          - External audit database configured: ${USING_EXTERNAL_AUDIT_DATABASE:-unknown}
+
+          The workflow has already attempted to mark expired APPROVED authorizations as EXPIRED.
+          Review the run logs and Console risk view before closing this issue.
+          EOF
+
+          EXISTING_ISSUE=$(gh issue list \
+            --state open \
+            --search "$TITLE in:title" \
+            --json number \
+            --jq '.[0].number // ""')
+
+          if [ -n "$EXISTING_ISSUE" ]; then
+            gh issue comment "$EXISTING_ISSUE" --body-file "$BODY_FILE"
+          else
+            gh issue create --title "$TITLE" --body-file "$BODY_FILE"
+          fi
