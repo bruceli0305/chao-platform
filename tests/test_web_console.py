@@ -74,6 +74,12 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "Recent GitHub Sync Links" in html
     assert "Recent GitHub Delivery Events" in html
     assert "Unlinked Delivered Tasks" in html
+    assert "github-link-result" in html
+    assert "renderGitHubBindTable" in html
+    assert "data-bind-github-task-code" in html
+    assert "github-external-id" in html
+    assert "github-url" in html
+    assert "/api/console/github-links/bind" in html
     assert "Failed GitHub Sync Links" in html
     assert "github-sync-details" in html
     assert "data-task-code" in html
@@ -304,3 +310,92 @@ def test_build_console_write_response_returns_not_found_for_unknown_path():
     assert status_code == HTTPStatus.NOT_FOUND
     assert payload["error"] == "not_found"
     assert "/api/console/approvals/approve" in payload["available_paths"]
+    assert "/api/console/github-links/bind" in payload["available_paths"]
+
+
+def test_build_console_write_response_binds_github_link(monkeypatch):
+    calls = {
+        "links": [],
+        "events": [],
+        "tool_calls": [],
+    }
+    task = {
+        "id": "task-1",
+        "task_code": "TASK-1",
+        "task_level": "L2",
+        "status": "DELIVERED",
+        "route_result": {"required_confirmation": "B"},
+    }
+
+    monkeypatch.setattr(web_console, "get_task_detail", lambda _task_code: task)
+    monkeypatch.setattr(
+        web_console,
+        "record_github_link",
+        lambda **kwargs: calls["links"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        web_console,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        web_console,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+
+    status_code, payload = web_console.build_console_write_response(
+        "/api/console/github-links/bind",
+        {
+            "task_code": "TASK-1",
+            "link_type": "pr",
+            "external_id": "42",
+            "url": "https://github.com/example/repo/pull/42",
+            "by": "lee",
+        },
+    )
+
+    assert status_code == HTTPStatus.OK
+    assert payload["task"] == task
+    assert calls["links"][0]["link_type"] == "pull_request"
+    assert calls["links"][0]["metadata"] == {
+        "task_code": "TASK-1",
+        "source": "web-console",
+    }
+    assert calls["events"][0]["event_type"] == "github_link_bound"
+    assert calls["tool_calls"][0]["tool_name"] == "cli.bind_github"
+    assert calls["tool_calls"][0]["permission_policy"] == "local-cli-github-link-bind"
+
+
+def test_build_console_write_response_rejects_missing_github_url():
+    status_code, payload = web_console.build_console_write_response(
+        "/api/console/github-links/bind",
+        {
+            "task_code": "TASK-1",
+            "link_type": "pull_request",
+            "external_id": "42",
+        },
+    )
+
+    assert status_code == HTTPStatus.BAD_REQUEST
+    assert payload == {
+        "error": "invalid_request",
+        "message": "url is required.",
+    }
+
+
+def test_build_console_write_response_rejects_missing_github_task(monkeypatch):
+    monkeypatch.setattr(web_console, "get_task_detail", lambda _task_code: None)
+
+    status_code, payload = web_console.build_console_write_response(
+        "/api/console/github-links/bind",
+        {
+            "task_code": "TASK-MISSING",
+            "link_type": "pull_request",
+            "external_id": "42",
+            "url": "https://github.com/example/repo/pull/42",
+        },
+    )
+
+    assert status_code == HTTPStatus.NOT_FOUND
+    assert payload == {"error": "task_not_found", "task_code": "TASK-MISSING"}

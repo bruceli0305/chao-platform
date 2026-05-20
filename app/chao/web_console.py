@@ -4,6 +4,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
+from app.chao.permissions import require_tool_permission
 from app.chao.services.console import (
     get_console_approval_queue,
     get_console_audit,
@@ -12,7 +13,10 @@ from app.chao.services.console import (
     get_console_overview,
     get_console_risks,
 )
+from app.chao.services.events import record_task_event
+from app.chao.services.github_links import normalize_github_link_type, record_github_link
 from app.chao.services.store import approve_task, get_task_detail
+from app.chao.services.tool_calls import record_tool_call
 
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
@@ -134,6 +138,7 @@ def build_console_index_html() -> str:
       <h2>GitHub Sync</h2>
       <div id="github-sync" class="grid"></div>
       <div id="github-sync-details"></div>
+      <div id="github-link-result"></div>
     </section>
     <section id="gates-section">
       <h2>Gates</h2>
@@ -278,6 +283,44 @@ def build_console_index_html() -> str:
       `;
     }
 
+    function renderGitHubBindTable(rows) {
+      if (!rows.length) {
+        return '<div class="muted">Unlinked Delivered Tasks: none.</div>';
+      }
+
+      const body = rows.map((task) => `
+        <tr data-task-code="${escapeHtml(task.task_code)}">
+          <td>${escapeHtml(task.task_code)}</td>
+          <td>${escapeHtml(task.title)}</td>
+          <td>${escapeHtml(task.task_level)}</td>
+          <td>${escapeHtml(task.owner)}</td>
+          <td>
+            <select name="github-link-type">
+              <option value="pull_request">PR</option>
+              <option value="issue">Issue</option>
+              <option value="commit">Commit</option>
+              <option value="ci_run">CI Run</option>
+            </select>
+            <input name="github-external-id" placeholder="External ID">
+            <input name="github-url" placeholder="GitHub URL">
+            <button type="button" data-bind-github-task-code="${escapeHtml(task.task_code)}">
+              Bind
+            </button>
+          </td>
+        </tr>
+      `).join("");
+
+      return `
+        <h2>Unlinked Delivered Tasks</h2>
+        <table>
+          <thead>
+            <tr><th>Task</th><th>Title</th><th>Level</th><th>Owner</th><th>Bind</th></tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      `;
+    }
+
     function renderRiskDetails(risks) {
       if (hasError(risks)) {
         return renderPanelError("Risk details", risks);
@@ -396,16 +439,7 @@ def build_console_index_html() -> str:
           { key: "created_by", label: "By" },
           { key: "created_at", label: "Created" }
         ])}
-        ${renderRiskTable(
-          "Unlinked Delivered Tasks",
-          githubSync.recent_unlinked_delivered_tasks ?? [],
-          [
-            { key: "task_code", label: "Task" },
-            { key: "title", label: "Title" },
-            { key: "task_level", label: "Level" },
-            { key: "owner", label: "Owner" }
-          ]
-        )}
+        ${renderGitHubBindTable(githubSync.recent_unlinked_delivered_tasks ?? [])}
         ${renderRiskTable("Failed GitHub Sync Links", githubSync.failed_links ?? [
         ], [
           { key: "task_code", label: "Task" },
@@ -774,6 +808,31 @@ def build_console_index_html() -> str:
     });
 
     document.querySelector("#github-sync-details").addEventListener("click", async (event) => {
+      const bindButton = event.target.closest("button[data-bind-github-task-code]");
+      if (bindButton) {
+        event.preventDefault();
+        const row = bindButton.closest("tr[data-task-code]");
+        const taskCode = bindButton.dataset.bindGithubTaskCode;
+        const linkType = row?.querySelector('select[name="github-link-type"]')?.value ?? "";
+        const externalId = row?.querySelector('input[name="github-external-id"]')?.value ?? "";
+        const url = row?.querySelector('input[name="github-url"]')?.value ?? "";
+        const result = await postJson("/api/console/github-links/bind", {
+          task_code: taskCode,
+          link_type: linkType,
+          external_id: externalId,
+          url,
+          by: "shangshu"
+        });
+        document.querySelector("#github-link-result").innerHTML = hasError(result)
+          ? renderPanelError("GitHub link", result)
+          : renderNotice(`Bound GitHub link for ${taskCode}`);
+        await refresh();
+        if (!hasError(result) && result.task?.task_code) {
+          await loadTaskDetail(result.task.task_code);
+        }
+        return;
+      }
+
       const row = event.target.closest("tr[data-task-code]");
       if (!row) return;
       await loadTaskDetail(row.dataset.taskCode);
@@ -844,26 +903,28 @@ def _build_service_error(path: str, exc: Exception) -> dict[str, Any]:
     }
 
 
-def build_console_write_response(path: str, payload: Any) -> tuple[int, dict[str, Any]]:
-    if path != "/api/console/approvals/approve":
-        return HTTPStatus.NOT_FOUND, {
-            "error": "not_found",
-            "path": path,
-            "available_paths": ["/api/console/approvals/approve"],
-        }
+def _write_not_found(path: str) -> tuple[int, dict[str, Any]]:
+    return HTTPStatus.NOT_FOUND, {
+        "error": "not_found",
+        "path": path,
+        "available_paths": [
+            "/api/console/approvals/approve",
+            "/api/console/github-links/bind",
+        ],
+    }
 
-    if not isinstance(payload, dict):
-        return HTTPStatus.BAD_REQUEST, {
-            "error": "invalid_request",
-            "message": "JSON request body must be an object.",
-        }
 
+def _invalid_request(message: str) -> tuple[int, dict[str, Any]]:
+    return HTTPStatus.BAD_REQUEST, {
+        "error": "invalid_request",
+        "message": message,
+    }
+
+
+def _build_approval_write_response(payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     task_code = str(payload.get("task_code") or "").strip()
     if not task_code:
-        return HTTPStatus.BAD_REQUEST, {
-            "error": "invalid_request",
-            "message": "task_code is required.",
-        }
+        return _invalid_request("task_code is required.")
 
     confirmed_by = str(payload.get("by") or "emperor").strip() or "emperor"
     note = str(payload.get("note") or "")
@@ -877,9 +938,106 @@ def build_console_write_response(path: str, payload: Any) -> tuple[int, dict[str
             "task_code": task_code,
         }
     except Exception as exc:
-        return HTTPStatus.SERVICE_UNAVAILABLE, _build_service_error(path, exc)
+        return HTTPStatus.SERVICE_UNAVAILABLE, _build_service_error(
+            "/api/console/approvals/approve", exc
+        )
 
     return HTTPStatus.OK, {"task": task}
+
+
+def _build_github_bind_write_response(payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    task_code = str(payload.get("task_code") or "").strip()
+    link_type = str(payload.get("link_type") or "").strip()
+    external_id = str(payload.get("external_id") or "").strip()
+    url = str(payload.get("url") or "").strip()
+
+    if not task_code:
+        return _invalid_request("task_code is required.")
+    if not link_type:
+        return _invalid_request("link_type is required.")
+    if not external_id:
+        return _invalid_request("external_id is required.")
+    if not url:
+        return _invalid_request("url is required.")
+
+    task = get_task_detail(task_code)
+    if task is None:
+        return HTTPStatus.NOT_FOUND, {"error": "task_not_found", "task_code": task_code}
+
+    created_by = str(payload.get("by") or "shangshu").strip() or "shangshu"
+    title = str(payload.get("title") or "") or None
+    link_status = str(payload.get("status") or "") or None
+
+    try:
+        normalized_link_type = normalize_github_link_type(link_type)
+        permission_decision = require_tool_permission(
+            agent_name="shangshu",
+            tool_name="cli.bind_github",
+            task_level=task["task_level"],
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
+            current_status=task["status"],
+        )
+        record_github_link(
+            task_id=task["id"],
+            link_type=normalized_link_type,
+            external_id=external_id,
+            url=url,
+            title=title,
+            status=link_status,
+            metadata={"task_code": task_code, "source": "web-console"},
+            created_by=created_by,
+        )
+    except (PermissionError, ValueError) as exc:
+        return HTTPStatus.BAD_REQUEST, {
+            "error": "github_link_bind_failed",
+            "message": str(exc),
+            "task_code": task_code,
+        }
+    except Exception as exc:
+        return HTTPStatus.SERVICE_UNAVAILABLE, _build_service_error(
+            "/api/console/github-links/bind", exc
+        )
+
+    record_task_event(
+        task_id=task["id"],
+        event_type="github_link_bound",
+        from_status=task["status"],
+        to_status=task["status"],
+        summary=f"绑定 GitHub {normalized_link_type}: {external_id}",
+        created_by=created_by,
+    )
+    record_tool_call(
+        task_id=task["id"],
+        agent_name="shangshu",
+        tool_name="cli.bind_github",
+        arguments_summary=(
+            f"task_code={task_code}; link_type={normalized_link_type}; external_id={external_id}"
+        ),
+        permission_policy=permission_decision["permission_policy"],
+        result_status="success",
+        permission_decision=permission_decision,
+        output_summary=f"url={url}",
+        risk_flag=permission_decision["risk_flag"],
+    )
+
+    return HTTPStatus.OK, {"task": get_task_detail(task_code)}
+
+
+def build_console_write_response(path: str, payload: Any) -> tuple[int, dict[str, Any]]:
+    if path != "/api/console/approvals/approve":
+        if path == "/api/console/github-links/bind":
+            if not isinstance(payload, dict):
+                return _invalid_request("JSON request body must be an object.")
+            return _build_github_bind_write_response(payload)
+        return _write_not_found(path)
+
+    if not isinstance(payload, dict):
+        return _invalid_request("JSON request body must be an object.")
+
+    return _build_approval_write_response(payload)
 
 
 def build_console_response(path: str, query_string: str = "") -> tuple[int, dict[str, Any]]:
