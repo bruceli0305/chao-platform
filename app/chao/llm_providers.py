@@ -1,9 +1,13 @@
 import os
+import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal
+from pathlib import Path
 
-ProviderName = Literal["deepseek", "openai", "anthropic", "openai-compatible"]
+ProviderName = str
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_LLM_PROVIDERS_PATH = REPO_ROOT / "config" / "llm-providers.toml"
 
 
 @dataclass(frozen=True)
@@ -37,44 +41,59 @@ class LLMProviderConfig:
         }
 
 
-PROVIDER_DEFAULTS: dict[ProviderName, LLMProviderDefaults] = {
-    "deepseek": LLMProviderDefaults(
-        name="deepseek",
-        api_style="openai-compatible",
-        base_url="https://api.deepseek.com",
-        api_key_env="DEEPSEEK_API_KEY",
-        model_env="DEEPSEEK_MODEL",
-        default_model="deepseek-chat",
-        notes="DeepSeek official API is OpenAI-compatible.",
-    ),
-    "openai": LLMProviderDefaults(
-        name="openai",
-        api_style="openai",
-        base_url="https://api.openai.com/v1",
-        api_key_env="OPENAI_API_KEY",
-        model_env="OPENAI_MODEL",
-        default_model="gpt-4.1-mini",
-        notes="OpenAI native API provider.",
-    ),
-    "anthropic": LLMProviderDefaults(
-        name="anthropic",
-        api_style="anthropic",
-        base_url="https://api.anthropic.com",
-        api_key_env="ANTHROPIC_API_KEY",
-        model_env="ANTHROPIC_MODEL",
-        default_model="claude-3-5-sonnet-latest",
-        notes="Anthropic native Messages API provider.",
-    ),
-    "openai-compatible": LLMProviderDefaults(
-        name="openai-compatible",
-        api_style="openai-compatible",
-        base_url=None,
-        api_key_env="CHAO_LLM_API_KEY",
-        model_env="CHAO_LLM_MODEL",
-        default_model=None,
-        notes="Generic OpenAI-compatible provider configured by environment.",
-    ),
-}
+def _optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("optional provider field must be a string")
+    if not value.strip():
+        return None
+    return value
+
+
+def _required_str(data: Mapping[str, object], key: str, provider_name: str) -> str:
+    value = data.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{provider_name} requires {key}")
+    return value
+
+
+def load_llm_provider_defaults(
+    config_path: Path = DEFAULT_LLM_PROVIDERS_PATH,
+) -> tuple[str, dict[ProviderName, LLMProviderDefaults]]:
+    data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    default_provider = data.get("default_provider")
+    providers = data.get("providers")
+
+    if not isinstance(default_provider, str) or not default_provider.strip():
+        raise ValueError(f"{config_path}: default_provider is required")
+    if not isinstance(providers, dict) or not providers:
+        raise ValueError(f"{config_path}: providers table is required")
+
+    defaults = {}
+    for provider_name, raw_provider in providers.items():
+        if not isinstance(provider_name, str):
+            raise ValueError(f"{config_path}: provider names must be strings")
+        if not isinstance(raw_provider, dict):
+            raise ValueError(f"{config_path}: providers.{provider_name} must be a table")
+
+        defaults[provider_name] = LLMProviderDefaults(
+            name=provider_name,
+            api_style=_required_str(raw_provider, "api_style", provider_name),
+            base_url=_optional_str(raw_provider.get("base_url")),
+            api_key_env=_required_str(raw_provider, "key_env", provider_name),
+            model_env=_required_str(raw_provider, "model_env", provider_name),
+            default_model=_optional_str(raw_provider.get("default_model")),
+            notes=_optional_str(raw_provider.get("notes")) or "",
+        )
+
+    if default_provider not in defaults:
+        raise ValueError(f"{config_path}: default_provider is not configured: {default_provider}")
+
+    return default_provider, defaults
+
+
+DEFAULT_PROVIDER, PROVIDER_DEFAULTS = load_llm_provider_defaults()
 
 
 def list_llm_provider_defaults() -> list[LLMProviderDefaults]:
@@ -93,7 +112,7 @@ def build_llm_provider_config(
     environ: Mapping[str, str] | None = None,
 ) -> LLMProviderConfig:
     env = os.environ if environ is None else environ
-    provider_name = (provider or env.get("CHAO_LLM_PROVIDER") or "deepseek").lower()
+    provider_name = (provider or env.get("CHAO_LLM_PROVIDER") or DEFAULT_PROVIDER).lower()
     defaults = get_llm_provider_defaults(provider_name)
 
     api_key_env = env.get("CHAO_LLM_API_KEY_ENV") or defaults.api_key_env

@@ -1,0 +1,6 @@
+name = "release-validation"
+description = "发布前检查、构建产物、健康检查和回滚确认。"
+enabled = true
+default_gates = ["build", "test", "manual_validation"]
+trigger_keywords = ["发布", "上线", "部署", "CI", "构建", "回滚"]
+allowed_task_levels = ["L1", "L2", "L3"]

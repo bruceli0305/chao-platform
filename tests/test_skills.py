@@ -5,7 +5,9 @@ from app.chao.skills import (
     describe_required_skills,
     get_skill,
     list_skills,
+    load_skill_registry,
     select_required_skills,
+    validate_skill_manifests,
 )
 
 
@@ -22,8 +24,17 @@ def test_skill_registry_contains_first_batch_and_skill_files():
 
     for definition in list_skills():
         assert Path(definition["path"]).is_file()
+        assert Path(definition["path"]).with_name("skill.toml").is_file()
         assert definition["default_gates"]
         assert definition["trigger_keywords"]
+        assert definition["allowed_task_levels"]
+
+
+def test_skill_registry_is_loaded_from_manifests():
+    registry = load_skill_registry()
+
+    assert registry == SKILL_REGISTRY
+    assert validate_skill_manifests() == []
 
 
 def test_get_skill_returns_definition():

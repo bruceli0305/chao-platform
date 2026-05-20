@@ -1,0 +1,6 @@
+name = "security-review"
+description = "权限、越权、Secret、敏感字段和安全边界审查。"
+enabled = true
+default_gates = ["secret_scan", "data_boundary_check", "manual_validation"]
+trigger_keywords = ["权限", "鉴权", "认证", "Secret", "密钥", "Token", "安全", "越权"]
+allowed_task_levels = ["L1", "L2", "L3"]

@@ -1,0 +1,6 @@
+name = "frontend-feature"
+description = "前端页面、组件、交互、样式和状态管理开发。"
+enabled = true
+default_gates = ["typecheck", "lint", "build", "manual_validation"]
+trigger_keywords = ["页面", "前端", "组件", "交互", "样式", "表单", "列表", "弹窗"]
+allowed_task_levels = ["L1", "L2", "L3"]

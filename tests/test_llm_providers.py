@@ -1,7 +1,9 @@
 from app.chao.llm_providers import (
+    DEFAULT_PROVIDER,
     build_llm_provider_config,
     get_llm_provider_defaults,
     list_llm_provider_defaults,
+    load_llm_provider_defaults,
 )
 
 
@@ -16,6 +18,14 @@ def test_default_llm_provider_is_deepseek_without_exposing_key():
         "model": "deepseek-chat",
         "api_key_set": False,
     }
+
+
+def test_llm_provider_defaults_are_loaded_from_config_file():
+    default_provider, defaults = load_llm_provider_defaults()
+
+    assert default_provider == DEFAULT_PROVIDER == "deepseek"
+    assert defaults["deepseek"].api_key_env == "DEEPSEEK_API_KEY"
+    assert defaults["openai-compatible"].base_url is None
 
 
 def test_deepseek_provider_detects_key_presence_without_returning_key():

@@ -63,6 +63,7 @@ from app.chao.services.tool_calls import (
     mark_stale_pending_tool_calls_timed_out,
     record_tool_call,
 )
+from app.chao.skills import list_skills, validate_skill_manifests
 from app.chao.tool_gateway import (
     ToolGatewayRequest,
     evaluate_tool_gateway_request,
@@ -979,6 +980,59 @@ def mcp_sdk_smoke_command(
         raise typer.Exit(code=1)
 
 
+@app.command("skills-list")
+def skills_list_command(
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    skills = list_skills()
+
+    if as_json:
+        print_json(data={"skills": skills})
+        return
+
+    table = Table(title="Skills")
+    table.add_column("Name", no_wrap=True)
+    table.add_column("Path", no_wrap=True)
+    table.add_column("Gates")
+    table.add_column("Levels")
+    table.add_column("Description")
+
+    for skill in skills:
+        table.add_row(
+            skill["name"],
+            skill["path"],
+            ", ".join(skill["default_gates"]),
+            ", ".join(skill["allowed_task_levels"]),
+            skill["description"],
+        )
+
+    console.print(table)
+
+
+@app.command("skills-validate")
+def skills_validate_command(
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    errors = validate_skill_manifests()
+    payload = {
+        "status": "failed" if errors else "success",
+        "errors": errors,
+        "skill_count": len(list_skills()),
+    }
+
+    if as_json:
+        print_json(data=payload)
+    elif errors:
+        print("[red]Skill manifest validation failed:[/red]")
+        for error in errors:
+            print(f"- {error}")
+    else:
+        print(f"[green]Skill manifest validation passed:[/green] {payload['skill_count']} skills")
+
+    if errors:
+        raise typer.Exit(code=1)
+
+
 @app.command("llm-providers")
 def llm_providers_command(
     provider: str | None = typer.Option(None, "--provider", help="Provider to resolve"),
@@ -998,6 +1052,28 @@ def llm_providers_command(
     selected = build_llm_provider_config(provider).to_safe_dict()
 
     print_json(data={"providers": defaults, "selected": selected})
+
+
+@app.command("llm-provider-doctor")
+def llm_provider_doctor_command(
+    provider: str | None = typer.Option(None, "--provider", help="Provider to resolve"),
+    require_key: bool = typer.Option(False, "--require-key", help="Fail if API key is not set"),
+):
+    try:
+        selected = build_llm_provider_config(provider).to_safe_dict()
+    except ValueError as exc:
+        print_json(data={"status": "failed", "error": str(exc)})
+        raise typer.Exit(code=1) from exc
+
+    status = "configured" if selected["api_key_set"] else "missing_api_key"
+    payload = {
+        "status": status,
+        "provider": selected,
+    }
+    print_json(data=payload)
+
+    if require_key and not selected["api_key_set"]:
+        raise typer.Exit(code=1)
 
 
 @app.command("authorize-llm-egress")

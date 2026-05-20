@@ -1,0 +1,6 @@
+name = "bugfix"
+description = "Bug 复现、定位、修复、回归验证。"
+enabled = true
+default_gates = ["lint", "test", "manual_validation"]
+trigger_keywords = ["修复", "bug", "Bug", "报错", "失败", "异常", "回归"]
+allowed_task_levels = ["L1", "L2", "L3"]

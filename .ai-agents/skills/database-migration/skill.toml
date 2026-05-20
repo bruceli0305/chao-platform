@@ -1,0 +1,17 @@
+name = "database-migration"
+description = "数据库结构、迁移脚本、备份、回滚和验证。"
+enabled = true
+default_gates = ["schema_check", "test", "manual_validation"]
+trigger_keywords = [
+  "数据库",
+  "迁移",
+  "数据表",
+  "表结构",
+  "建表",
+  "改表",
+  "字段迁移",
+  "索引",
+  "SQL",
+  "schema",
+]
+allowed_task_levels = ["L1", "L2", "L3"]

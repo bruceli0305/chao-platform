@@ -1,0 +1,6 @@
+name = "api-development"
+description = "API 契约、接口实现、异常路径和接口验证。"
+enabled = true
+default_gates = ["lint", "test", "manual_validation"]
+trigger_keywords = ["接口", "API", "api", "端点", "请求", "响应"]
+allowed_task_levels = ["L1", "L2", "L3"]
