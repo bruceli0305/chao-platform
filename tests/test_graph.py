@@ -20,6 +20,7 @@ def test_graph_l1_delivered():
     assert result["skill_usage"][0]["name"] == "bugfix"
     assert result["skill_execution_plan"]["skills"][0]["name"] == "bugfix"
     assert "lint" in result["skill_execution_plan"]["combined_gates"]
+    assert "lint" in result["validation_result"]["checks"]
     assert result["historian_records"][1]["type"] == "skill_usage"
 
 
