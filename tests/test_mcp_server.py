@@ -77,8 +77,12 @@ def test_handle_mcp_message_tools_call_executes_registered_handler(monkeypatch):
 
     monkeypatch.setattr("app.chao.mcp_server.execute_registered_tool_handler", fake_execute)
     monkeypatch.setattr(
-        "app.chao.mcp_server.persist_tool_gateway_audit",
-        lambda audit: audits.append(audit) or True,
+        "app.chao.tool_gateway.start_tool_gateway_audit",
+        lambda audit: audits.append(("start", audit)) or "tool-call-1",
+    )
+    monkeypatch.setattr(
+        "app.chao.tool_gateway.finish_tool_gateway_audit",
+        lambda tool_call_id, audit: audits.append(("finish", tool_call_id, audit)) or True,
     )
 
     response = handle_mcp_message(
@@ -99,16 +103,22 @@ def test_handle_mcp_message_tools_call_executes_registered_handler(monkeypatch):
     assert result["isError"] is False
     assert structured["result_status"] == "success"
     assert structured["audit_persisted"] is True
+    assert structured["audit_completed"] is True
     assert structured["output"]["arguments"] == {"pretty": True}
     assert json.loads(result["content"][0]["text"]) == structured
-    assert audits[0]["task_id"] == "task-1"
+    assert audits[0][1]["task_id"] == "task-1"
+    assert audits[1][2]["result_status"] == "success"
 
 
 def test_handle_mcp_message_tools_call_marks_denied_as_error(monkeypatch):
     audits = []
     monkeypatch.setattr(
-        "app.chao.mcp_server.persist_tool_gateway_audit",
-        lambda audit: audits.append(audit) or True,
+        "app.chao.tool_gateway.start_tool_gateway_audit",
+        lambda audit: audits.append(("start", audit)) or "tool-call-1",
+    )
+    monkeypatch.setattr(
+        "app.chao.tool_gateway.finish_tool_gateway_audit",
+        lambda tool_call_id, audit: audits.append(("finish", tool_call_id, audit)) or True,
     )
 
     response = handle_mcp_message(
@@ -126,7 +136,9 @@ def test_handle_mcp_message_tools_call_marks_denied_as_error(monkeypatch):
     assert response["result"]["isError"] is True
     assert response["result"]["structuredContent"]["result_status"] == "denied"
     assert response["result"]["structuredContent"]["audit_persisted"] is True
-    assert audits[0]["result_status"] == "denied"
+    assert response["result"]["structuredContent"]["audit_completed"] is True
+    assert audits[0][1]["result_status"] == "denied"
+    assert audits[1][2]["result_status"] == "denied"
 
 
 def test_parse_mcp_line_reports_parse_error():

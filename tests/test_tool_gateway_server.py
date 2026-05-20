@@ -78,8 +78,12 @@ def test_handle_tool_gateway_message_executes_registered_handler(monkeypatch):
         fake_execute,
     )
     monkeypatch.setattr(
-        "app.chao.tool_gateway_server.persist_tool_gateway_audit",
-        lambda audit: audits.append(audit) or True,
+        "app.chao.tool_gateway.start_tool_gateway_audit",
+        lambda audit: audits.append(("start", audit)) or "tool-call-1",
+    )
+    monkeypatch.setattr(
+        "app.chao.tool_gateway.finish_tool_gateway_audit",
+        lambda tool_call_id, audit: audits.append(("finish", tool_call_id, audit)) or True,
     )
 
     response = handle_tool_gateway_message(
@@ -99,9 +103,11 @@ def test_handle_tool_gateway_message_executes_registered_handler(monkeypatch):
     assert result["allowed"] is True
     assert result["result_status"] == "success"
     assert result["audit_persisted"] is True
+    assert result["audit_completed"] is True
     assert result["output"]["tool_name"] == "data_boundary_check"
     assert result["output"]["arguments"] == {"pretty": True}
-    assert audits[0]["tool_name"] == "data_boundary_check"
+    assert audits[0][1]["tool_name"] == "data_boundary_check"
+    assert audits[1][2]["result_status"] == "success"
 
 
 def test_handle_tool_gateway_message_rejects_non_object_arguments():
@@ -122,8 +128,12 @@ def test_handle_tool_gateway_message_rejects_non_object_arguments():
 
 def test_handle_tool_gateway_message_reports_unregistered_allowed_handler(monkeypatch):
     monkeypatch.setattr(
-        "app.chao.tool_gateway_server.persist_tool_gateway_audit",
-        lambda _audit: True,
+        "app.chao.tool_gateway.start_tool_gateway_audit",
+        lambda _audit: "tool-call-1",
+    )
+    monkeypatch.setattr(
+        "app.chao.tool_gateway.finish_tool_gateway_audit",
+        lambda _tool_call_id, _audit: True,
     )
 
     response = handle_tool_gateway_message(
@@ -151,8 +161,12 @@ def test_handle_tool_gateway_message_reports_unregistered_allowed_handler(monkey
 def test_handle_tool_gateway_message_persists_denied_execute(monkeypatch):
     audits = []
     monkeypatch.setattr(
-        "app.chao.tool_gateway_server.persist_tool_gateway_audit",
-        lambda audit: audits.append(audit) or True,
+        "app.chao.tool_gateway.start_tool_gateway_audit",
+        lambda audit: audits.append(("start", audit)) or "tool-call-1",
+    )
+    monkeypatch.setattr(
+        "app.chao.tool_gateway.finish_tool_gateway_audit",
+        lambda tool_call_id, audit: audits.append(("finish", tool_call_id, audit)) or True,
     )
 
     response = handle_tool_gateway_message(
@@ -171,13 +185,19 @@ def test_handle_tool_gateway_message_persists_denied_execute(monkeypatch):
 
     assert result["result_status"] == "denied"
     assert result["audit_persisted"] is True
-    assert audits[0]["result_status"] == "denied"
+    assert result["audit_completed"] is True
+    assert audits[0][1]["result_status"] == "denied"
+    assert audits[1][2]["result_status"] == "denied"
 
 
 def test_handle_tool_gateway_message_execute_echo_blocks_denied_request(monkeypatch):
     monkeypatch.setattr(
-        "app.chao.tool_gateway_server.persist_tool_gateway_audit",
-        lambda _audit: True,
+        "app.chao.tool_gateway.start_tool_gateway_audit",
+        lambda _audit: "tool-call-1",
+    )
+    monkeypatch.setattr(
+        "app.chao.tool_gateway.finish_tool_gateway_audit",
+        lambda _tool_call_id, _audit: True,
     )
 
     response = handle_tool_gateway_message(

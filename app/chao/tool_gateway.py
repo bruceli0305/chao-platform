@@ -144,3 +144,75 @@ def persist_tool_gateway_audit(
     )
 
     return True
+
+
+def start_tool_gateway_audit(
+    audit: dict[str, Any],
+    *,
+    starter: Callable[..., str] | None = None,
+) -> str | None:
+    task_id = audit.get("task_id")
+
+    if not task_id:
+        return None
+
+    if starter is None:
+        from app.chao.services.tool_calls import start_tool_call
+
+        starter = start_tool_call
+
+    return starter(
+        task_id=str(task_id),
+        agent_name=str(audit["agent_name"]),
+        tool_name=str(audit["tool_name"]),
+        arguments_summary=audit.get("arguments_summary"),
+        permission_policy=audit.get("permission_policy"),
+        permission_decision=audit.get("permission_decision"),
+        risk_flag=audit.get("risk_flag"),
+    )
+
+
+def finish_tool_gateway_audit(
+    tool_call_id: str | None,
+    audit: dict[str, Any],
+    *,
+    finisher: Callable[..., None] | None = None,
+) -> bool:
+    if not tool_call_id:
+        return False
+
+    if finisher is None:
+        from app.chao.services.tool_calls import finish_tool_call
+
+        finisher = finish_tool_call
+
+    finisher(
+        tool_call_id,
+        result_status=str(audit["result_status"]),
+        output_summary=audit.get("output_summary"),
+        permission_decision=audit.get("permission_decision"),
+        risk_flag=audit.get("risk_flag"),
+    )
+
+    return True
+
+
+def execute_audited_tool_gateway_request(
+    request: ToolGatewayRequest,
+    handler: Callable[[], Any],
+) -> dict[str, Any]:
+    evaluated = evaluate_tool_gateway_request(request)
+    tool_call_id = start_tool_gateway_audit(evaluated["audit"])
+
+    if not evaluated["allowed"]:
+        evaluated["audit_persisted"] = tool_call_id is not None
+        evaluated["audit_completed"] = finish_tool_gateway_audit(
+            tool_call_id,
+            evaluated["audit"],
+        )
+        return evaluated
+
+    result = execute_tool_gateway_request(request, handler)
+    result["audit_persisted"] = tool_call_id is not None
+    result["audit_completed"] = finish_tool_gateway_audit(tool_call_id, result["audit"])
+    return result

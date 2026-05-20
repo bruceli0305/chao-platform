@@ -5,8 +5,7 @@ from typing import Any, TextIO
 from app.chao.mcp_sdk import get_mcp_sdk_status
 from app.chao.tool_gateway import (
     ToolGatewayRequest,
-    execute_tool_gateway_request,
-    persist_tool_gateway_audit,
+    execute_audited_tool_gateway_request,
 )
 from app.chao.tool_gateway_handlers import (
     execute_registered_tool_handler,
@@ -98,15 +97,6 @@ def _mcp_tool_result(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _execute_and_persist_tool_call(
-    request: ToolGatewayRequest,
-    handler,
-) -> dict[str, Any]:
-    result = execute_tool_gateway_request(request, handler)
-    result["audit_persisted"] = persist_tool_gateway_audit(result["audit"])
-    return result
-
-
 def handle_mcp_message(message: dict[str, Any]) -> dict[str, Any] | None:
     message_id = message.get("id")
     method = message.get("method")
@@ -147,7 +137,7 @@ def handle_mcp_message(message: dict[str, Any]) -> dict[str, Any] | None:
             if not isinstance(handler_arguments, dict):
                 return _error(message_id, -32602, "arguments.arguments must be an object")
 
-            result = _execute_and_persist_tool_call(
+            result = execute_audited_tool_gateway_request(
                 request,
                 lambda: execute_registered_tool_handler(tool_name, handler_arguments),
             )

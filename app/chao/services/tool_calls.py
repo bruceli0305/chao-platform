@@ -64,6 +64,86 @@ def record_tool_call(
         conn.commit()
 
 
+def start_tool_call(
+    task_id: str,
+    agent_name: str,
+    tool_name: str,
+    arguments_summary: str | None,
+    permission_policy: str | None,
+    permission_decision: dict[str, Any] | None = None,
+    risk_flag: str | None = None,
+) -> str:
+    tool_call_id = str(uuid.uuid4())
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into tool_calls (
+                    id,
+                    task_id,
+                    agent_name,
+                    tool_name,
+                    arguments_summary,
+                    permission_policy,
+                    permission_decision,
+                    result_status,
+                    risk_flag
+                )
+                values (%s, %s, %s, %s, %s, %s, %s, 'started', %s)
+                """,
+                (
+                    tool_call_id,
+                    task_id,
+                    agent_name,
+                    tool_name,
+                    arguments_summary,
+                    permission_policy,
+                    Jsonb(permission_decision or {}),
+                    risk_flag,
+                ),
+            )
+
+        conn.commit()
+
+    return tool_call_id
+
+
+def finish_tool_call(
+    tool_call_id: str,
+    *,
+    result_status: str,
+    output_summary: str | None = None,
+    permission_decision: dict[str, Any] | None = None,
+    risk_flag: str | None = None,
+) -> None:
+    output_hash = _hash_text(output_summary)
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                update tool_calls
+                set
+                    result_status = %s,
+                    output_hash = %s,
+                    permission_decision = coalesce(%s, permission_decision),
+                    risk_flag = coalesce(%s, risk_flag),
+                    finished_at = now()
+                where id = %s
+                """,
+                (
+                    result_status,
+                    output_hash,
+                    Jsonb(permission_decision) if permission_decision is not None else None,
+                    risk_flag,
+                    tool_call_id,
+                ),
+            )
+
+        conn.commit()
+
+
 def list_tool_calls(task_id: str) -> list[dict[str, Any]]:
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
