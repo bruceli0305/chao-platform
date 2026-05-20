@@ -3,6 +3,11 @@ from typing import Any
 
 ALLOWED_EXECUTE_TASK_LEVELS = {"L1", "L2"}
 ALLOWED_EXECUTE_DATA_CLASSIFICATIONS = {"D0", "D1"}
+ALLOWED_EXECUTE_PROVIDER_MODELS = {
+    "anthropic": {"claude-3-5-sonnet-latest"},
+    "deepseek": {"deepseek-chat"},
+    "openai": {"gpt-4.1-mini"},
+}
 DATA_CLASSIFICATION_ORDER = {"D0": 0, "D1": 1, "D2": 2, "D3": 3, "D4": 4}
 
 
@@ -13,6 +18,7 @@ class LLMEgressDecision:
     task_level: str
     data_classification: str
     provider: str
+    model: str
     execute: bool
 
     def to_dict(self) -> dict[str, object]:
@@ -22,6 +28,7 @@ class LLMEgressDecision:
             "task_level": self.task_level,
             "data_classification": self.data_classification,
             "provider": self.provider,
+            "model": self.model,
             "execute": self.execute,
         }
 
@@ -45,10 +52,13 @@ def evaluate_llm_egress_policy(
     task_level: str,
     data_classification: str,
     provider: str,
+    model: str,
     execute: bool,
 ) -> LLMEgressDecision:
     normalized_level = normalize_task_level(task_level)
     normalized_classification = normalize_data_classification(data_classification)
+    normalized_provider = provider.strip().lower()
+    normalized_model = model.strip()
 
     if not execute:
         return LLMEgressDecision(
@@ -56,8 +66,23 @@ def evaluate_llm_egress_policy(
             reason="dry-run does not call external provider",
             task_level=normalized_level,
             data_classification=normalized_classification,
-            provider=provider,
+            provider=normalized_provider,
+            model=normalized_model,
             execute=False,
+        )
+
+    if normalized_model not in ALLOWED_EXECUTE_PROVIDER_MODELS.get(normalized_provider, set()):
+        return LLMEgressDecision(
+            allowed=False,
+            reason=(
+                f"{normalized_provider}/{normalized_model} is not allowlisted "
+                "for external LLM execution"
+            ),
+            task_level=normalized_level,
+            data_classification=normalized_classification,
+            provider=normalized_provider,
+            model=normalized_model,
+            execute=True,
         )
 
     if normalized_level not in ALLOWED_EXECUTE_TASK_LEVELS:
@@ -66,7 +91,8 @@ def evaluate_llm_egress_policy(
             reason=f"{normalized_level} tasks cannot call external LLM providers",
             task_level=normalized_level,
             data_classification=normalized_classification,
-            provider=provider,
+            provider=normalized_provider,
+            model=normalized_model,
             execute=True,
         )
 
@@ -76,7 +102,8 @@ def evaluate_llm_egress_policy(
             reason=f"{normalized_classification} data cannot be sent to external LLM providers",
             task_level=normalized_level,
             data_classification=normalized_classification,
-            provider=provider,
+            provider=normalized_provider,
+            model=normalized_model,
             execute=True,
         )
 
@@ -85,7 +112,8 @@ def evaluate_llm_egress_policy(
         reason="external LLM egress allowed",
         task_level=normalized_level,
         data_classification=normalized_classification,
-        provider=provider,
+        provider=normalized_provider,
+        model=normalized_model,
         execute=True,
     )
 

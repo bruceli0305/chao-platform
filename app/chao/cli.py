@@ -624,6 +624,7 @@ def llm_chat_command(
             task_level=task["task_level"],
             data_classification=resolved_classification,
             provider=provider_config.name,
+            model=provider_config.model,
             execute=execute,
         )
         if egress_decision.allowed:

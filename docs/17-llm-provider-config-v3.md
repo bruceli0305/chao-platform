@@ -107,8 +107,17 @@ zhongshu
 dry-run：允许，不调用外部 Provider；
 --execute：仅允许 L1 / L2 任务；
 --execute：仅允许 D0 / D1 数据；
+--execute：仅允许已登记的 provider / model 组合；
 任务 data_assets 中出现更高分级时，以最高分级为准；
-D2 / D3 / D4、L3 / L4 或未知分级会被拒绝外发，并写入 tool_calls 审计。
+D2 / D3 / D4、L3 / L4、未知分级或未登记模型会被拒绝外发，并写入 tool_calls 审计。
+```
+
+当前真实外发 allowlist：
+
+```text
+deepseek / deepseek-chat；
+openai / gpt-4.1-mini；
+anthropic / claude-3-5-sonnet-latest。
 ```
 
 `--data-classification` 用于声明本次 prompt 中包含的最高数据分级，默认 `D1`。
@@ -116,6 +125,5 @@ D2 / D3 / D4、L3 / L4 或未知分级会被拒绝外发，并写入 tool_calls 
 ## 6. 后续
 
 ```text
-按 Provider / 模型增加更细粒度 allowlist；
 为 L3 / L4 增加人工确认后的临时外发授权流程。
 ```

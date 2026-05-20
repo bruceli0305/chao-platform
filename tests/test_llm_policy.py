@@ -8,6 +8,7 @@ def test_llm_egress_policy_allows_l1_d1_execute():
         task_level="L1",
         data_classification="D1",
         provider="deepseek",
+        model="deepseek-chat",
         execute=True,
     )
 
@@ -19,7 +20,8 @@ def test_llm_egress_policy_allows_dry_run_for_high_classification():
     decision = evaluate_llm_egress_policy(
         task_level="L4",
         data_classification="D3",
-        provider="deepseek",
+        provider="openai-compatible",
+        model="custom-model",
         execute=False,
     )
 
@@ -32,6 +34,7 @@ def test_llm_egress_policy_denies_l3_execute():
         task_level="L3",
         data_classification="D1",
         provider="deepseek",
+        model="deepseek-chat",
         execute=True,
     )
 
@@ -44,6 +47,7 @@ def test_llm_egress_policy_denies_d2_execute():
         task_level="L2",
         data_classification="D2",
         provider="deepseek",
+        model="deepseek-chat",
         execute=True,
     )
 
@@ -68,5 +72,38 @@ def test_llm_egress_policy_rejects_unknown_data_classification():
             task_level="L2",
             data_classification="PUBLIC",
             provider="deepseek",
+            model="deepseek-chat",
             execute=True,
         )
+
+
+def test_llm_egress_policy_denies_unallowlisted_provider_model():
+    decision = evaluate_llm_egress_policy(
+        task_level="L2",
+        data_classification="D1",
+        provider="openai-compatible",
+        model="custom-model",
+        execute=True,
+    )
+
+    assert decision.allowed is False
+    assert (
+        decision.reason
+        == "openai-compatible/custom-model is not allowlisted for external LLM execution"
+    )
+
+
+def test_llm_egress_policy_denies_unallowlisted_model_for_provider():
+    decision = evaluate_llm_egress_policy(
+        task_level="L2",
+        data_classification="D1",
+        provider="deepseek",
+        model="deepseek-reasoner",
+        execute=True,
+    )
+
+    assert decision.allowed is False
+    assert (
+        decision.reason
+        == "deepseek/deepseek-reasoner is not allowlisted for external LLM execution"
+    )
