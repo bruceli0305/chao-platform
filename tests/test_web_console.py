@@ -51,6 +51,7 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "Task Tool Calls" in html
     assert "Task Gate Results" in html
     assert "Task Skill Usage" in html
+    assert "Task Skill Execution Plan" in html
     assert "Task LLM Egress Authorizations" in html
     assert "Recent LLM Egress Authorizations" in html
     assert "Expired LLM Egress Authorizations" in html

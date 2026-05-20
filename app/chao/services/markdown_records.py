@@ -35,6 +35,25 @@ def _format_skill_usage(skill_usage: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _format_skill_execution_plan(plan: dict[str, Any]) -> str:
+    if not plan:
+        return "- none"
+
+    lines = [
+        f"- status: {plan.get('status', '')}",
+        "- combined_gates: " + ", ".join(plan.get("combined_gates", [])),
+    ]
+
+    for skill in plan.get("skills", []):
+        lines.append(
+            f"- {skill.get('name', '')}: gates={', '.join(skill.get('default_gates', []))}; "
+            f"status={skill.get('status', '')}; "
+            f"sha256={skill.get('content_sha256', '')}"
+        )
+
+    return "\n".join(lines)
+
+
 def save_task_markdown(result: dict[str, Any]) -> Path:
     TASK_RECORDS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -106,6 +125,10 @@ def save_task_markdown(result: dict[str, Any]) -> Path:
         "## Skill Usage",
         "",
         _format_skill_usage(result.get("skill_usage", [])),
+        "",
+        "## Skill Execution Plan",
+        "",
+        _format_skill_execution_plan(result.get("skill_execution_plan", {})),
         "",
         "## 路由结果",
         "",

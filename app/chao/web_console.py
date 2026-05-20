@@ -532,6 +532,13 @@ def build_console_index_html() -> str:
           { key: "status", label: "Status" },
           { key: "content_sha256", label: "SHA256" }
         ]),
+        renderRiskTable("Task Skill Execution Plan", task.skill_execution_plan?.skills ?? [
+        ], [
+          { key: "name", label: "Skill" },
+          { key: "status", label: "Status" },
+          { key: "path", label: "Path" },
+          { key: "content_sha256", label: "SHA256" }
+        ]),
         renderRiskTable("Task GitHub Links", task.github_links ?? [
         ], [
           { key: "link_type", label: "Type" },

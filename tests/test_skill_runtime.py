@@ -1,6 +1,10 @@
 import pytest
 
-from app.chao.skill_runtime import load_skill_usage, prepare_required_skills
+from app.chao.skill_runtime import (
+    build_skill_execution_plan,
+    load_skill_usage,
+    prepare_required_skills,
+)
 from app.chao.skills import get_skill
 
 
@@ -40,6 +44,9 @@ def test_prepare_required_skills_adds_usage_to_state_and_historian_record():
 
     assert result["skill_usage"][0]["name"] == "bugfix"
     assert result["route_result"]["skill_usage"][0]["name"] == "bugfix"
+    assert result["skill_execution_plan"]["status"] == "ready"
+    assert result["skill_execution_plan"]["skills"][0]["name"] == "bugfix"
+    assert "manual_validation" in result["skill_execution_plan"]["combined_gates"]
     assert result["historian_records"][-1]["type"] == "skill_usage"
     assert "bugfix" in result["historian_records"][-1]["content"]
 
@@ -56,4 +63,32 @@ def test_prepare_required_skills_handles_tasks_without_skills():
     )
 
     assert result["skill_usage"] == []
+    assert result["skill_execution_plan"] == {
+        "status": "not_required",
+        "skills": [],
+        "combined_gates": [],
+    }
+    assert result["route_result"]["skill_execution_plan"]["status"] == "not_required"
     assert result["historian_records"] == []
+
+
+def test_build_skill_execution_plan_merges_route_and_skill_gates():
+    skill = get_skill("frontend-feature")
+    usage = {
+        "name": "frontend-feature",
+        "path": skill["path"],
+        "status": "loaded",
+        "content_sha256": "a" * 64,
+    }
+
+    plan = build_skill_execution_plan(
+        required_gates=["manual_validation"],
+        skill_details=[skill],
+        skill_usage=[usage],
+    )
+
+    assert plan["status"] == "ready"
+    assert plan["skills"][0]["default_gates"] == skill["default_gates"]
+    assert plan["skills"][0]["content_sha256"] == "a" * 64
+    assert plan["combined_gates"][0] == "manual_validation"
+    assert "build" in plan["combined_gates"]

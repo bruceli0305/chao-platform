@@ -53,16 +53,63 @@ def load_skill_usage(skill: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_skill_execution_plan(
+    *,
+    required_gates: list[str],
+    skill_details: list[dict[str, Any]],
+    skill_usage: list[dict[str, Any]],
+) -> dict[str, Any]:
+    usage_by_name = {usage["name"]: usage for usage in skill_usage}
+    combined_gates = list(dict.fromkeys(required_gates))
+    skill_steps = []
+
+    for skill in skill_details:
+        usage = usage_by_name.get(skill["name"], {})
+        default_gates = skill.get("default_gates", [])
+        combined_gates = list(dict.fromkeys([*combined_gates, *default_gates]))
+        skill_steps.append(
+            {
+                "name": skill["name"],
+                "path": skill["path"],
+                "status": usage.get("status", "missing"),
+                "content_sha256": usage.get("content_sha256"),
+                "default_gates": default_gates,
+            }
+        )
+
+    return {
+        "status": "ready" if skill_steps else "not_required",
+        "skills": skill_steps,
+        "combined_gates": combined_gates,
+    }
+
+
 def prepare_required_skills(state: ChaoState) -> ChaoState:
     skill_details = state.get("required_skill_details", [])
 
     if not skill_details:
+        skill_execution_plan = build_skill_execution_plan(
+            required_gates=state.get("required_gates", []),
+            skill_details=[],
+            skill_usage=[],
+        )
         return {
             **state,
             "skill_usage": [],
+            "skill_execution_plan": skill_execution_plan,
+            "route_result": {
+                **state.get("route_result", {}),
+                "skill_usage": [],
+                "skill_execution_plan": skill_execution_plan,
+            },
         }
 
     skill_usage = [load_skill_usage(skill) for skill in skill_details]
+    skill_execution_plan = build_skill_execution_plan(
+        required_gates=state.get("required_gates", []),
+        skill_details=skill_details,
+        skill_usage=skill_usage,
+    )
     records = list(state.get("historian_records", []))
     skill_names = ", ".join(skill["name"] for skill in skill_usage)
 
@@ -77,11 +124,13 @@ def prepare_required_skills(state: ChaoState) -> ChaoState:
     route_result = {
         **state.get("route_result", {}),
         "skill_usage": skill_usage,
+        "skill_execution_plan": skill_execution_plan,
     }
 
     return {
         **state,
         "route_result": route_result,
         "skill_usage": skill_usage,
+        "skill_execution_plan": skill_execution_plan,
         "historian_records": records,
     }

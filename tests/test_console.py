@@ -608,6 +608,27 @@ def test_console_task_renders_task_detail(monkeypatch):
                 "primary_storage": "Git / Markdown",
             }
         ],
+        "skill_usage": [
+            {
+                "name": "bugfix",
+                "path": ".ai-agents/skills/bugfix/SKILL.md",
+                "status": "loaded",
+                "content_sha256": "a" * 64,
+            }
+        ],
+        "skill_execution_plan": {
+            "status": "ready",
+            "skills": [
+                {
+                    "name": "bugfix",
+                    "path": ".ai-agents/skills/bugfix/SKILL.md",
+                    "status": "loaded",
+                    "content_sha256": "a" * 64,
+                    "default_gates": ["lint", "test", "manual_validation"],
+                }
+            ],
+            "combined_gates": ["manual_validation", "lint", "test"],
+        },
         "llm_egress_authorizations": [
             {
                 "provider": "deepseek",
@@ -630,6 +651,8 @@ def test_console_task_renders_task_detail(monkeypatch):
     assert "Task Detail" in result.output
     assert "TASK-TEST" in result.output
     assert "runner_patch" in result.output
+    assert "Skill Execution Plan" in result.output
+    assert "bugfix" in result.output
     assert "deepseek-chat" in result.output
 
 

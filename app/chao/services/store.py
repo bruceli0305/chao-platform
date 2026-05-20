@@ -386,6 +386,7 @@ def get_task_detail(task_code: str) -> dict[str, Any] | None:
         "required_skill_paths": route_result.get("required_skill_paths", []),
         "required_skill_details": route_result.get("required_skill_details", []),
         "skill_usage": route_result.get("skill_usage", []),
+        "skill_execution_plan": route_result.get("skill_execution_plan", {}),
         "events": list_task_events(task[0]),
         "tool_calls": list_tool_calls(task[0]),
         "artifacts": list_artifacts(task[0]),

@@ -18,6 +18,8 @@ def test_graph_l1_delivered():
     assert result["status"] == "DELIVERED"
     assert len(result["historian_records"]) == 3
     assert result["skill_usage"][0]["name"] == "bugfix"
+    assert result["skill_execution_plan"]["skills"][0]["name"] == "bugfix"
+    assert "lint" in result["skill_execution_plan"]["combined_gates"]
     assert result["historian_records"][1]["type"] == "skill_usage"
 
 
@@ -40,6 +42,7 @@ def test_graph_l2_delivered():
     assert result["validation_result"]["deliverable"] is True
     assert result["validation_result"]["plan"]
     assert result["skill_usage"]
+    assert result["skill_execution_plan"]["status"] == "ready"
 
 
 def test_graph_l3_needs_confirmation():
@@ -59,6 +62,7 @@ def test_graph_l3_needs_confirmation():
     assert result["status"] == "NEED_CONFIRMATION"
     assert result["required_confirmation"] == "A"
     assert result["skill_usage"][0]["name"] == "database-migration"
+    assert "schema_check" in result["skill_execution_plan"]["combined_gates"]
 
 
 def test_graph_l4_needs_confirmation_without_execution():

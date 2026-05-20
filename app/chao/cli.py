@@ -289,6 +289,30 @@ def console_task_command(
         )
     console.print(data_assets)
 
+    skill_usage = Table(title="Skill Usage")
+    skill_usage.add_column("Skill")
+    skill_usage.add_column("Status")
+    skill_usage.add_column("SHA256")
+    for skill in task.get("skill_usage", []):
+        skill_usage.add_row(
+            _display_value(skill.get("name")),
+            _display_value(skill.get("status")),
+            _display_value(skill.get("content_sha256")),
+        )
+    console.print(skill_usage)
+
+    skill_plan = Table(title="Skill Execution Plan")
+    skill_plan.add_column("Skill")
+    skill_plan.add_column("Status")
+    skill_plan.add_column("Gates")
+    for skill in task.get("skill_execution_plan", {}).get("skills", []):
+        skill_plan.add_row(
+            _display_value(skill.get("name")),
+            _display_value(skill.get("status")),
+            ", ".join(skill.get("default_gates", [])),
+        )
+    console.print(skill_plan)
+
     llm_authorizations = Table(title="LLM Egress Authorizations")
     llm_authorizations.add_column("Provider")
     llm_authorizations.add_column("Model")
