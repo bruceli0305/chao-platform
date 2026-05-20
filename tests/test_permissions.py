@@ -11,6 +11,7 @@ def test_tool_registry_contains_first_batch():
     assert set(TOOL_REGISTRY) == {
         "cli.new",
         "cli.approve",
+        "cli.authorize_llm_egress",
         "cli.bind_github",
         "cli.runner_branch",
         "cli.runner_patch",
@@ -170,6 +171,20 @@ def test_emperor_can_approve_l4_waiting_task():
     assert decision["permission_policy"] == "human-approval-required"
     assert decision["requires_confirmation"] is True
     assert decision["risk_flag"] == "A_CONFIRMATION"
+
+
+def test_emperor_can_authorize_llm_egress_after_approval():
+    decision = evaluate_tool_permission(
+        agent_name="emperor",
+        tool_name="cli.authorize_llm_egress",
+        task_level="L3",
+        required_confirmation="A",
+        current_status="DESIGNING",
+    )
+
+    assert decision["allowed"] is True
+    assert decision["permission_policy"] == "governed-llm-egress-authorization"
+    assert decision["risk_flag"] is None
 
 
 def test_high_risk_tool_requires_waiting_confirmation_state():

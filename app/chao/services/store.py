@@ -14,6 +14,7 @@ from app.chao.services.design_artifacts import save_design_artifact
 from app.chao.services.events import list_task_events, record_task_event
 from app.chao.services.github_links import list_task_github_links
 from app.chao.services.hubu_artifacts import save_hubu_artifact
+from app.chao.services.llm_egress_authorizations import list_task_llm_egress_authorizations
 from app.chao.services.milestone_artifacts import save_milestone_artifact
 from app.chao.services.review_artifacts import save_review_artifact
 from app.chao.services.tool_calls import list_tool_calls, record_tool_call
@@ -375,6 +376,7 @@ def get_task_detail(task_code: str) -> dict[str, Any] | None:
         "artifacts": list_artifacts(task[0]),
         "data_assets": list_task_data_assets(task[0]),
         "github_links": list_task_github_links(task[0]),
+        "llm_egress_authorizations": list_task_llm_egress_authorizations(task[0]),
         "confirmations": [
             {
                 "confirmation_level": confirmation[0],

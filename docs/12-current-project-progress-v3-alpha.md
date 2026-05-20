@@ -165,7 +165,8 @@ MCP Server stdio 外壳已定义，mcp-serve 支持 initialize、tools/list 和 
 LLM Provider 配置层已定义，默认支持 DeepSeek，并支持 OpenAI、Anthropic、OpenAI-compatible；
 LLM Chat 最小 client 已定义，llm-chat 默认 dry-run，显式 --execute 才调用外部 Provider，并写入 tool_calls 审计；
 LLM Chat 任务上下文组装已定义，llm-chat 会按 TASK_CODE 外发任务摘要上下文并在外发前脱敏常见 Secret 形态；
-LLM Chat 外发策略已定义，真实 --execute 仅允许 L1/L2、D0/D1 和已登记 provider/model；L3/L4 必须显式开启 governed egress 且已有 A 级批准；
+LLM Chat 外发策略已定义，真实 --execute 仅允许 L1/L2、D0/D1 和已登记 provider/model；L3/L4 必须显式开启 governed egress 且存在未过期授权记录；
+LLM egress 独立授权记录已定义，authorize-llm-egress 会写入 llm_egress_authorizations、task_events 和 tool_calls；
 Console 只读总览已定义，CLI 可输出任务、artifact、data_asset 和工具调用概览；
 Console 只读任务详情已定义，CLI 可输出单任务审计链摘要；
 Console 只读审批中心已定义，CLI 可输出 NEED_CONFIRMATION 任务队列；
@@ -282,7 +283,7 @@ Markdown 史官记录生成。
 
 ```text
 官方 MCP SDK 客户端联调；
-L3 / L4 LLM 外发的独立有效期授权记录；
+llm_egress_authorizations 的 Web Console 展示与过期审计；
 Skills 自动读取、执行和交付记录闭环；
 GitHub Issue / PR / Commit / CI 结果与 task 的自动双向同步；
 Docker Sandbox 的镜像固化、缓存策略和真实流水线接入；
@@ -307,7 +308,7 @@ Web Console 的审批操作和产品化 UI。
 
 ```text
 1. 完成真实 MCP 客户端联调；
-2. 补 L3 / L4 LLM 外发的独立有效期授权记录；
+2. 补 llm_egress_authorizations 的 Web Console 展示与过期审计；
 3. Skills 自动读取、执行和交付记录闭环；
 4. 持续使用 Ubuntu + Docker 作为最终验证环境，数据库变更统一通过 Docker psql 执行。
 ```

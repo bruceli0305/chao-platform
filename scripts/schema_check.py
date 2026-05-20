@@ -11,6 +11,7 @@ REQUIRED_TABLES = [
     "gate_results",
     "context_chunks",
     "confirmations",
+    "llm_egress_authorizations",
     "task_events",
     "tool_calls",
     "artifacts",
@@ -56,6 +57,15 @@ REQUIRED_COLUMNS = {
         "url",
         "metadata",
         "created_by",
+    ],
+    "llm_egress_authorizations": [
+        "task_id",
+        "provider",
+        "model",
+        "data_classification",
+        "status",
+        "authorized_by",
+        "expires_at",
     ],
 }
 

@@ -31,6 +31,18 @@ def test_github_links_columns_are_required():
     ]
 
 
+def test_llm_egress_authorizations_columns_are_required():
+    assert REQUIRED_COLUMNS["llm_egress_authorizations"] == [
+        "task_id",
+        "provider",
+        "model",
+        "data_classification",
+        "status",
+        "authorized_by",
+        "expires_at",
+    ]
+
+
 def test_storage_policy_check_requires_storage_policies_table():
     assert should_check_storage_policies({"tasks", "context_chunks"}) is False
     assert should_check_storage_policies({"tasks", "context_chunks", "storage_policies"}) is True

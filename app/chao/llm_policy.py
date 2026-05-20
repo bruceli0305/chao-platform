@@ -50,6 +50,25 @@ def resolve_task_data_classification(
     return max(classifications, key=lambda item: DATA_CLASSIFICATION_ORDER[item])
 
 
+def is_llm_provider_model_allowlisted(provider: str, model: str) -> bool:
+    normalized_provider = provider.strip().lower()
+    normalized_model = model.strip()
+    return normalized_model in ALLOWED_EXECUTE_PROVIDER_MODELS.get(normalized_provider, set())
+
+
+def is_data_classification_covered(
+    *,
+    authorized_classification: str,
+    requested_classification: str,
+) -> bool:
+    normalized_authorized = normalize_data_classification(authorized_classification)
+    normalized_requested = normalize_data_classification(requested_classification)
+    return (
+        DATA_CLASSIFICATION_ORDER[normalized_authorized]
+        >= DATA_CLASSIFICATION_ORDER[normalized_requested]
+    )
+
+
 def evaluate_llm_egress_policy(
     *,
     task_level: str,
@@ -76,7 +95,7 @@ def evaluate_llm_egress_policy(
             governed_egress_approved=governed_egress_approved,
         )
 
-    if normalized_model not in ALLOWED_EXECUTE_PROVIDER_MODELS.get(normalized_provider, set()):
+    if not is_llm_provider_model_allowlisted(normalized_provider, normalized_model):
         return LLMEgressDecision(
             allowed=False,
             reason=(

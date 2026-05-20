@@ -176,6 +176,15 @@ def test_llm_chat_execute_allows_l3_with_governed_approval(monkeypatch):
                 "confirmed_by": "emperor",
             }
         ],
+        "llm_egress_authorizations": [
+            {
+                "provider": "deepseek",
+                "model": "deepseek-chat",
+                "data_classification": "D1",
+                "status": "APPROVED",
+                "active": True,
+            }
+        ],
     }
 
     def fake_execute(_config, prompt, **_kwargs):
@@ -221,7 +230,7 @@ def test_llm_chat_execute_allows_l3_with_governed_approval(monkeypatch):
     assert calls[0]["permission_decision"]["egress_policy"]["governed_egress_approved"] is True
 
 
-def test_llm_chat_execute_denies_l3_without_a_approval_even_with_flag(monkeypatch):
+def test_llm_chat_execute_denies_l3_without_active_authorization_even_with_flag(monkeypatch):
     calls = []
     task = {
         "id": "task-1",
@@ -231,7 +240,8 @@ def test_llm_chat_execute_denies_l3_without_a_approval_even_with_flag(monkeypatc
         "task_level": "L3",
         "status": "DESIGNING",
         "route_result": {"required_confirmation": "A"},
-        "confirmations": [{"confirmation_level": "A", "status": "PENDING"}],
+        "confirmations": [{"confirmation_level": "A", "status": "APPROVED"}],
+        "llm_egress_authorizations": [],
     }
 
     monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: task)
@@ -251,6 +261,72 @@ def test_llm_chat_execute_denies_l3_without_a_approval_even_with_flag(monkeypatc
     assert result.exit_code == 1
     assert calls[0]["result_status"] == "denied"
     assert calls[0]["permission_decision"]["egress_policy"]["governed_egress_approved"] is False
+
+
+def test_authorize_llm_egress_records_time_limited_authorization(monkeypatch):
+    calls = {"events": [], "tools": [], "authorizations": []}
+    task = {
+        "id": "task-1",
+        "task_code": "TASK-1",
+        "title": "Governed task",
+        "raw_request": "Summarize governed task.",
+        "task_level": "L3",
+        "status": "DESIGNING",
+        "route_result": {"required_confirmation": "A"},
+        "confirmations": [{"confirmation_level": "A", "status": "APPROVED"}],
+    }
+
+    def fake_record_authorization(**kwargs):
+        calls["authorizations"].append(kwargs)
+        return {
+            "id": "auth-1",
+            **kwargs,
+            "status": "APPROVED",
+            "expires_at": "2026-05-21T00:00:00+00:00",
+        }
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: task)
+    monkeypatch.setattr(cli, "record_llm_egress_authorization", fake_record_authorization)
+    monkeypatch.setattr(cli, "record_task_event", lambda **kwargs: calls["events"].append(kwargs))
+    monkeypatch.setattr(cli, "record_tool_call", lambda **kwargs: calls["tools"].append(kwargs))
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "authorize-llm-egress",
+            "TASK-1",
+            "--provider",
+            "deepseek",
+            "--model",
+            "deepseek-chat",
+            "--ttl-hours",
+            "2",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert calls["authorizations"][0]["ttl_hours"] == 2
+    assert calls["events"][0]["event_type"] == "llm_egress_authorized"
+    assert calls["tools"][0]["tool_name"] == "cli.authorize_llm_egress"
+    assert calls["tools"][0]["permission_policy"] == "governed-llm-egress-authorization"
+
+
+def test_authorize_llm_egress_requires_a_approval(monkeypatch):
+    task = {
+        "id": "task-1",
+        "task_code": "TASK-1",
+        "task_level": "L3",
+        "status": "DESIGNING",
+        "route_result": {"required_confirmation": "A"},
+        "confirmations": [],
+    }
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: task)
+
+    result = CliRunner().invoke(cli.app, ["authorize-llm-egress", "TASK-1"])
+
+    assert result.exit_code == 1
+    assert "A-level APPROVED confirmation is required" in result.output
 
 
 def test_llm_chat_requires_existing_task(monkeypatch):

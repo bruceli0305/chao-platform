@@ -10,7 +10,13 @@ from rich.table import Table
 from app.chao.graph.main_graph import build_graph
 from app.chao.llm_client import execute_llm_chat_completion
 from app.chao.llm_context import build_llm_task_prompt
-from app.chao.llm_policy import evaluate_llm_egress_policy, resolve_task_data_classification
+from app.chao.llm_policy import (
+    evaluate_llm_egress_policy,
+    is_data_classification_covered,
+    is_llm_provider_model_allowlisted,
+    normalize_data_classification,
+    resolve_task_data_classification,
+)
 from app.chao.llm_providers import build_llm_provider_config, list_llm_provider_defaults
 from app.chao.mcp_server import serve_mcp
 from app.chao.permissions import require_tool_permission
@@ -35,6 +41,7 @@ from app.chao.services.console import (
 from app.chao.services.data_assets import record_data_asset
 from app.chao.services.events import record_task_event
 from app.chao.services.github_links import normalize_github_link_type, record_github_link
+from app.chao.services.llm_egress_authorizations import record_llm_egress_authorization
 from app.chao.services.markdown_records import save_task_markdown
 from app.chao.services.store import (
     approve_task,
@@ -584,6 +591,92 @@ def llm_providers_command(
     print_json(data={"providers": defaults, "selected": selected})
 
 
+@app.command("authorize-llm-egress")
+def authorize_llm_egress_command(
+    task_code: str,
+    provider: str = typer.Option("deepseek", "--provider", help="LLM provider"),
+    model: str = typer.Option("deepseek-chat", "--model", help="LLM model"),
+    data_classification: str = typer.Option(
+        "D1",
+        "--data-classification",
+        help="Highest data classification covered by this authorization",
+    ),
+    ttl_hours: int = typer.Option(24, "--ttl-hours", min=1, help="Authorization lifetime"),
+    by: str = typer.Option("emperor", "--by", help="Authorizing agent or user"),
+    reason: str = typer.Option("", "--reason", help="Governance reason"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    try:
+        normalized_classification = normalize_data_classification(data_classification)
+        if task["task_level"] not in {"L3", "L4"}:
+            raise ValueError("LLM egress authorization is only required for L3/L4 tasks.")
+        if not _has_approved_a_confirmation(task):
+            raise ValueError(
+                "A-level APPROVED confirmation is required before LLM egress authorization."
+            )
+        if not is_llm_provider_model_allowlisted(provider, model):
+            raise ValueError(f"{provider}/{model} is not allowlisted for external LLM execution")
+
+        permission_decision = require_tool_permission(
+            agent_name=by,
+            tool_name="cli.authorize_llm_egress",
+            task_level=task["task_level"],
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
+            current_status=task["status"],
+        )
+        authorization = record_llm_egress_authorization(
+            task_id=task["id"],
+            provider=provider.strip().lower(),
+            model=model.strip(),
+            data_classification=normalized_classification,
+            authorized_by=by,
+            reason=reason,
+            ttl_hours=ttl_hours,
+        )
+    except (PermissionError, RuntimeError, ValueError) as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    record_task_event(
+        task_id=task["id"],
+        event_type="llm_egress_authorized",
+        from_status=task["status"],
+        to_status=task["status"],
+        summary=(
+            f"LLM egress authorized for {authorization['provider']}/"
+            f"{authorization['model']} until {authorization['expires_at']}"
+        ),
+        created_by=by,
+    )
+    record_tool_call(
+        task_id=task["id"],
+        agent_name=by,
+        tool_name="cli.authorize_llm_egress",
+        arguments_summary=(
+            f"task_code={task_code}; provider={authorization['provider']}; "
+            f"model={authorization['model']}; data_classification={normalized_classification}; "
+            f"ttl_hours={ttl_hours}"
+        ),
+        permission_policy=permission_decision["permission_policy"],
+        result_status="success",
+        permission_decision=permission_decision,
+        output_summary=(
+            f"authorization_id={authorization['id']}; expires_at={authorization['expires_at']}"
+        ),
+        risk_flag=permission_decision["risk_flag"],
+    )
+
+    print_json(data={"task_code": task_code, "authorization": authorization})
+
+
 @app.command("llm-chat")
 def llm_chat_command(
     task_code: str,
@@ -631,7 +724,15 @@ def llm_chat_command(
             provider=provider_config.name,
             model=provider_config.model,
             execute=execute,
-            governed_egress_approved=(allow_governed_egress and _has_approved_a_confirmation(task)),
+            governed_egress_approved=(
+                allow_governed_egress
+                and _has_active_llm_egress_authorization(
+                    task,
+                    provider=provider_config.name,
+                    model=provider_config.model,
+                    data_classification=resolved_classification,
+                )
+            ),
         )
         if egress_decision.allowed:
             result = execute_llm_chat_completion(
@@ -704,6 +805,35 @@ def _has_approved_a_confirmation(task: dict[str, object]) -> bool:
             and confirmation.get("status") == "APPROVED"
         ):
             return True
+
+    return False
+
+
+def _has_active_llm_egress_authorization(
+    task: dict[str, object],
+    *,
+    provider: str,
+    model: str,
+    data_classification: str,
+) -> bool:
+    normalized_provider = provider.strip().lower()
+    normalized_model = model.strip()
+
+    for authorization in task.get("llm_egress_authorizations", []) or []:
+        if not isinstance(authorization, dict):
+            continue
+        if authorization.get("active") is not True:
+            continue
+        if authorization.get("provider") != normalized_provider:
+            continue
+        if authorization.get("model") != normalized_model:
+            continue
+        if not is_data_classification_covered(
+            authorized_classification=str(authorization.get("data_classification", "")),
+            requested_classification=data_classification,
+        ):
+            continue
+        return True
 
     return False
 

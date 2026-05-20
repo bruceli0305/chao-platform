@@ -99,11 +99,18 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         "description": "Call a configured external LLM provider with a task-scoped prompt.",
         "permission_policy": "llm-provider-chat-completion",
     },
+    "cli.authorize_llm_egress": {
+        "name": "cli.authorize_llm_egress",
+        "category": "llm.governance",
+        "risk": "medium",
+        "description": "Create a time-limited authorization for governed LLM egress.",
+        "permission_policy": "governed-llm-egress-authorization",
+    },
 }
 
 ROLE_ALLOWED_TOOLS: dict[str, set[str]] = {
     "shangshu": {"cli.new", "cli.bind_github"},
-    "emperor": {"cli.approve"},
+    "emperor": {"cli.approve", "cli.authorize_llm_egress"},
     "gongbu": {
         "cli.runner_branch",
         "cli.runner_patch",
