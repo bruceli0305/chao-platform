@@ -294,6 +294,13 @@ def build_console_index_html() -> str:
           { key: "status", label: "Status" },
           { key: "command", label: "Command" }
         ]),
+        renderRiskTable("Stale Tool Calls", risks.stale_tool_calls ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "agent_name", label: "Agent" },
+          { key: "tool_name", label: "Tool" },
+          { key: "age_minutes", label: "Age Minutes" }
+        ]),
         renderRiskTable("Pending Tool Calls", risks.pending_tool_calls ?? [
         ], [
           { key: "task_code", label: "Task" },

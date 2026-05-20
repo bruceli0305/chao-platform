@@ -119,3 +119,76 @@ def test_tool_gateway_call_rejects_missing_task(monkeypatch):
 
     assert result.exit_code == 1
     assert "Task not found" in result.output
+
+
+def test_tool_gateway_reconcile_reports_stale_pending_calls(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        cli,
+        "list_stale_pending_tool_calls",
+        lambda max_age_minutes, limit: (
+            calls.append((max_age_minutes, limit))
+            or [
+                {
+                    "id": "tool-call-1",
+                    "task_id": "task-1",
+                    "task_code": "TASK-1",
+                    "agent_name": "xingbu",
+                    "tool_name": "schema_check",
+                    "result_status": "started",
+                    "age_minutes": 31,
+                }
+            ]
+        ),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        ["tool-gateway-reconcile", "--max-age-minutes", "15", "--limit", "10"],
+    )
+
+    assert result.exit_code == 0
+    assert calls == [(15, 10)]
+    assert '"dry_run": true' in result.output
+    assert '"count": 1' in result.output
+    assert "schema_check" in result.output
+
+
+def test_tool_gateway_reconcile_apply_marks_timed_out_and_records_events(monkeypatch):
+    calls = {"reconcile": [], "events": []}
+    monkeypatch.setattr(
+        cli,
+        "mark_stale_pending_tool_calls_timed_out",
+        lambda max_age_minutes, limit: (
+            calls["reconcile"].append((max_age_minutes, limit))
+            or [
+                {
+                    "id": "tool-call-1",
+                    "task_id": "task-1",
+                    "task_code": "TASK-1",
+                    "agent_name": "xingbu",
+                    "tool_name": "schema_check",
+                    "result_status": "timed_out",
+                    "age_minutes": 31,
+                }
+            ]
+        ),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        ["tool-gateway-reconcile", "--max-age-minutes", "15", "--limit", "10", "--apply"],
+    )
+
+    assert result.exit_code == 0
+    assert calls["reconcile"] == [(15, 10)]
+    assert calls["events"][0]["task_id"] == "task-1"
+    assert calls["events"][0]["event_type"] == "tool_call_timed_out"
+    assert calls["events"][0]["created_by"] == "xingbu"
+    assert '"dry_run": false' in result.output
+    assert '"result_status": "timed_out"' in result.output

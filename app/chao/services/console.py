@@ -3,6 +3,7 @@ from typing import Any
 import psycopg
 
 from app.chao.config import DATABASE_URL
+from app.chao.services.tool_calls import DEFAULT_STALE_PENDING_TOOL_CALL_MINUTES
 
 
 def _rows_to_counts(rows: list[tuple[str, int]]) -> dict[str, int]:
@@ -607,6 +608,18 @@ def get_console_gates(limit: int = 20) -> dict[str, Any]:
             )
             pending_tool_call_count = cur.fetchone()[0]
 
+            cur.execute(
+                """
+                select count(*)
+                from tool_calls
+                where lower(coalesce(result_status, '')) = 'started'
+                  and finished_at is null
+                  and started_at < now() - (%s::int * interval '1 minute')
+                """,
+                (DEFAULT_STALE_PENDING_TOOL_CALL_MINUTES,),
+            )
+            stale_tool_call_count = cur.fetchone()[0]
+
             cur.execute("select count(*) from storage_policies")
             storage_policy_count = cur.fetchone()[0]
 
@@ -656,6 +669,7 @@ def get_console_gates(limit: int = 20) -> dict[str, Any]:
             "empty_decision_count": empty_tool_decision_count,
             "failed_tool_call_count": failed_tool_call_count,
             "pending_tool_call_count": pending_tool_call_count,
+            "stale_tool_call_count": stale_tool_call_count,
         },
         "data_boundary_audit": {
             "storage_policy_count": storage_policy_count,
@@ -768,6 +782,28 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
                 (limit,),
             )
             pending_tool_call_rows = cur.fetchall()
+
+            cur.execute(
+                """
+                select
+                    t.task_code,
+                    tc.agent_name,
+                    tc.tool_name,
+                    tc.permission_policy,
+                    tc.result_status,
+                    tc.started_at::text,
+                    floor(extract(epoch from (now() - tc.started_at)) / 60)::int
+                from tool_calls tc
+                join tasks t on t.id = tc.task_id
+                where lower(coalesce(tc.result_status, '')) = 'started'
+                  and tc.finished_at is null
+                  and tc.started_at < now() - (%s::int * interval '1 minute')
+                order by tc.started_at asc
+                limit %s
+                """,
+                (DEFAULT_STALE_PENDING_TOOL_CALL_MINUTES, limit),
+            )
+            stale_tool_call_rows = cur.fetchall()
 
             cur.execute(
                 """
@@ -903,6 +939,18 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
             }
             for row in pending_tool_call_rows
         ],
+        "stale_tool_calls": [
+            {
+                "task_code": row[0],
+                "agent_name": row[1],
+                "tool_name": row[2],
+                "permission_policy": row[3],
+                "result_status": row[4],
+                "started_at": row[5],
+                "age_minutes": row[6],
+            }
+            for row in stale_tool_call_rows
+        ],
         "data_boundary_risks": data_boundary_risks,
         "github_risks": [
             {
@@ -933,6 +981,7 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
             "runner_failure_count": len(runner_failure_rows),
             "tool_risk_count": len(tool_risk_rows),
             "pending_tool_call_count": len(pending_tool_call_rows),
+            "stale_tool_call_count": len(stale_tool_call_rows),
             "data_boundary_risk_count": sum(data_boundary_risks.values()),
             "github_risk_count": len(github_risk_rows),
             "expired_llm_egress_authorization_count": len(expired_llm_egress_authorization_rows),

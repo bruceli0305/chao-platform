@@ -354,6 +354,7 @@ def test_get_console_gates_returns_audit_summary(monkeypatch):
         [(0,)],
         [(1,)],
         [(2,)],
+        [(1,)],
         [(3,)],
         [(0,)],
         [(0,)],
@@ -401,6 +402,7 @@ def test_get_console_gates_returns_audit_summary(monkeypatch):
         "empty_decision_count": 0,
         "failed_tool_call_count": 1,
         "pending_tool_call_count": 2,
+        "stale_tool_call_count": 1,
     }
     assert gates["data_boundary_audit"] == {
         "storage_policy_count": 3,
@@ -452,6 +454,17 @@ def test_get_console_risks_returns_risk_summary(monkeypatch):
                 "data-boundary-validation",
                 "started",
                 "2026-05-14 00:00:03",
+            )
+        ],
+        [
+            (
+                "TASK-STALE",
+                "xingbu",
+                "schema_check",
+                "schema-read-validation",
+                "started",
+                "2026-05-14 00:00:00",
+                30,
             )
         ],
         [(1,)],
@@ -519,6 +532,7 @@ def test_get_console_risks_returns_risk_summary(monkeypatch):
     assert risks["runner_failures"][0]["artifact_type"] == "runner_failure_feedback"
     assert risks["tool_risks"][0]["tool_name"] == "cli.new"
     assert risks["pending_tool_calls"][0]["task_code"] == "TASK-PENDING"
+    assert risks["stale_tool_calls"][0]["task_code"] == "TASK-STALE"
     assert risks["data_boundary_risks"] == {
         "invalid_data_asset_classification_count": 1,
         "invalid_context_classification_count": 2,
@@ -532,6 +546,7 @@ def test_get_console_risks_returns_risk_summary(monkeypatch):
         "runner_failure_count": 1,
         "tool_risk_count": 1,
         "pending_tool_call_count": 1,
+        "stale_tool_call_count": 1,
         "data_boundary_risk_count": 6,
         "github_risk_count": 1,
         "expired_llm_egress_authorization_count": 1,
@@ -819,6 +834,7 @@ def test_console_gates_renders_gate_summary(monkeypatch):
             "empty_decision_count": 0,
             "failed_tool_call_count": 1,
             "pending_tool_call_count": 2,
+            "stale_tool_call_count": 1,
         },
         "data_boundary_audit": {
             "storage_policy_count": 3,
@@ -880,6 +896,14 @@ def test_console_risks_renders_risk_summary(monkeypatch):
                 "started_at": "2026-05-14 00:00:03",
             }
         ],
+        "stale_tool_calls": [
+            {
+                "task_code": "TASK-STALE",
+                "agent_name": "xingbu",
+                "tool_name": "schema_check",
+                "age_minutes": 30,
+            }
+        ],
         "data_boundary_risks": {
             "invalid_data_asset_classification_count": 0,
             "invalid_context_classification_count": 0,
@@ -907,6 +931,7 @@ def test_console_risks_renders_risk_summary(monkeypatch):
             "runner_failure_count": 1,
             "tool_risk_count": 1,
             "pending_tool_call_count": 1,
+            "stale_tool_call_count": 1,
             "data_boundary_risk_count": 0,
             "github_risk_count": 1,
             "expired_llm_egress_authorization_count": 1,
@@ -923,6 +948,8 @@ def test_console_risks_renders_risk_summary(monkeypatch):
     assert "TASK-BLOCKED" in result.output
     assert "runner_failure_feedback" in result.output
     assert "pytest" in result.output
+    assert "Stale Tool Calls" in result.output
+    assert "schema_check" in result.output
     assert "Pending Tool Calls" in result.output
     assert "data_boundary_check" in result.output
     assert "ci_run" in result.output

@@ -56,7 +56,12 @@ from app.chao.services.store import (
     save_task_result,
     update_task_status,
 )
-from app.chao.services.tool_calls import record_tool_call
+from app.chao.services.tool_calls import (
+    DEFAULT_STALE_PENDING_TOOL_CALL_MINUTES,
+    list_stale_pending_tool_calls,
+    mark_stale_pending_tool_calls_timed_out,
+    record_tool_call,
+)
 from app.chao.tool_gateway import (
     ToolGatewayRequest,
     evaluate_tool_gateway_request,
@@ -565,6 +570,20 @@ def console_risks_command(
         )
     console.print(runner_failures)
 
+    stale_tools = Table(title="Stale Tool Calls")
+    stale_tools.add_column("Task")
+    stale_tools.add_column("Agent")
+    stale_tools.add_column("Tool")
+    stale_tools.add_column("Age Minutes")
+    for tool_call in risks["stale_tool_calls"]:
+        stale_tools.add_row(
+            _display_value(tool_call.get("task_code")),
+            _display_value(tool_call.get("agent_name")),
+            _display_value(tool_call.get("tool_name")),
+            _display_value(tool_call.get("age_minutes")),
+        )
+    console.print(stale_tools)
+
     pending_tools = Table(title="Pending Tool Calls")
     pending_tools.add_column("Task")
     pending_tools.add_column("Agent")
@@ -808,6 +827,52 @@ def tool_gateway_call_command(
 
     if execute and result["result_status"] != "success":
         raise typer.Exit(code=1)
+
+
+@app.command("tool-gateway-reconcile")
+def tool_gateway_reconcile_command(
+    max_age_minutes: int = typer.Option(
+        DEFAULT_STALE_PENDING_TOOL_CALL_MINUTES,
+        "--max-age-minutes",
+        min=1,
+        help="Pending tool call age threshold before it is treated as stale.",
+    ),
+    limit: int = typer.Option(100, "--limit", min=1, max=500, help="Maximum records to scan."),
+    apply: bool = typer.Option(False, "--apply", help="Mark stale pending tool calls timed_out."),
+    by: str = typer.Option("xingbu", "--by", help="Reconciliation agent name"),
+):
+    if apply:
+        stale_tool_calls = mark_stale_pending_tool_calls_timed_out(
+            max_age_minutes=max_age_minutes,
+            limit=limit,
+        )
+        for tool_call in stale_tool_calls:
+            record_task_event(
+                task_id=tool_call["task_id"],
+                event_type="tool_call_timed_out",
+                from_status=None,
+                to_status=None,
+                summary=(
+                    f"Tool call {tool_call['tool_name']} timed out after "
+                    f"{tool_call['age_minutes']} minute(s)."
+                ),
+                created_by=by,
+            )
+    else:
+        stale_tool_calls = list_stale_pending_tool_calls(
+            max_age_minutes=max_age_minutes,
+            limit=limit,
+        )
+
+    print_json(
+        data={
+            "dry_run": not apply,
+            "applied": apply,
+            "max_age_minutes": max_age_minutes,
+            "count": len(stale_tool_calls),
+            "stale_tool_calls": stale_tool_calls,
+        }
+    )
 
 
 @app.command("mcp-serve")
