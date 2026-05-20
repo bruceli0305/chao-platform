@@ -56,6 +56,7 @@ from app.chao.services.store import (
     update_task_status,
 )
 from app.chao.services.tool_calls import record_tool_call
+from app.chao.tool_gateway_handlers import list_tool_handlers
 from app.chao.tool_gateway_server import serve_tool_gateway
 from app.chao.web_console import run_web_console_server
 
@@ -697,6 +698,37 @@ def web_console_command(
 @app.command("tool-gateway-serve")
 def tool_gateway_serve_command():
     raise typer.Exit(code=serve_tool_gateway())
+
+
+@app.command("tool-gateway-tools")
+def tool_gateway_tools_command(
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    tools = list_tool_handlers()
+
+    if as_json:
+        print_json(data={"tools": tools})
+        return
+
+    table = Table(title="Tool Gateway Tools")
+    table.add_column("Tool")
+    table.add_column("Category")
+    table.add_column("Risk")
+    table.add_column("Policy")
+    table.add_column("Roles")
+    table.add_column("Description")
+
+    for tool in tools:
+        table.add_row(
+            _display_value(tool.get("tool_name")),
+            _display_value(tool.get("category")),
+            _display_value(tool.get("risk")),
+            _display_value(tool.get("permission_policy")),
+            ", ".join(tool.get("allowed_roles", [])),
+            _display_value(tool.get("description")),
+        )
+
+    console.print(table)
 
 
 @app.command("mcp-serve")

@@ -740,6 +740,55 @@ def test_console_github_sync_renders_sync_summary(monkeypatch):
     assert "TASK-CI" in result.output
 
 
+def test_tool_gateway_tools_renders_policy_metadata(monkeypatch):
+    monkeypatch.setattr(
+        cli,
+        "list_tool_handlers",
+        lambda: [
+            {
+                "tool_name": "data_boundary_check",
+                "description": "Run data boundary check.",
+                "category": "filesystem.read",
+                "risk": "medium",
+                "permission_policy": "data-boundary-validation",
+                "allowed_roles": ["hubu", "menxia", "xingbu"],
+            }
+        ],
+    )
+
+    result = CliRunner().invoke(cli.app, ["tool-gateway-tools"])
+
+    assert result.exit_code == 0
+    assert "Tool Gateway Tools" in result.output
+    assert "data_boundary_check" in result.output
+    assert "filesystem.read" in result.output
+    assert "data-boundary-validation" in result.output
+    assert "xingbu" in result.output
+
+
+def test_tool_gateway_tools_outputs_json(monkeypatch):
+    monkeypatch.setattr(
+        cli,
+        "list_tool_handlers",
+        lambda: [
+            {
+                "tool_name": "schema_check",
+                "description": "Run schema check.",
+                "category": "postgres.read",
+                "risk": "medium",
+                "permission_policy": "schema-read-validation",
+                "allowed_roles": ["menxia", "xingbu"],
+            }
+        ],
+    )
+
+    result = CliRunner().invoke(cli.app, ["tool-gateway-tools", "--json"])
+
+    assert result.exit_code == 0
+    assert "schema_check" in result.output
+    assert "schema-read-validation" in result.output
+
+
 def test_console_gates_renders_gate_summary(monkeypatch):
     gates = {
         "gate_status_counts": {"pass": 2},
