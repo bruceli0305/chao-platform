@@ -12,7 +12,7 @@ from app.chao.services.console import (
     get_console_overview,
     get_console_risks,
 )
-from app.chao.services.store import get_task_detail
+from app.chao.services.store import approve_task, get_task_detail
 
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
@@ -79,7 +79,7 @@ def build_console_index_html() -> str:
 <body>
   <header>
     <h1>Chao Console</h1>
-    <div class="muted">Read-only local control plane</div>
+    <div class="muted">Local control plane</div>
     <nav aria-label="Console sections">
       <a href="#controls-section">Controls</a>
       <a href="#overview-section">Overview</a>
@@ -147,6 +147,7 @@ def build_console_index_html() -> str:
     <section id="approvals-section">
       <h2>Approval Queue</h2>
       <div id="approval-queue"></div>
+      <div id="approval-result"></div>
     </section>
     <section id="recent-section">
       <h2>Recent Tasks</h2>
@@ -203,6 +204,12 @@ def build_console_index_html() -> str:
           <td>${escapeHtml(task.task_level)}</td>
           <td>${escapeHtml(task.status)}</td>
           <td>${escapeHtml(task.owner)}</td>
+          <td>
+            <input name="approval-note" placeholder="Approval note">
+            <button type="button" data-approve-task-code="${escapeHtml(task.task_code)}">
+              Approve
+            </button>
+          </td>
         </tr>
       `).join("");
 
@@ -238,7 +245,10 @@ def build_console_index_html() -> str:
       return `
         <table>
           <thead>
-            <tr><th>Task</th><th>Title</th><th>Level</th><th>Confirm</th><th>Owner</th></tr>
+            <tr>
+              <th>Task</th><th>Title</th><th>Level</th>
+              <th>Confirm</th><th>Owner</th><th>Action</th>
+            </tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
@@ -601,6 +611,19 @@ def build_console_index_html() -> str:
       return payload;
     }
 
+    async function postJson(path, payload) {
+      const response = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { ...data, http_status: response.status };
+      }
+      return data;
+    }
+
     function selectedLimit() {
       const value = Number.parseInt(document.querySelector("#record-limit").value, 10);
       if (Number.isNaN(value)) return 8;
@@ -718,6 +741,27 @@ def build_console_index_html() -> str:
     });
 
     document.querySelector("#approval-queue").addEventListener("click", async (event) => {
+      const approveButton = event.target.closest("button[data-approve-task-code]");
+      if (approveButton) {
+        event.preventDefault();
+        const row = approveButton.closest("tr[data-task-code]");
+        const taskCode = approveButton.dataset.approveTaskCode;
+        const note = row?.querySelector('input[name="approval-note"]')?.value ?? "";
+        const result = await postJson("/api/console/approvals/approve", {
+          task_code: taskCode,
+          by: "emperor",
+          note
+        });
+        document.querySelector("#approval-result").innerHTML = hasError(result)
+          ? renderPanelError("Approval", result)
+          : renderNotice(`Approved ${taskCode}`);
+        await refresh();
+        if (!hasError(result) && result.task?.task_code) {
+          await loadTaskDetail(result.task.task_code);
+        }
+        return;
+      }
+
       const row = event.target.closest("tr[data-task-code]");
       if (!row) return;
       await loadTaskDetail(row.dataset.taskCode);
@@ -800,6 +844,44 @@ def _build_service_error(path: str, exc: Exception) -> dict[str, Any]:
     }
 
 
+def build_console_write_response(path: str, payload: Any) -> tuple[int, dict[str, Any]]:
+    if path != "/api/console/approvals/approve":
+        return HTTPStatus.NOT_FOUND, {
+            "error": "not_found",
+            "path": path,
+            "available_paths": ["/api/console/approvals/approve"],
+        }
+
+    if not isinstance(payload, dict):
+        return HTTPStatus.BAD_REQUEST, {
+            "error": "invalid_request",
+            "message": "JSON request body must be an object.",
+        }
+
+    task_code = str(payload.get("task_code") or "").strip()
+    if not task_code:
+        return HTTPStatus.BAD_REQUEST, {
+            "error": "invalid_request",
+            "message": "task_code is required.",
+        }
+
+    confirmed_by = str(payload.get("by") or "emperor").strip() or "emperor"
+    note = str(payload.get("note") or "")
+
+    try:
+        task = approve_task(task_code=task_code, confirmed_by=confirmed_by, note=note)
+    except ValueError as exc:
+        return HTTPStatus.BAD_REQUEST, {
+            "error": "approval_failed",
+            "message": str(exc),
+            "task_code": task_code,
+        }
+    except Exception as exc:
+        return HTTPStatus.SERVICE_UNAVAILABLE, _build_service_error(path, exc)
+
+    return HTTPStatus.OK, {"task": task}
+
+
 def build_console_response(path: str, query_string: str = "") -> tuple[int, dict[str, Any]]:
     query = parse_qs(query_string)
     limit = _parse_limit(query)
@@ -876,6 +958,32 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
         status_code, payload = build_console_response(parsed.path, parsed.query)
         response = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
 
+        self.send_response(int(status_code))
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(response)))
+        self.end_headers()
+        self.wfile.write(response)
+
+    def do_POST(self) -> None:
+        parsed = urlparse(self.path)
+        content_length = int(self.headers.get("Content-Length", "0") or "0")
+        raw_body = self.rfile.read(content_length) if content_length else b"{}"
+
+        try:
+            payload = json.loads(raw_body.decode("utf-8"))
+        except json.JSONDecodeError:
+            status_code, response_payload = (
+                HTTPStatus.BAD_REQUEST,
+                {
+                    "error": "invalid_json",
+                    "message": "Request body must be valid JSON.",
+                },
+            )
+        else:
+            status_code, response_payload = build_console_write_response(parsed.path, payload)
+
+        response = json.dumps(response_payload, ensure_ascii=False, indent=2).encode("utf-8")
         self.send_response(int(status_code))
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")

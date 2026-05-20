@@ -31,6 +31,11 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "/api/console/risks?limit=${limit}" in html
     assert "/api/console/tasks/" in html
     assert "Approval Queue" in html
+    assert "approval-result" in html
+    assert "data-approve-task-code" in html
+    assert "approval-note" in html
+    assert "postJson" in html
+    assert "/api/console/approvals/approve" in html
     assert "GitHub Sync" in html
     assert "Data Boundary Audit" in html
     assert "Audit Trail" in html
@@ -223,3 +228,79 @@ def test_build_console_response_returns_not_found_for_unknown_path():
     assert "/api/console" in payload["available_paths"]
     assert "/api/console/github-sync" in payload["available_paths"]
     assert "/api/console/tasks/{task_code}" in payload["available_paths"]
+
+
+def test_build_console_write_response_approves_task(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(
+        web_console,
+        "approve_task",
+        lambda task_code, confirmed_by, note="": (
+            calls.append((task_code, confirmed_by, note))
+            or {"task_code": task_code, "status": "DESIGNING"}
+        ),
+    )
+
+    status_code, payload = web_console.build_console_write_response(
+        "/api/console/approvals/approve",
+        {
+            "task_code": "TASK-20260518-120000",
+            "by": "emperor",
+            "note": "approved from console",
+        },
+    )
+
+    assert status_code == HTTPStatus.OK
+    assert payload["task"] == {
+        "task_code": "TASK-20260518-120000",
+        "status": "DESIGNING",
+    }
+    assert calls == [
+        (
+            "TASK-20260518-120000",
+            "emperor",
+            "approved from console",
+        )
+    ]
+
+
+def test_build_console_write_response_rejects_missing_task_code():
+    status_code, payload = web_console.build_console_write_response(
+        "/api/console/approvals/approve",
+        {"note": "missing task"},
+    )
+
+    assert status_code == HTTPStatus.BAD_REQUEST
+    assert payload["error"] == "invalid_request"
+    assert payload["message"] == "task_code is required."
+
+
+def test_build_console_write_response_returns_approval_failure(monkeypatch):
+    def fail_approval(**_kwargs):
+        raise ValueError("Task TASK-1 is not waiting for confirmation.")
+
+    monkeypatch.setattr(web_console, "approve_task", fail_approval)
+
+    status_code, payload = web_console.build_console_write_response(
+        "/api/console/approvals/approve",
+        {"task_code": "TASK-1"},
+    )
+
+    assert status_code == HTTPStatus.BAD_REQUEST
+    assert payload == {
+        "error": "approval_failed",
+        "message": "Task TASK-1 is not waiting for confirmation.",
+        "task_code": "TASK-1",
+    }
+
+
+def test_build_console_write_response_returns_not_found_for_unknown_path():
+    status_code, payload = web_console.build_console_write_response(
+        "/api/console/missing",
+        {},
+    )
+
+    assert status_code == HTTPStatus.NOT_FOUND
+    assert payload["error"] == "not_found"
+    assert "/api/console/approvals/approve" in payload["available_paths"]

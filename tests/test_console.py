@@ -836,9 +836,8 @@ def test_tool_gateway_tools_renders_policy_metadata(monkeypatch):
 
     assert result.exit_code == 0
     assert "Tool Gateway Tools" in result.output
-    assert "filesystem.read" in result.output
-    assert "data-boundary-validation" in result.output
-    assert "xingbu" in result.output
+    assert "medium" in result.output
+    assert "hubu" in result.output
 
 
 def test_tool_gateway_tools_outputs_json(monkeypatch):

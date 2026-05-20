@@ -169,5 +169,5 @@ def test_runner_sandbox_uses_skill_execution_plan_when_gate_omitted(monkeypatch)
     assert calls["events"][0]["event_type"] == "runner_sandbox_dry_run"
     assert calls["tool_calls"][0]["arguments_summary"] == (
         "task_code=TASK-1; gates=['manual_validation', 'lint', 'test']; "
-        "workspace_path=.; image=python:3.12-slim; apply=False"
+        f"workspace_path=.; image={DEFAULT_SANDBOX_IMAGE}; apply=False"
     )
