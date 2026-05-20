@@ -130,5 +130,9 @@ anthropic / claude-3-5-sonnet-latest。
 ## 6. 后续
 
 ```text
-将 audit-llm-egress-authorizations 接入 GitHub Actions / cron 的定期执行。
+`.github/workflows/llm-egress-audit.yml` 已支持 schedule / workflow_dispatch。
+如需审计外部数据库，在 GitHub Secrets 中配置 `CHAO_AUDIT_DATABASE_URL`；
+未配置时 workflow 只使用 Actions 内置 pgvector 数据库做安全冒烟。
+
+下一步：为审计失败或发现异常补充告警 / issue 回流。
 ```

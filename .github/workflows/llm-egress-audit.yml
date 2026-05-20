@@ -1,0 +1,77 @@
+name: LLM Egress Authorization Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 19 * * *"
+
+jobs:
+  audit-expired-authorizations:
+    name: Audit expired LLM egress authorizations
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: chao
+          POSTGRES_PASSWORD: chao_dev_password
+          POSTGRES_DB: chao
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chao -d chao"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      LOCAL_DATABASE_URL: postgresql://chao:chao_dev_password@localhost:5432/chao
+      CHAO_AUDIT_DATABASE_URL: ${{ secrets.CHAO_AUDIT_DATABASE_URL }}
+      PGPASSWORD: chao_dev_password
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Resolve audit database
+        run: |
+          if [ -n "${CHAO_AUDIT_DATABASE_URL:-}" ]; then
+            echo "DATABASE_URL=$CHAO_AUDIT_DATABASE_URL" >> "$GITHUB_ENV"
+            echo "USING_EXTERNAL_AUDIT_DATABASE=true" >> "$GITHUB_ENV"
+          else
+            echo "DATABASE_URL=$LOCAL_DATABASE_URL" >> "$GITHUB_ENV"
+            echo "USING_EXTERNAL_AUDIT_DATABASE=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Initialize local audit database
+        if: env.USING_EXTERNAL_AUDIT_DATABASE == 'false'
+        run: psql "$DATABASE_URL" -f db/init/001_init.sql
+
+      - name: Verify audit schema
+        run: uv run python scripts/schema_check.py
+
+      - name: Run expired LLM egress authorization audit
+        run: uv run python main.py audit-llm-egress-authorizations --apply --by xingbu
+
+      - name: Verify no approved expired authorizations remain
+        run: |
+          EXPIRED_APPROVED_COUNT=$(psql "$DATABASE_URL" -t -A -c "select count(*) from llm_egress_authorizations where status = 'APPROVED' and expires_at <= now();")
+          echo "EXPIRED_APPROVED_COUNT=$EXPIRED_APPROVED_COUNT"
+          test "$EXPIRED_APPROVED_COUNT" = "0"
