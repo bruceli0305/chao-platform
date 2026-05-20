@@ -83,6 +83,29 @@ def _display_value(value: object) -> str:
     return str(value)
 
 
+def _resolve_task_validation_gates(task: dict[str, object], gates: list[str] | None) -> list[str]:
+    if gates:
+        return [str(gate) for gate in gates]
+
+    skill_execution_plan = task.get("skill_execution_plan")
+    if isinstance(skill_execution_plan, dict):
+        combined_gates = skill_execution_plan.get("combined_gates")
+        if isinstance(combined_gates, list) and combined_gates:
+            return [str(gate) for gate in combined_gates]
+
+    route_result = task.get("route_result")
+    if isinstance(route_result, dict):
+        required_gates = route_result.get("required_gates")
+        if isinstance(required_gates, list) and required_gates:
+            return [str(gate) for gate in required_gates]
+
+    required_gates = task.get("required_gates")
+    if isinstance(required_gates, list) and required_gates:
+        return [str(gate) for gate in required_gates]
+
+    raise ValueError("No validation gates provided or recorded for this task.")
+
+
 @app.command()
 def new(title: str, request: str):
     task_id = str(uuid.uuid4())
@@ -1627,9 +1650,9 @@ def runner_patch_command(
 def runner_validate_command(
     task_code: str,
     gate: Annotated[
-        list[str],
+        list[str] | None,
         typer.Option("--gate", help="Validation gate to execute"),
-    ],
+    ] = None,
     timeout_seconds: int = typer.Option(120, "--timeout", help="Per-command timeout seconds"),
     by: str = typer.Option("xingbu", "--by", help="Validation agent name"),
 ):
@@ -1650,8 +1673,9 @@ def runner_validate_command(
             ),
             current_status=task["status"],
         )
+        validation_gates = _resolve_task_validation_gates(task, gate)
         validation_result = execute_runner_validation_commands(
-            gate,
+            validation_gates,
             timeout_seconds=timeout_seconds,
         )
     except (PermissionError, ValueError) as exc:
@@ -1669,14 +1693,14 @@ def runner_validate_command(
         event_type=event_type,
         from_status=task["status"],
         to_status=task["status"],
-        summary=f"Runner validation {result_status}: {', '.join(gate)}",
+        summary=f"Runner validation {result_status}: {', '.join(validation_gates)}",
         created_by=by,
     )
     record_tool_call(
         task_id=task["id"],
         agent_name=by,
         tool_name="cli.runner_validate",
-        arguments_summary=f"task_code={task_code}; gates={gate}",
+        arguments_summary=f"task_code={task_code}; gates={validation_gates}",
         permission_policy=permission_decision["permission_policy"],
         result_status=result_status,
         permission_decision=permission_decision,
