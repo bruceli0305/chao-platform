@@ -26,10 +26,12 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "/api/console?${buildOverviewQuery(limit, filters)}" in html
     assert "/api/console/approvals?limit=${limit}" in html
     assert "/api/console/audit?limit=${limit}" in html
+    assert "/api/console/github-sync?limit=${limit}" in html
     assert "/api/console/gates?limit=${limit}" in html
     assert "/api/console/risks?limit=${limit}" in html
     assert "/api/console/tasks/" in html
     assert "Approval Queue" in html
+    assert "GitHub Sync" in html
     assert "Data Boundary Audit" in html
     assert "Audit Trail" in html
     assert "Recent Tool Calls" in html
@@ -40,6 +42,7 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "gate-details" in html
     assert "renderRiskDetails" in html
     assert "renderGateDetails" in html
+    assert "renderGitHubSyncDetails" in html
     assert "renderAuditTrail" in html
     assert "task-summary" in html
     assert "renderTaskSummary" in html
@@ -59,6 +62,10 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "buildTaskUrl" in html
     assert "gate_results" in html
     assert "Runner Failures" in html
+    assert "Recent GitHub Sync Links" in html
+    assert "Recent GitHub Delivery Events" in html
+    assert "Failed GitHub Sync Links" in html
+    assert "github-sync-details" in html
     assert "data-task-code" in html
     assert "Task Detail" in html
 
@@ -131,6 +138,25 @@ def test_build_console_response_clamps_limit(monkeypatch):
     assert calls == [100]
 
 
+def test_build_console_response_returns_github_sync(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(
+        web_console,
+        "get_console_github_sync",
+        lambda limit=20: calls.append(limit) or {"summary": {"github_link_count": 2}},
+    )
+
+    status_code, payload = web_console.build_console_response(
+        "/api/console/github-sync",
+        "limit=4",
+    )
+
+    assert status_code == HTTPStatus.OK
+    assert payload["summary"] == {"github_link_count": 2}
+    assert calls == [4]
+
+
 def test_build_console_response_returns_task_detail(monkeypatch):
     calls = []
 
@@ -189,4 +215,5 @@ def test_build_console_response_returns_not_found_for_unknown_path():
     assert status_code == HTTPStatus.NOT_FOUND
     assert payload["error"] == "not_found"
     assert "/api/console" in payload["available_paths"]
+    assert "/api/console/github-sync" in payload["available_paths"]
     assert "/api/console/tasks/{task_code}" in payload["available_paths"]

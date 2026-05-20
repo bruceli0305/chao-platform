@@ -382,6 +382,164 @@ def get_console_audit(limit: int = 20) -> dict[str, list[dict[str, Any]]]:
     }
 
 
+def get_console_github_sync(limit: int = 20) -> dict[str, Any]:
+    failed_statuses = ("failure", "failed", "error", "cancelled")
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("select count(*) from github_links")
+            github_link_count = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                select count(distinct task_id)
+                from github_links
+                """
+            )
+            linked_task_count = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                select count(*)
+                from task_events
+                where event_type = 'github_delivery_recorded'
+                """
+            )
+            github_delivery_event_count = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                select count(*)
+                from github_links
+                where lower(coalesce(status, '')) in ('failure', 'failed', 'error', 'cancelled')
+                """
+            )
+            failed_github_link_count = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                select link_type, count(*)
+                from github_links
+                group by link_type
+                order by link_type asc
+                """
+            )
+            link_type_rows = cur.fetchall()
+
+            cur.execute(
+                """
+                select coalesce(nullif(status, ''), 'unknown') as status_name, count(*)
+                from github_links
+                group by status_name
+                order by status_name asc
+                """
+            )
+            status_rows = cur.fetchall()
+
+            cur.execute(
+                """
+                select
+                    t.task_code,
+                    t.title,
+                    gl.link_type,
+                    gl.external_id,
+                    gl.url,
+                    gl.status,
+                    gl.created_by,
+                    gl.created_at::text
+                from github_links gl
+                join tasks t on t.id = gl.task_id
+                order by gl.created_at desc
+                limit %s
+                """,
+                (limit,),
+            )
+            recent_link_rows = cur.fetchall()
+
+            cur.execute(
+                """
+                select
+                    t.task_code,
+                    e.summary,
+                    e.created_by,
+                    e.created_at::text
+                from task_events e
+                join tasks t on t.id = e.task_id
+                where e.event_type = 'github_delivery_recorded'
+                order by e.created_at desc
+                limit %s
+                """,
+                (limit,),
+            )
+            recent_event_rows = cur.fetchall()
+
+            cur.execute(
+                """
+                select
+                    t.task_code,
+                    t.title,
+                    gl.link_type,
+                    gl.external_id,
+                    gl.url,
+                    gl.status,
+                    gl.created_at::text
+                from github_links gl
+                join tasks t on t.id = gl.task_id
+                where lower(coalesce(gl.status, '')) in ('failure', 'failed', 'error', 'cancelled')
+                order by gl.created_at desc
+                limit %s
+                """,
+                (limit,),
+            )
+            failed_link_rows = cur.fetchall()
+
+    return {
+        "summary": {
+            "github_link_count": github_link_count,
+            "linked_task_count": linked_task_count,
+            "github_delivery_event_count": github_delivery_event_count,
+            "failed_github_link_count": failed_github_link_count,
+        },
+        "link_type_counts": _rows_to_counts(link_type_rows),
+        "status_counts": _rows_to_counts(status_rows),
+        "recent_links": [
+            {
+                "task_code": row[0],
+                "title": row[1],
+                "link_type": row[2],
+                "external_id": row[3],
+                "url": row[4],
+                "status": row[5],
+                "created_by": row[6],
+                "created_at": row[7],
+            }
+            for row in recent_link_rows
+        ],
+        "recent_delivery_events": [
+            {
+                "task_code": row[0],
+                "summary": row[1],
+                "created_by": row[2],
+                "created_at": row[3],
+            }
+            for row in recent_event_rows
+        ],
+        "failed_links": [
+            {
+                "task_code": row[0],
+                "title": row[1],
+                "link_type": row[2],
+                "external_id": row[3],
+                "url": row[4],
+                "status": row[5],
+                "created_at": row[6],
+            }
+            for row in failed_link_rows
+        ],
+        "failed_statuses": list(failed_statuses),
+    }
+
+
 def get_console_gates(limit: int = 20) -> dict[str, Any]:
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:

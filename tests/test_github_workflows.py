@@ -27,6 +27,9 @@ def test_github_task_sync_workflow_records_issue_pr_and_ci_events():
     assert "workflow_run:" in workflow
     assert "CHAO_SYNC_DATABASE_URL" in workflow
     assert "scripts/record_github_delivery.py" in workflow
-    assert "issues: read" in workflow
+    assert "issues: write" in workflow
     assert "pull-requests: read" in workflow
     assert "actions: read" in workflow
+    assert "Create GitHub task sync failure issue" in workflow
+    assert 'gh issue create --title "$TITLE" --body-file "$BODY_FILE"' in workflow
+    assert 'gh issue comment "$EXISTING_ISSUE" --body-file "$BODY_FILE"' in workflow

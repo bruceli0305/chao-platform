@@ -42,7 +42,40 @@ def extract_task_code(event: dict[str, Any]) -> str | None:
     pull_request = event.get("pull_request")
 
     if pull_request:
-        task_codes = extract_task_codes(pull_request.get("body") or "")
+        task_codes = extract_task_codes(
+            "\n".join(
+                [
+                    pull_request.get("title") or "",
+                    pull_request.get("body") or "",
+                ]
+            )
+        )
+        return task_codes[0] if task_codes else None
+
+    issue = event.get("issue")
+
+    if issue:
+        task_codes = extract_task_codes(
+            "\n".join(
+                [
+                    issue.get("title") or "",
+                    issue.get("body") or "",
+                ]
+            )
+        )
+        return task_codes[0] if task_codes else None
+
+    workflow_run = event.get("workflow_run")
+
+    if workflow_run:
+        task_codes = extract_task_codes(
+            "\n".join(
+                [
+                    workflow_run.get("display_title") or "",
+                    (workflow_run.get("head_commit") or {}).get("message") or "",
+                ]
+            )
+        )
         return task_codes[0] if task_codes else None
 
     candidate_text = "\n".join(
@@ -59,7 +92,28 @@ def extract_task_code(event: dict[str, Any]) -> str | None:
 def build_delivery_links(event: dict[str, Any], env: dict[str, str]) -> list[dict[str, Any]]:
     links = []
     repo_url = build_repo_url(env)
+    issue = event.get("issue")
     pull_request = event.get("pull_request")
+    workflow_run = event.get("workflow_run")
+
+    if issue:
+        links.append(
+            {
+                "link_type": "issue",
+                "external_id": str(issue["number"]),
+                "url": issue["html_url"],
+                "title": issue.get("title"),
+                "status": issue.get("state"),
+                "metadata": {
+                    "action": event.get("action"),
+                    "labels": [
+                        label.get("name")
+                        for label in issue.get("labels", [])
+                        if isinstance(label, dict)
+                    ],
+                },
+            }
+        )
 
     if pull_request:
         state = "merged" if pull_request.get("merged") else pull_request.get("state")
@@ -77,7 +131,26 @@ def build_delivery_links(event: dict[str, Any], env: dict[str, str]) -> list[dic
             }
         )
 
+    if workflow_run:
+        links.append(
+            {
+                "link_type": "ci_run",
+                "external_id": str(workflow_run["id"]),
+                "url": workflow_run["html_url"],
+                "title": workflow_run.get("name"),
+                "status": workflow_run.get("conclusion") or workflow_run.get("status"),
+                "metadata": {
+                    "event": workflow_run.get("event"),
+                    "head_branch": workflow_run.get("head_branch"),
+                    "head_sha": workflow_run.get("head_sha"),
+                },
+            }
+        )
+
     commit_sha = env.get("GITHUB_SHA") or event.get("after")
+
+    if workflow_run:
+        commit_sha = workflow_run.get("head_sha") or commit_sha
 
     if repo_url and commit_sha:
         links.append(

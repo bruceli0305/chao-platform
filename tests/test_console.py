@@ -255,6 +255,96 @@ def test_get_console_audit_returns_recent_records(monkeypatch):
     assert queries[-1][1] == (3,)
 
 
+def test_get_console_github_sync_returns_sync_summary(monkeypatch):
+    queries = []
+    rows = [
+        [(5,)],
+        [(2,)],
+        [(3,)],
+        [(1,)],
+        [("ci_run", 2), ("pull_request", 3)],
+        [("failed", 1), ("success", 4)],
+        [
+            (
+                "TASK-PR",
+                "GitHub sync task",
+                "pull_request",
+                "42",
+                "https://github.com/example/repo/pull/42",
+                "open",
+                "github-actions",
+                "2026-05-20 00:00:00",
+            )
+        ],
+        [
+            (
+                "TASK-PR",
+                "GitHub delivery context recorded for TASK-PR: 3 link(s).",
+                "github-actions",
+                "2026-05-20 00:00:01",
+            )
+        ],
+        [
+            (
+                "TASK-CI",
+                "CI task",
+                "ci_run",
+                "99",
+                "https://github.com/example/repo/actions/runs/99",
+                "failed",
+                "2026-05-20 00:00:02",
+            )
+        ],
+    ]
+
+    class FakeCursor:
+        def __init__(self):
+            self.index = -1
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def execute(self, query, params=None):
+            queries.append((query, params))
+            self.index += 1
+
+        def fetchall(self):
+            return rows[self.index]
+
+        def fetchone(self):
+            return rows[self.index][0]
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def cursor(self):
+            return FakeCursor()
+
+    monkeypatch.setattr(console.psycopg, "connect", lambda _url: FakeConnection())
+
+    github_sync = console.get_console_github_sync(limit=5)
+
+    assert github_sync["summary"] == {
+        "github_link_count": 5,
+        "linked_task_count": 2,
+        "github_delivery_event_count": 3,
+        "failed_github_link_count": 1,
+    }
+    assert github_sync["link_type_counts"] == {"ci_run": 2, "pull_request": 3}
+    assert github_sync["status_counts"] == {"failed": 1, "success": 4}
+    assert github_sync["recent_links"][0]["external_id"] == "42"
+    assert github_sync["recent_delivery_events"][0]["task_code"] == "TASK-PR"
+    assert github_sync["failed_links"][0]["status"] == "failed"
+    assert queries[-1][1] == (5,)
+
+
 def test_get_console_gates_returns_audit_summary(monkeypatch):
     queries = []
     rows = [
@@ -597,6 +687,57 @@ def test_console_audit_renders_recent_records(monkeypatch):
     assert "runner_patch" in result.output
     assert "pull_request" in result.output
     assert "deepseek-chat" in result.output
+
+
+def test_console_github_sync_renders_sync_summary(monkeypatch):
+    github_sync = {
+        "summary": {
+            "github_link_count": 2,
+            "linked_task_count": 1,
+            "github_delivery_event_count": 1,
+            "failed_github_link_count": 1,
+        },
+        "link_type_counts": {"pull_request": 1, "ci_run": 1},
+        "status_counts": {"open": 1, "failed": 1},
+        "recent_links": [
+            {
+                "task_code": "TASK-PR",
+                "link_type": "pull_request",
+                "external_id": "42",
+                "status": "open",
+                "created_by": "github-actions",
+            }
+        ],
+        "recent_delivery_events": [
+            {
+                "task_code": "TASK-PR",
+                "summary": "GitHub delivery context recorded for TASK-PR: 2 link(s).",
+                "created_by": "github-actions",
+                "created_at": "2026-05-20 00:00:00",
+            }
+        ],
+        "failed_links": [
+            {
+                "task_code": "TASK-CI",
+                "link_type": "ci_run",
+                "external_id": "99",
+                "status": "failed",
+            }
+        ],
+        "failed_statuses": ["failure", "failed", "error", "cancelled"],
+    }
+
+    monkeypatch.setattr(cli, "get_console_github_sync", lambda limit=20: github_sync)
+
+    result = CliRunner().invoke(cli.app, ["console-github-sync"])
+
+    assert result.exit_code == 0
+    assert "GitHub Task Sync Summary" in result.output
+    assert "Recent GitHub Sync Links" in result.output
+    assert "Recent GitHub Delivery Events" in result.output
+    assert "Failed GitHub Sync Links" in result.output
+    assert "TASK-PR" in result.output
+    assert "TASK-CI" in result.output
 
 
 def test_console_gates_renders_gate_summary(monkeypatch):

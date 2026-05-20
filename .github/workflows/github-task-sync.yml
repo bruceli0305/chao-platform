@@ -1,0 +1,84 @@
+name: GitHub Task Sync
+
+on:
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled]
+  pull_request:
+    types: [opened, edited, closed, reopened, synchronize]
+  workflow_run:
+    workflows:
+      - Chao Local MVP CI
+      - LLM Egress Authorization Audit
+    types: [completed]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  actions: read
+
+jobs:
+  record-github-delivery-context:
+    name: Record GitHub delivery context
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: ${{ secrets.CHAO_SYNC_DATABASE_URL }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Skip when sync database is not configured
+        if: env.DATABASE_URL == ''
+        run: |
+          echo "CHAO_SYNC_DATABASE_URL is not configured; skipping GitHub task sync."
+
+      - name: Install uv
+        if: env.DATABASE_URL != ''
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install Python 3.12
+        if: env.DATABASE_URL != ''
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        if: env.DATABASE_URL != ''
+        run: uv sync --all-extras --dev
+
+      - name: Record GitHub task links
+        if: env.DATABASE_URL != ''
+        run: uv run python scripts/record_github_delivery.py
+
+      - name: Create GitHub task sync failure issue
+        if: failure() && env.DATABASE_URL != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="GitHub task sync requires attention"
+          BODY_FILE=$(mktemp)
+          cat > "$BODY_FILE" <<EOF
+          GitHub task sync failed and requires follow-up.
+
+          - Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          - Event name: $GITHUB_EVENT_NAME
+          - Ref: $GITHUB_REF
+          - Actor: $GITHUB_ACTOR
+
+          The sync workflow does not include database connection details in this issue.
+          Review the run logs and the task's GitHub links before closing.
+          EOF
+
+          EXISTING_ISSUE=$(gh issue list \
+            --state open \
+            --search "$TITLE in:title" \
+            --json number \
+            --jq '.[0].number // ""')
+
+          if [ -n "$EXISTING_ISSUE" ]; then
+            gh issue comment "$EXISTING_ISSUE" --body-file "$BODY_FILE"
+          else
+            gh issue create --title "$TITLE" --body-file "$BODY_FILE"
+          fi

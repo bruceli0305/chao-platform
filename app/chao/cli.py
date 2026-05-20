@@ -35,6 +35,7 @@ from app.chao.services.console import (
     get_console_approval_queue,
     get_console_audit,
     get_console_gates,
+    get_console_github_sync,
     get_console_overview,
     get_console_risks,
 )
@@ -604,6 +605,83 @@ def console_risks_command(
             _display_value(authorization.get("expires_at")),
         )
     console.print(llm_authorizations)
+
+
+@app.command("console-github-sync")
+def console_github_sync_command(
+    limit: int = typer.Option(20, "--limit", help="GitHub sync record limit"),
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    github_sync = get_console_github_sync(limit=limit)
+
+    if as_json:
+        print_json(data=github_sync)
+        return
+
+    summary = Table(title="GitHub Task Sync Summary")
+    summary.add_column("Metric")
+    summary.add_column("Count")
+    for metric, count in github_sync["summary"].items():
+        summary.add_row(metric, str(count))
+    console.print(summary)
+
+    link_types = Table(title="GitHub Link Types")
+    link_types.add_column("Type")
+    link_types.add_column("Count")
+    for link_type, count in github_sync["link_type_counts"].items():
+        link_types.add_row(link_type, str(count))
+    console.print(link_types)
+
+    statuses = Table(title="GitHub Link Status")
+    statuses.add_column("Status")
+    statuses.add_column("Count")
+    for status, count in github_sync["status_counts"].items():
+        statuses.add_row(status, str(count))
+    console.print(statuses)
+
+    recent_links = Table(title="Recent GitHub Sync Links")
+    recent_links.add_column("Task")
+    recent_links.add_column("Type")
+    recent_links.add_column("External ID")
+    recent_links.add_column("Status")
+    recent_links.add_column("By")
+    for link in github_sync["recent_links"]:
+        recent_links.add_row(
+            _display_value(link.get("task_code")),
+            _display_value(link.get("link_type")),
+            _display_value(link.get("external_id")),
+            _display_value(link.get("status")),
+            _display_value(link.get("created_by")),
+        )
+    console.print(recent_links)
+
+    delivery_events = Table(title="Recent GitHub Delivery Events")
+    delivery_events.add_column("Task")
+    delivery_events.add_column("Summary")
+    delivery_events.add_column("By")
+    delivery_events.add_column("Created At")
+    for event in github_sync["recent_delivery_events"]:
+        delivery_events.add_row(
+            _display_value(event.get("task_code")),
+            _display_value(event.get("summary")),
+            _display_value(event.get("created_by")),
+            _display_value(event.get("created_at")),
+        )
+    console.print(delivery_events)
+
+    failed_links = Table(title="Failed GitHub Sync Links")
+    failed_links.add_column("Task")
+    failed_links.add_column("Type")
+    failed_links.add_column("External ID")
+    failed_links.add_column("Status")
+    for link in github_sync["failed_links"]:
+        failed_links.add_row(
+            _display_value(link.get("task_code")),
+            _display_value(link.get("link_type")),
+            _display_value(link.get("external_id")),
+            _display_value(link.get("status")),
+        )
+    console.print(failed_links)
 
 
 @app.command("web-console")

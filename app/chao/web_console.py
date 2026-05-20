@@ -8,6 +8,7 @@ from app.chao.services.console import (
     get_console_approval_queue,
     get_console_audit,
     get_console_gates,
+    get_console_github_sync,
     get_console_overview,
     get_console_risks,
 )
@@ -83,6 +84,7 @@ def build_console_index_html() -> str:
       <a href="#controls-section">Controls</a>
       <a href="#overview-section">Overview</a>
       <a href="#risks-section">Risks</a>
+      <a href="#github-sync-section">GitHub Sync</a>
       <a href="#gates-section">Gates</a>
       <a href="#audit-section">Audit</a>
       <a href="#approvals-section">Approvals</a>
@@ -127,6 +129,11 @@ def build_console_index_html() -> str:
       <h2>Risks</h2>
       <div id="risks" class="grid"></div>
       <div id="risk-details"></div>
+    </section>
+    <section id="github-sync-section">
+      <h2>GitHub Sync</h2>
+      <div id="github-sync" class="grid"></div>
+      <div id="github-sync-details"></div>
     </section>
     <section id="gates-section">
       <h2>Gates</h2>
@@ -333,6 +340,44 @@ def build_console_index_html() -> str:
           { key: "gate_name", label: "Gate" },
           { key: "status", label: "Status" },
           { key: "command", label: "Command" }
+        ])}
+      `;
+    }
+
+    function renderGitHubSyncDetails(githubSync) {
+      if (hasError(githubSync)) {
+        return renderPanelError("GitHub Sync", githubSync);
+      }
+
+      const typeMetrics = Object.entries(githubSync.link_type_counts ?? {});
+      const statusMetrics = Object.entries(githubSync.status_counts ?? {});
+
+      return `
+        <h2>GitHub Link Types</h2>
+        <div class="grid">${typeMetrics.map(asMetric).join("")}</div>
+        <h2>GitHub Link Status</h2>
+        <div class="grid">${statusMetrics.map(asMetric).join("")}</div>
+        ${renderRiskTable("Recent GitHub Sync Links", githubSync.recent_links ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "link_type", label: "Type" },
+          { key: "external_id", label: "External ID" },
+          { key: "status", label: "Status" },
+          { key: "created_by", label: "By" }
+        ])}
+        ${renderRiskTable("Recent GitHub Delivery Events", githubSync.recent_delivery_events ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "summary", label: "Summary" },
+          { key: "created_by", label: "By" },
+          { key: "created_at", label: "Created" }
+        ])}
+        ${renderRiskTable("Failed GitHub Sync Links", githubSync.failed_links ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "link_type", label: "Type" },
+          { key: "external_id", label: "External ID" },
+          { key: "status", label: "Status" }
         ])}
       `;
     }
@@ -571,6 +616,7 @@ def build_console_index_html() -> str:
       const filters = selectedTaskFilters();
       const overview = await loadJson(`/api/console?${buildOverviewQuery(limit, filters)}`);
       const risks = await loadJson(`/api/console/risks?limit=${limit}`);
+      const githubSync = await loadJson(`/api/console/github-sync?limit=${limit}`);
       const gates = await loadJson(`/api/console/gates?limit=${limit}`);
       const audit = await loadJson(`/api/console/audit?limit=${limit}`);
       const approvals = await loadJson(`/api/console/approvals?limit=${limit}`);
@@ -598,6 +644,11 @@ def build_console_index_html() -> str:
         ? renderPanelError("Risks", risks)
         : Object.entries(risks.summary ?? {}).map(asMetric).join("");
       document.querySelector("#risk-details").innerHTML = renderRiskDetails(risks);
+      document.querySelector("#github-sync").innerHTML = hasError(githubSync)
+        ? renderPanelError("GitHub Sync", githubSync)
+        : Object.entries(githubSync.summary ?? {}).map(asMetric).join("");
+      document.querySelector("#github-sync-details").innerHTML =
+        renderGitHubSyncDetails(githubSync);
       document.querySelector("#gates").innerHTML = hasError(gates)
         ? renderPanelError("Gates", gates)
         : Object.entries(gates.gate_status_counts ?? {}).map(asMetric).join("");
@@ -634,6 +685,12 @@ def build_console_index_html() -> str:
     });
 
     document.querySelector("#risk-details").addEventListener("click", async (event) => {
+      const row = event.target.closest("tr[data-task-code]");
+      if (!row) return;
+      await loadTaskDetail(row.dataset.taskCode);
+    });
+
+    document.querySelector("#github-sync-details").addEventListener("click", async (event) => {
       const row = event.target.closest("tr[data-task-code]");
       if (!row) return;
       await loadTaskDetail(row.dataset.taskCode);
@@ -726,6 +783,8 @@ def build_console_response(path: str, query_string: str = "") -> tuple[int, dict
             return HTTPStatus.OK, {"approvals": get_console_approval_queue(limit=limit)}
         if path == "/api/console/audit":
             return HTTPStatus.OK, get_console_audit(limit=limit)
+        if path == "/api/console/github-sync":
+            return HTTPStatus.OK, get_console_github_sync(limit=limit)
         if path == "/api/console/gates":
             return HTTPStatus.OK, get_console_gates(limit=limit)
         if path == "/api/console/risks":
@@ -751,6 +810,7 @@ def build_console_response(path: str, query_string: str = "") -> tuple[int, dict
             "/api/console",
             "/api/console/approvals",
             "/api/console/audit",
+            "/api/console/github-sync",
             "/api/console/gates",
             "/api/console/risks",
             "/api/console/tasks/{task_code}",
