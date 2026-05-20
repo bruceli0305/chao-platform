@@ -94,7 +94,7 @@ def get_console_overview(
                 """
                 select count(*)
                 from tool_calls
-                where result_status <> 'success'
+                where lower(coalesce(result_status, '')) not in ('success', 'started')
                 """
             )
             failed_tool_call_count = cur.fetchone()[0]
@@ -592,10 +592,20 @@ def get_console_gates(limit: int = 20) -> dict[str, Any]:
                 """
                 select count(*)
                 from tool_calls
-                where result_status <> 'success'
+                where lower(coalesce(result_status, '')) not in ('success', 'started')
                 """
             )
             failed_tool_call_count = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                select count(*)
+                from tool_calls
+                where lower(coalesce(result_status, '')) = 'started'
+                  and finished_at is null
+                """
+            )
+            pending_tool_call_count = cur.fetchone()[0]
 
             cur.execute("select count(*) from storage_policies")
             storage_policy_count = cur.fetchone()[0]
@@ -645,6 +655,7 @@ def get_console_gates(limit: int = 20) -> dict[str, Any]:
             "missing_policy_count": missing_tool_policy_count,
             "empty_decision_count": empty_tool_decision_count,
             "failed_tool_call_count": failed_tool_call_count,
+            "pending_tool_call_count": pending_tool_call_count,
         },
         "data_boundary_audit": {
             "storage_policy_count": storage_policy_count,
@@ -727,7 +738,7 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
                     tc.started_at::text
                 from tool_calls tc
                 join tasks t on t.id = tc.task_id
-                where tc.result_status <> 'success'
+                where lower(coalesce(tc.result_status, '')) not in ('success', 'started')
                    or tc.permission_policy is null
                    or tc.permission_policy = ''
                    or tc.permission_decision = '{}'::jsonb
@@ -737,6 +748,26 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
                 (limit,),
             )
             tool_risk_rows = cur.fetchall()
+
+            cur.execute(
+                """
+                select
+                    t.task_code,
+                    tc.agent_name,
+                    tc.tool_name,
+                    tc.permission_policy,
+                    tc.result_status,
+                    tc.started_at::text
+                from tool_calls tc
+                join tasks t on t.id = tc.task_id
+                where lower(coalesce(tc.result_status, '')) = 'started'
+                  and tc.finished_at is null
+                order by tc.started_at desc
+                limit %s
+                """,
+                (limit,),
+            )
+            pending_tool_call_rows = cur.fetchall()
 
             cur.execute(
                 """
@@ -861,6 +892,17 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
             }
             for row in tool_risk_rows
         ],
+        "pending_tool_calls": [
+            {
+                "task_code": row[0],
+                "agent_name": row[1],
+                "tool_name": row[2],
+                "permission_policy": row[3],
+                "result_status": row[4],
+                "started_at": row[5],
+            }
+            for row in pending_tool_call_rows
+        ],
         "data_boundary_risks": data_boundary_risks,
         "github_risks": [
             {
@@ -890,6 +932,7 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
             "failed_gate_count": len(failed_gate_rows),
             "runner_failure_count": len(runner_failure_rows),
             "tool_risk_count": len(tool_risk_rows),
+            "pending_tool_call_count": len(pending_tool_call_rows),
             "data_boundary_risk_count": sum(data_boundary_risks.values()),
             "github_risk_count": len(github_risk_rows),
             "expired_llm_egress_authorization_count": len(expired_llm_egress_authorization_rows),

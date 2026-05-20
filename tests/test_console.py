@@ -353,6 +353,7 @@ def test_get_console_gates_returns_audit_summary(monkeypatch):
         [(0,)],
         [(0,)],
         [(1,)],
+        [(2,)],
         [(3,)],
         [(0,)],
         [(0,)],
@@ -399,6 +400,7 @@ def test_get_console_gates_returns_audit_summary(monkeypatch):
         "missing_policy_count": 0,
         "empty_decision_count": 0,
         "failed_tool_call_count": 1,
+        "pending_tool_call_count": 2,
     }
     assert gates["data_boundary_audit"] == {
         "storage_policy_count": 3,
@@ -440,6 +442,16 @@ def test_get_console_risks_returns_risk_summary(monkeypatch):
                 "failed",
                 "high",
                 "2026-05-14 00:00:02",
+            )
+        ],
+        [
+            (
+                "TASK-PENDING",
+                "xingbu",
+                "data_boundary_check",
+                "data-boundary-validation",
+                "started",
+                "2026-05-14 00:00:03",
             )
         ],
         [(1,)],
@@ -506,6 +518,7 @@ def test_get_console_risks_returns_risk_summary(monkeypatch):
     assert risks["failed_gates"][0]["gate_name"] == "pytest"
     assert risks["runner_failures"][0]["artifact_type"] == "runner_failure_feedback"
     assert risks["tool_risks"][0]["tool_name"] == "cli.new"
+    assert risks["pending_tool_calls"][0]["task_code"] == "TASK-PENDING"
     assert risks["data_boundary_risks"] == {
         "invalid_data_asset_classification_count": 1,
         "invalid_context_classification_count": 2,
@@ -518,6 +531,7 @@ def test_get_console_risks_returns_risk_summary(monkeypatch):
         "failed_gate_count": 1,
         "runner_failure_count": 1,
         "tool_risk_count": 1,
+        "pending_tool_call_count": 1,
         "data_boundary_risk_count": 6,
         "github_risk_count": 1,
         "expired_llm_egress_authorization_count": 1,
@@ -804,6 +818,7 @@ def test_console_gates_renders_gate_summary(monkeypatch):
             "missing_policy_count": 0,
             "empty_decision_count": 0,
             "failed_tool_call_count": 1,
+            "pending_tool_call_count": 2,
         },
         "data_boundary_audit": {
             "storage_policy_count": 3,
@@ -857,6 +872,14 @@ def test_console_risks_renders_risk_summary(monkeypatch):
                 "result_status": "failed",
             }
         ],
+        "pending_tool_calls": [
+            {
+                "task_code": "TASK-PENDING",
+                "agent_name": "xingbu",
+                "tool_name": "data_boundary_check",
+                "started_at": "2026-05-14 00:00:03",
+            }
+        ],
         "data_boundary_risks": {
             "invalid_data_asset_classification_count": 0,
             "invalid_context_classification_count": 0,
@@ -883,6 +906,7 @@ def test_console_risks_renders_risk_summary(monkeypatch):
             "failed_gate_count": 1,
             "runner_failure_count": 1,
             "tool_risk_count": 1,
+            "pending_tool_call_count": 1,
             "data_boundary_risk_count": 0,
             "github_risk_count": 1,
             "expired_llm_egress_authorization_count": 1,
@@ -899,5 +923,7 @@ def test_console_risks_renders_risk_summary(monkeypatch):
     assert "TASK-BLOCKED" in result.output
     assert "runner_failure_feedback" in result.output
     assert "pytest" in result.output
+    assert "Pending Tool Calls" in result.output
+    assert "data_boundary_check" in result.output
     assert "ci_run" in result.output
     assert "Expired LLM Egress Authorizations" in result.output

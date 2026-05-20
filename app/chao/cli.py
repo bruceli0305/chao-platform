@@ -565,6 +565,20 @@ def console_risks_command(
         )
     console.print(runner_failures)
 
+    pending_tools = Table(title="Pending Tool Calls")
+    pending_tools.add_column("Task")
+    pending_tools.add_column("Agent")
+    pending_tools.add_column("Tool")
+    pending_tools.add_column("Started At")
+    for tool_call in risks["pending_tool_calls"]:
+        pending_tools.add_row(
+            _display_value(tool_call.get("task_code")),
+            _display_value(tool_call.get("agent_name")),
+            _display_value(tool_call.get("tool_name")),
+            _display_value(tool_call.get("started_at")),
+        )
+    console.print(pending_tools)
+
     tools = Table(title="Tool Risks")
     tools.add_column("Task")
     tools.add_column("Agent")
