@@ -27,7 +27,7 @@ from app.chao.repositories import (
     list_repository_configs,
     validate_repository_configs,
 )
-from app.chao.repository_sync import execute_repository_sync
+from app.chao.repository_sync import execute_repository_sync, inspect_repository_status
 from app.chao.runner_artifacts import save_failure_feedback_artifact, save_patch_artifact
 from app.chao.runner_branch import create_runner_branch
 from app.chao.runner_executor import (
@@ -1134,6 +1134,23 @@ def repository_sync_command(
     print_json(data={"repository": repository_config.to_safe_dict(), "sync": result})
 
     if result["errors"]:
+        raise typer.Exit(code=1)
+
+
+@app.command("repository-status")
+def repository_status_command(
+    repository: str | None = typer.Argument(None, help="Repository name"),
+):
+    try:
+        repository_config = get_repository_config(repository)
+        status = inspect_repository_status(repository_config)
+    except ValueError as exc:
+        print_json(data={"status": "failed", "error": str(exc)})
+        raise typer.Exit(code=1) from exc
+
+    print_json(data={"repository": repository_config.to_safe_dict(), "workspace_status": status})
+
+    if status["errors"]:
         raise typer.Exit(code=1)
 
 
