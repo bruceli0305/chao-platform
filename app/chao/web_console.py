@@ -5,6 +5,8 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
 from app.chao.permissions import require_tool_permission
+from app.chao.repositories import list_repository_configs
+from app.chao.repository_sync import inspect_repository_status
 from app.chao.services.console import (
     get_console_approval_queue,
     get_console_audit,
@@ -87,6 +89,7 @@ def build_console_index_html() -> str:
     <nav aria-label="Console sections">
       <a href="#controls-section">Controls</a>
       <a href="#overview-section">Overview</a>
+      <a href="#repositories-section">Repositories</a>
       <a href="#risks-section">Risks</a>
       <a href="#github-sync-section">GitHub Sync</a>
       <a href="#gates-section">Gates</a>
@@ -128,6 +131,11 @@ def build_console_index_html() -> str:
     <section id="overview-section">
       <h2>Overview</h2>
       <div id="overview" class="grid"></div>
+    </section>
+    <section id="repositories-section">
+      <h2>Repositories</h2>
+      <div id="repositories" class="grid"></div>
+      <div id="repository-details"></div>
     </section>
     <section id="risks-section">
       <h2>Risks</h2>
@@ -450,6 +458,24 @@ def build_console_index_html() -> str:
       `;
     }
 
+    function renderRepositoryDetails(repositoryStatus) {
+      if (hasError(repositoryStatus)) {
+        return renderPanelError("Repositories", repositoryStatus);
+      }
+
+      return renderRiskTable("Repository Workspaces", repositoryStatus.repositories ?? [], [
+        { key: "name", label: "Name" },
+        { key: "default_branch", label: "Default Branch" },
+        { key: "current_branch", label: "Current Branch" },
+        { key: "workspace_path", label: "Workspace" },
+        { key: "workspace_ready", label: "Ready" },
+        { key: "dirty", label: "Dirty" },
+        { key: "ahead", label: "Ahead" },
+        { key: "behind", label: "Behind" },
+        { key: "errors", label: "Errors" }
+      ]);
+    }
+
     function renderAuditTrail(audit) {
       if (hasError(audit)) {
         return renderPanelError("Audit Trail", audit);
@@ -711,6 +737,7 @@ def build_console_index_html() -> str:
       const limit = selectedLimit();
       const filters = selectedTaskFilters();
       const overview = await loadJson(`/api/console?${buildOverviewQuery(limit, filters)}`);
+      const repositories = await loadJson("/api/console/repositories");
       const risks = await loadJson(`/api/console/risks?limit=${limit}`);
       const githubSync = await loadJson(`/api/console/github-sync?limit=${limit}`);
       const gates = await loadJson(`/api/console/gates?limit=${limit}`);
@@ -736,6 +763,11 @@ def build_console_index_html() -> str:
         document.querySelector("#recent-tasks").innerHTML =
           renderRecentTasks(overview.recent_tasks ?? []);
       }
+      document.querySelector("#repositories").innerHTML = hasError(repositories)
+        ? renderPanelError("Repositories", repositories)
+        : Object.entries(repositories.summary ?? {}).map(asMetric).join("");
+      document.querySelector("#repository-details").innerHTML =
+        renderRepositoryDetails(repositories);
       document.querySelector("#risks").innerHTML = hasError(risks)
         ? renderPanelError("Risks", risks)
         : Object.entries(risks.summary ?? {}).map(asMetric).join("");
@@ -903,6 +935,46 @@ def _build_service_error(path: str, exc: Exception) -> dict[str, Any]:
     }
 
 
+def _build_repository_status_response() -> dict[str, Any]:
+    rows = []
+
+    for repository in list_repository_configs():
+        status = inspect_repository_status(repository)
+        workspace_ready = (
+            status["workspace_exists"] and status["is_git_repository"] and not status["errors"]
+        )
+        rows.append(
+            {
+                "name": repository.name,
+                "enabled": repository.enabled,
+                "git_url": repository.git_url,
+                "default_branch": repository.default_branch,
+                "branch_prefix": repository.branch_prefix,
+                "workspace_path": status["workspace_path"],
+                "workspace_ready": workspace_ready,
+                "workspace_exists": status["workspace_exists"],
+                "is_git_repository": status["is_git_repository"],
+                "current_branch": status["current_branch"],
+                "head_commit": status["head_commit"],
+                "remote_url": status["remote_url"],
+                "dirty": status["dirty"],
+                "ahead": status["ahead"],
+                "behind": status["behind"],
+                "errors": "; ".join(status["errors"]),
+            }
+        )
+
+    return {
+        "summary": {
+            "repositories": len(rows),
+            "ready": sum(1 for row in rows if row["workspace_ready"]),
+            "dirty": sum(1 for row in rows if row["dirty"]),
+            "errors": sum(1 for row in rows if row["errors"]),
+        },
+        "repositories": rows,
+    }
+
+
 def _write_not_found(path: str) -> tuple[int, dict[str, Any]]:
     return HTTPStatus.NOT_FOUND, {
         "error": "not_found",
@@ -1058,6 +1130,8 @@ def build_console_response(path: str, query_string: str = "") -> tuple[int, dict
                 status=status,
                 task_level=task_level,
             )
+        if path == "/api/console/repositories":
+            return HTTPStatus.OK, _build_repository_status_response()
         if path == "/api/console/approvals":
             return HTTPStatus.OK, {"approvals": get_console_approval_queue(limit=limit)}
         if path == "/api/console/audit":
@@ -1087,6 +1161,7 @@ def build_console_response(path: str, query_string: str = "") -> tuple[int, dict
         "available_paths": [
             "/health",
             "/api/console",
+            "/api/console/repositories",
             "/api/console/approvals",
             "/api/console/audit",
             "/api/console/github-sync",

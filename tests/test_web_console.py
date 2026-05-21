@@ -1,6 +1,7 @@
 from http import HTTPStatus
 
 from app.chao import web_console
+from app.chao.repositories import RepositoryConfig
 
 
 def test_build_console_index_html_contains_read_only_ui():
@@ -11,6 +12,7 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "Refresh" in html
     assert "Console sections" in html
     assert "#overview-section" in html
+    assert "#repositories-section" in html
     assert "#task-detail-section" in html
     assert "selectedLimit" in html
     assert "task-search" in html
@@ -24,6 +26,7 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "renderPanelError" in html
     assert "Console load failed" in html
     assert "/api/console?${buildOverviewQuery(limit, filters)}" in html
+    assert 'loadJson("/api/console/repositories")' in html
     assert "/api/console/approvals?limit=${limit}" in html
     assert "/api/console/audit?limit=${limit}" in html
     assert "/api/console/github-sync?limit=${limit}" in html
@@ -48,6 +51,8 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "renderRiskDetails" in html
     assert "renderGateDetails" in html
     assert "renderGitHubSyncDetails" in html
+    assert "renderRepositoryDetails" in html
+    assert "Repository Workspaces" in html
     assert "renderAuditTrail" in html
     assert "task-summary" in html
     assert "renderTaskSummary" in html
@@ -173,6 +178,52 @@ def test_build_console_response_returns_github_sync(monkeypatch):
     assert calls == [4]
 
 
+def test_build_console_response_returns_repository_status(monkeypatch):
+    repository = RepositoryConfig(
+        name="demo",
+        git_url="git@github.com:example/demo.git",
+        default_branch="main",
+        workspace_path="/opt/chao/workspaces/demo",
+        sandbox_root="/opt/chao/sandboxes/demo",
+        branch_prefix="codex/",
+        enabled=True,
+    )
+
+    monkeypatch.setattr(web_console, "list_repository_configs", lambda: [repository])
+    monkeypatch.setattr(
+        web_console,
+        "inspect_repository_status",
+        lambda _repository: {
+            "repository": "demo",
+            "workspace_path": "/opt/chao/workspaces/demo",
+            "default_branch": "main",
+            "workspace_exists": True,
+            "is_git_repository": True,
+            "current_branch": "main",
+            "head_commit": "abc123",
+            "remote_url": "git@github.com:example/demo.git",
+            "dirty": False,
+            "status_lines": [],
+            "ahead": 0,
+            "behind": 1,
+            "errors": [],
+        },
+    )
+
+    status_code, payload = web_console.build_console_response("/api/console/repositories")
+
+    assert status_code == HTTPStatus.OK
+    assert payload["summary"] == {
+        "repositories": 1,
+        "ready": 1,
+        "dirty": 0,
+        "errors": 0,
+    }
+    assert payload["repositories"][0]["name"] == "demo"
+    assert payload["repositories"][0]["workspace_ready"] is True
+    assert payload["repositories"][0]["behind"] == 1
+
+
 def test_build_console_response_returns_task_detail(monkeypatch):
     calls = []
 
@@ -232,6 +283,7 @@ def test_build_console_response_returns_not_found_for_unknown_path():
     assert status_code == HTTPStatus.NOT_FOUND
     assert payload["error"] == "not_found"
     assert "/api/console" in payload["available_paths"]
+    assert "/api/console/repositories" in payload["available_paths"]
     assert "/api/console/github-sync" in payload["available_paths"]
     assert "/api/console/tasks/{task_code}" in payload["available_paths"]
 
