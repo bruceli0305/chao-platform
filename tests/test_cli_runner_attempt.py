@@ -1,6 +1,23 @@
 from typer.testing import CliRunner
 
 from app.chao import cli
+from app.chao.repositories import RepositoryConfig
+
+
+def _repository_config(
+    *,
+    name: str = "chao-platform",
+    workspace_path: str = ".",
+):
+    return RepositoryConfig(
+        name=name,
+        git_url="git@github.com:example/repo.git",
+        default_branch="main",
+        workspace_path=workspace_path,
+        sandbox_root=".chao/sandboxes",
+        branch_prefix="codex/",
+        enabled=True,
+    )
 
 
 def _task():
@@ -65,15 +82,16 @@ def test_runner_attempt_apply_records_patch_artifact(monkeypatch, tmp_path):
     artifact_path.write_text("patch", encoding="utf-8")
 
     monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
     monkeypatch.setattr(
         cli,
         "apply_text_patch_operations",
-        lambda operations, dry_run=True: _execution_result(applied=not dry_run),
+        lambda operations, dry_run=True, **_kwargs: _execution_result(applied=not dry_run),
     )
     monkeypatch.setattr(
         cli,
         "execute_runner_validation_commands",
-        lambda gates, timeout_seconds=120: _validation_result(deliverable=True),
+        lambda gates, timeout_seconds=120, **_kwargs: _validation_result(deliverable=True),
     )
     monkeypatch.setattr(cli, "save_patch_artifact", lambda task: artifact_path)
     monkeypatch.setattr(cli, "record_artifact", lambda **kwargs: calls["artifacts"].append(kwargs))
@@ -138,15 +156,16 @@ def test_runner_attempt_apply_records_failure_feedback(monkeypatch, tmp_path):
     artifact_path.write_text("failure", encoding="utf-8")
 
     monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
     monkeypatch.setattr(
         cli,
         "apply_text_patch_operations",
-        lambda operations, dry_run=True: _execution_result(applied=not dry_run),
+        lambda operations, dry_run=True, **_kwargs: _execution_result(applied=not dry_run),
     )
     monkeypatch.setattr(
         cli,
         "execute_runner_validation_commands",
-        lambda gates, timeout_seconds=120: _validation_result(deliverable=False),
+        lambda gates, timeout_seconds=120, **_kwargs: _validation_result(deliverable=False),
     )
     monkeypatch.setattr(cli, "save_failure_feedback_artifact", lambda task: artifact_path)
     monkeypatch.setattr(cli, "record_artifact", lambda **kwargs: calls["artifacts"].append(kwargs))
@@ -205,15 +224,16 @@ def test_runner_attempt_dry_run_skips_artifact_recording(monkeypatch):
     }
 
     monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
     monkeypatch.setattr(
         cli,
         "apply_text_patch_operations",
-        lambda operations, dry_run=True: _execution_result(applied=not dry_run),
+        lambda operations, dry_run=True, **_kwargs: _execution_result(applied=not dry_run),
     )
     monkeypatch.setattr(
         cli,
         "execute_runner_validation_commands",
-        lambda gates, timeout_seconds=120: _validation_result(deliverable=True),
+        lambda gates, timeout_seconds=120, **_kwargs: _validation_result(deliverable=True),
     )
     monkeypatch.setattr(cli, "record_artifact", lambda **kwargs: calls["artifacts"].append(kwargs))
     monkeypatch.setattr(
@@ -267,15 +287,16 @@ def test_runner_attempt_uses_skill_execution_plan_when_gate_omitted(monkeypatch)
         "validation_gates": [],
     }
 
-    def execute_validation(gates, timeout_seconds=120):
+    def execute_validation(gates, timeout_seconds=120, **_kwargs):
         calls["validation_gates"].extend(gates)
         return _validation_result(deliverable=True)
 
     monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task_with_skill_gates())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
     monkeypatch.setattr(
         cli,
         "apply_text_patch_operations",
-        lambda operations, dry_run=True: _execution_result(applied=not dry_run),
+        lambda operations, dry_run=True, **_kwargs: _execution_result(applied=not dry_run),
     )
     monkeypatch.setattr(cli, "execute_runner_validation_commands", execute_validation)
     monkeypatch.setattr(
@@ -308,5 +329,65 @@ def test_runner_attempt_uses_skill_execution_plan_when_gate_omitted(monkeypatch)
         "Runner attempt dry-run: manual_validation, lint, test"
     )
     assert calls["tool_calls"][1]["arguments_summary"] == (
-        "task_code=TASK-1; gates=['manual_validation', 'lint', 'test']"
+        "task_code=TASK-1; repository=chao-platform; gates=['manual_validation', 'lint', 'test']"
     )
+
+
+def test_runner_attempt_uses_explicit_repository_config(monkeypatch):
+    calls = {
+        "events": [],
+        "tool_calls": [],
+        "patch_kwargs": None,
+        "validation_kwargs": None,
+    }
+    repository = _repository_config(
+        name="server-repo",
+        workspace_path="/opt/chao/workspaces/server-repo",
+    )
+
+    def apply_patch(operations, **kwargs):
+        calls["patch_kwargs"] = kwargs
+        return _execution_result(applied=not kwargs["dry_run"])
+
+    def execute_validation(_gates, **kwargs):
+        calls["validation_kwargs"] = kwargs
+        return _validation_result(deliverable=True)
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: repository)
+    monkeypatch.setattr(cli, "apply_text_patch_operations", apply_patch)
+    monkeypatch.setattr(cli, "execute_runner_validation_commands", execute_validation)
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "runner-attempt",
+            "TASK-1",
+            "app/chao/demo.txt",
+            "--old-text",
+            "old",
+            "--new-text",
+            "new",
+            "--repository",
+            "server-repo",
+            "--gate",
+            "compile",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert calls["patch_kwargs"]["repo_root"] == "/opt/chao/workspaces/server-repo"
+    assert calls["validation_kwargs"]["repo_root"] == "/opt/chao/workspaces/server-repo"
+    assert "repository=server-repo" in calls["tool_calls"][0]["arguments_summary"]
+    assert "repository=server-repo" in calls["tool_calls"][1]["arguments_summary"]
+    assert '"name": "server-repo"' in result.output

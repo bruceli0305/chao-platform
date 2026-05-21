@@ -1759,6 +1759,7 @@ def runner_patch_command(
     path: str,
     old_text: str = typer.Option(..., "--old-text", help="Text that must match once"),
     new_text: str = typer.Option(..., "--new-text", help="Replacement text"),
+    repository: str | None = typer.Option(None, "--repository", help="Repository config name"),
     apply: bool = typer.Option(False, "--apply", help="Write the patch to disk"),
     by: str = typer.Option("gongbu", "--by", help="Runner agent name"),
 ):
@@ -1783,6 +1784,7 @@ def runner_patch_command(
             ),
             current_status=task["status"],
         )
+        repository_config = get_repository_config(repository)
         execution_result = apply_text_patch_operations(
             [
                 {
@@ -1791,6 +1793,7 @@ def runner_patch_command(
                     "new_text": new_text,
                 }
             ],
+            repo_root=repository_config.workspace_path,
             dry_run=not apply,
         )
     except (PermissionError, ValueError, FileNotFoundError) as exc:
@@ -1810,7 +1813,10 @@ def runner_patch_command(
         task_id=task["id"],
         agent_name=by,
         tool_name="cli.runner_patch",
-        arguments_summary=f"task_code={task_code}; path={path}; apply={apply}",
+        arguments_summary=(
+            f"task_code={task_code}; repository={repository_config.name}; "
+            f"path={path}; apply={apply}"
+        ),
         permission_policy=permission_decision["permission_policy"],
         result_status="success",
         permission_decision=permission_decision,
@@ -1825,6 +1831,7 @@ def runner_patch_command(
         data={
             "task_code": task_code,
             "event_type": event_type,
+            "repository": repository_config.to_safe_dict(),
             "execution_result": execution_result,
         }
     )
@@ -1837,6 +1844,7 @@ def runner_validate_command(
         list[str] | None,
         typer.Option("--gate", help="Validation gate to execute"),
     ] = None,
+    repository: str | None = typer.Option(None, "--repository", help="Repository config name"),
     timeout_seconds: int = typer.Option(120, "--timeout", help="Per-command timeout seconds"),
     by: str = typer.Option("xingbu", "--by", help="Validation agent name"),
 ):
@@ -1857,9 +1865,11 @@ def runner_validate_command(
             ),
             current_status=task["status"],
         )
+        repository_config = get_repository_config(repository)
         validation_gates = _resolve_task_validation_gates(task, gate)
         validation_result = execute_runner_validation_commands(
             validation_gates,
+            repo_root=repository_config.workspace_path,
             timeout_seconds=timeout_seconds,
         )
     except (PermissionError, ValueError) as exc:
@@ -1884,7 +1894,9 @@ def runner_validate_command(
         task_id=task["id"],
         agent_name=by,
         tool_name="cli.runner_validate",
-        arguments_summary=f"task_code={task_code}; gates={validation_gates}",
+        arguments_summary=(
+            f"task_code={task_code}; repository={repository_config.name}; gates={validation_gates}"
+        ),
         permission_policy=permission_decision["permission_policy"],
         result_status=result_status,
         permission_decision=permission_decision,
@@ -1892,7 +1904,13 @@ def runner_validate_command(
         risk_flag=permission_decision["risk_flag"],
     )
 
-    print_json(data={"task_code": task_code, "validation_result": validation_result})
+    print_json(
+        data={
+            "task_code": task_code,
+            "repository": repository_config.to_safe_dict(),
+            "validation_result": validation_result,
+        }
+    )
 
     if not validation_result["deliverable"]:
         raise typer.Exit(code=1)
@@ -1908,6 +1926,7 @@ def runner_attempt_command(
     ] = None,
     old_text: str = typer.Option(..., "--old-text", help="Text that must match once"),
     new_text: str = typer.Option(..., "--new-text", help="Replacement text"),
+    repository: str | None = typer.Option(None, "--repository", help="Repository config name"),
     apply: bool = typer.Option(False, "--apply", help="Write the patch before validation"),
     timeout_seconds: int = typer.Option(120, "--timeout", help="Per-command timeout seconds"),
     patch_by: str = typer.Option("gongbu", "--patch-by", help="Patch agent name"),
@@ -1944,6 +1963,7 @@ def runner_attempt_command(
             ),
             current_status=task["status"],
         )
+        repository_config = get_repository_config(repository)
         execution_result = apply_text_patch_operations(
             [
                 {
@@ -1952,11 +1972,13 @@ def runner_attempt_command(
                     "new_text": new_text,
                 }
             ],
+            repo_root=repository_config.workspace_path,
             dry_run=not apply,
         )
         validation_gates = _resolve_task_validation_gates(task, gate)
         validation_result = execute_runner_validation_commands(
             validation_gates,
+            repo_root=repository_config.workspace_path,
             timeout_seconds=timeout_seconds,
         )
     except (PermissionError, ValueError, FileNotFoundError) as exc:
@@ -2025,7 +2047,10 @@ def runner_attempt_command(
         task_id=task["id"],
         agent_name=patch_by,
         tool_name="cli.runner_patch",
-        arguments_summary=f"task_code={task_code}; path={path}; apply={apply}",
+        arguments_summary=(
+            f"task_code={task_code}; repository={repository_config.name}; "
+            f"path={path}; apply={apply}"
+        ),
         permission_policy=patch_permission["permission_policy"],
         result_status="success",
         permission_decision=patch_permission,
@@ -2039,7 +2064,9 @@ def runner_attempt_command(
         task_id=task["id"],
         agent_name=validate_by,
         tool_name="cli.runner_validate",
-        arguments_summary=f"task_code={task_code}; gates={validation_gates}",
+        arguments_summary=(
+            f"task_code={task_code}; repository={repository_config.name}; gates={validation_gates}"
+        ),
         permission_policy=validation_permission["permission_policy"],
         result_status="success" if delivered else "failed",
         permission_decision=validation_permission,
@@ -2050,6 +2077,7 @@ def runner_attempt_command(
     print_json(
         data={
             "task_code": task_code,
+            "repository": repository_config.to_safe_dict(),
             "status": next_status,
             "artifact_type": artifact_type,
             "artifact_uri": artifact_uri,
