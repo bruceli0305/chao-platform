@@ -27,6 +27,7 @@ from app.chao.repositories import (
     list_repository_configs,
     validate_repository_configs,
 )
+from app.chao.repository_sync import execute_repository_sync
 from app.chao.runner_artifacts import save_failure_feedback_artifact, save_patch_artifact
 from app.chao.runner_branch import create_runner_branch
 from app.chao.runner_executor import (
@@ -1106,6 +1107,33 @@ def repositories_validate_command(
         )
 
     if errors:
+        raise typer.Exit(code=1)
+
+
+@app.command("repository-sync")
+def repository_sync_command(
+    repository: str | None = typer.Argument(None, help="Repository name"),
+    pull_ff_only: bool = typer.Option(
+        False,
+        "--pull-ff-only",
+        help="Use git pull --ff-only instead of git fetch for existing workspaces",
+    ),
+    apply: bool = typer.Option(False, "--apply", help="Execute the planned git command"),
+):
+    try:
+        repository_config = get_repository_config(repository)
+        result = execute_repository_sync(
+            repository_config,
+            mode="pull-ff-only" if pull_ff_only else "fetch",
+            dry_run=not apply,
+        )
+    except ValueError as exc:
+        print_json(data={"status": "failed", "error": str(exc)})
+        raise typer.Exit(code=1) from exc
+
+    print_json(data={"repository": repository_config.to_safe_dict(), "sync": result})
+
+    if result["errors"]:
         raise typer.Exit(code=1)
 
 
