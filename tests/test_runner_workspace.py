@@ -103,6 +103,45 @@ def test_create_runner_workspace_rejects_existing_workspace(tmp_path):
         )
 
 
+def test_create_runner_workspace_allows_configured_external_sandbox_root(tmp_path):
+    repo_root = tmp_path / "repo"
+    sandbox_root = tmp_path / "sandboxes"
+    repo_root.mkdir()
+    sandbox_root.mkdir()
+    plan = {
+        "workspace_required": True,
+        "workspace_path": str(sandbox_root / "codex-task-demo"),
+        "branch_name": "codex/task-demo",
+        "base_ref": "main",
+        "create_command": [
+            "git",
+            "worktree",
+            "add",
+            "-b",
+            "codex/task-demo",
+            str(sandbox_root / "codex-task-demo"),
+            "main",
+        ],
+        "reason": "test",
+    }
+
+    def fake_runner(command, **_kwargs):
+        if command[:3] == ["git", "show-ref", "--verify"]:
+            return FakeCompletedProcess(returncode=1)
+        raise AssertionError(command)
+
+    result = create_runner_workspace(
+        plan,
+        repo_root=repo_root,
+        allowed_workspace_root=sandbox_root,
+        dry_run=True,
+        command_runner=fake_runner,
+    )
+
+    assert result["errors"] == []
+    assert result["workspace_exists"] is False
+
+
 def test_create_runner_workspace_skips_l4_plan(tmp_path):
     plan = build_runner_workspace_plan(
         task_code="TASK-20260511-191300-226866",

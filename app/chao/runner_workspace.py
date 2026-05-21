@@ -40,11 +40,25 @@ def _run_command(
     )
 
 
-def _resolve_workspace_path(repo_root: Path | str, workspace_path: str) -> Path:
+def _resolve_workspace_path(
+    repo_root: Path | str,
+    workspace_path: str,
+    allowed_workspace_root: Path | str | None = None,
+) -> Path:
     root = Path(repo_root).resolve()
-    path = (root / workspace_path).resolve()
+    workspace = Path(workspace_path)
+    path = workspace.resolve() if workspace.is_absolute() else (root / workspace).resolve()
 
-    if root != path and root not in path.parents:
+    allowed_roots = [root]
+    if allowed_workspace_root is not None:
+        allowed_root = Path(allowed_workspace_root)
+        allowed_roots.append(
+            allowed_root.resolve()
+            if allowed_root.is_absolute()
+            else (root / allowed_root).resolve()
+        )
+
+    if not any(allowed == path or allowed in path.parents for allowed in allowed_roots):
         raise ValueError(f"Runner workspace path escapes repository: {workspace_path}")
 
     return path
@@ -54,6 +68,7 @@ def inspect_runner_workspace(
     workspace_plan: RunnerWorkspacePlan,
     *,
     repo_root: Path | str = ".",
+    allowed_workspace_root: Path | str | None = None,
     command_runner: Any = subprocess.run,
 ) -> RunnerWorkspaceExecution:
     workspace_path = workspace_plan["workspace_path"]
@@ -77,7 +92,11 @@ def inspect_runner_workspace(
     if workspace_path is None:
         raise ValueError("Runner workspace plan missing workspace_path.")
 
-    resolved_workspace = _resolve_workspace_path(repo_root, workspace_path)
+    resolved_workspace = _resolve_workspace_path(
+        repo_root,
+        workspace_path,
+        allowed_workspace_root,
+    )
     workspace_exists = resolved_workspace.exists()
     if workspace_exists:
         errors.append(f"Runner workspace already exists: {workspace_path}")
@@ -113,12 +132,14 @@ def create_runner_workspace(
     workspace_plan: RunnerWorkspacePlan,
     *,
     repo_root: Path | str = ".",
+    allowed_workspace_root: Path | str | None = None,
     dry_run: bool = True,
     command_runner: Any = subprocess.run,
 ) -> RunnerWorkspaceExecution:
     inspection = inspect_runner_workspace(
         workspace_plan,
         repo_root=repo_root,
+        allowed_workspace_root=allowed_workspace_root,
         command_runner=command_runner,
     )
     inspection["dry_run"] = dry_run

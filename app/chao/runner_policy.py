@@ -247,8 +247,12 @@ def build_runner_workspace_plan(
     title: str,
     task_level: TaskLevel,
     base_ref: str = "HEAD",
+    branch_prefix: str | None = None,
+    sandbox_root: str | None = None,
 ) -> RunnerWorkspacePlan:
     policy = build_runner_boundary_policy(task_level)
+    runner_branch_prefix = branch_prefix or policy["required_branch_prefix"]
+    runner_sandbox_root = sandbox_root or policy["sandbox_root"]
 
     if not policy["can_execute"]:
         return {
@@ -263,10 +267,10 @@ def build_runner_workspace_plan(
     branch_name = build_runner_branch_name(
         task_code=task_code,
         title=title,
-        branch_prefix=policy["required_branch_prefix"],
+        branch_prefix=runner_branch_prefix,
     )
     workspace_slug = normalize_branch_slug(branch_name.replace("/", "-"), fallback="runner")
-    workspace_path = f"{policy['sandbox_root']}/{workspace_slug}"
+    workspace_path = f"{runner_sandbox_root.rstrip('/')}/{workspace_slug}"
 
     return {
         "workspace_required": True,

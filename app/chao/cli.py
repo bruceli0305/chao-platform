@@ -1561,7 +1561,10 @@ def runner_branch_command(
 @app.command("runner-workspace")
 def runner_workspace_command(
     task_code: str,
-    base_ref: str = typer.Option("HEAD", "--base-ref", help="Git base ref for worktree creation"),
+    repository: str | None = typer.Option(None, "--repository", help="Repository config name"),
+    base_ref: str | None = typer.Option(
+        None, "--base-ref", help="Git base ref for worktree creation"
+    ),
     apply: bool = typer.Option(False, "--apply", help="Create the isolated runner worktree"),
     by: str = typer.Option("gongbu", "--by", help="Runner agent name"),
 ):
@@ -1582,14 +1585,20 @@ def runner_workspace_command(
             ),
             current_status=task["status"],
         )
+        repository_config = get_repository_config(repository)
+        resolved_base_ref = base_ref or repository_config.default_branch
         workspace_plan = build_runner_workspace_plan(
             task_code=task_code,
             title=task.get("title", ""),
             task_level=task["task_level"],
-            base_ref=base_ref,
+            base_ref=resolved_base_ref,
+            branch_prefix=repository_config.branch_prefix,
+            sandbox_root=repository_config.sandbox_root,
         )
         workspace_result = create_runner_workspace(
             workspace_plan,
+            repo_root=repository_config.workspace_path,
+            allowed_workspace_root=repository_config.sandbox_root,
             dry_run=not apply,
         )
     except (PermissionError, RuntimeError, ValueError) as exc:
@@ -1615,7 +1624,10 @@ def runner_workspace_command(
         task_id=task["id"],
         agent_name=by,
         tool_name="cli.runner_workspace",
-        arguments_summary=f"task_code={task_code}; base_ref={base_ref}; apply={apply}",
+        arguments_summary=(
+            f"task_code={task_code}; repository={repository_config.name}; "
+            f"base_ref={resolved_base_ref}; apply={apply}"
+        ),
         permission_policy=permission_decision["permission_policy"],
         result_status="success",
         permission_decision=permission_decision,
@@ -1630,6 +1642,7 @@ def runner_workspace_command(
         data={
             "task_code": task_code,
             "event_type": event_type,
+            "repository": repository_config.to_safe_dict(),
             "workspace_plan": workspace_plan,
             "workspace_result": workspace_result,
         }
