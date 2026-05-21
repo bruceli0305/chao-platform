@@ -214,8 +214,10 @@ def build_runner_branch_plan(
     title: str,
     task_level: TaskLevel,
     base_ref: str = "HEAD",
+    branch_prefix: str | None = None,
 ) -> RunnerBranchPlan:
     policy = build_runner_boundary_policy(task_level)
+    runner_branch_prefix = branch_prefix or policy["required_branch_prefix"]
 
     if not policy["can_execute"]:
         return {
@@ -229,7 +231,7 @@ def build_runner_branch_plan(
     branch_name = build_runner_branch_name(
         task_code=task_code,
         title=title,
-        branch_prefix=policy["required_branch_prefix"],
+        branch_prefix=runner_branch_prefix,
     )
 
     return {

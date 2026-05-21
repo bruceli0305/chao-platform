@@ -119,3 +119,22 @@ def test_create_runner_branch_skips_l4_plan():
 
     assert result["branch_required"] is False
     assert result["created"] is False
+
+
+def test_build_runner_branch_plan_accepts_custom_branch_prefix():
+    plan = build_runner_branch_plan(
+        task_code="TASK-20260511-191300-226866",
+        title="Patch demo",
+        task_level="L2",
+        base_ref="main",
+        branch_prefix="server/",
+    )
+
+    assert plan["branch_name"] == "server/task-20260511-191300-226866-patch-demo"
+    assert plan["create_command"] == [
+        "git",
+        "checkout",
+        "-b",
+        "server/task-20260511-191300-226866-patch-demo",
+        "main",
+    ]

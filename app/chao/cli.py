@@ -1483,7 +1483,10 @@ def _has_active_llm_egress_authorization(
 @app.command("runner-branch")
 def runner_branch_command(
     task_code: str,
-    base_ref: str = typer.Option("HEAD", "--base-ref", help="Git base ref for branch creation"),
+    repository: str | None = typer.Option(None, "--repository", help="Repository config name"),
+    base_ref: str | None = typer.Option(
+        None, "--base-ref", help="Git base ref for branch creation"
+    ),
     apply: bool = typer.Option(False, "--apply", help="Create and switch to the runner branch"),
     by: str = typer.Option("gongbu", "--by", help="Runner agent name"),
 ):
@@ -1504,14 +1507,18 @@ def runner_branch_command(
             ),
             current_status=task["status"],
         )
+        repository_config = get_repository_config(repository)
+        resolved_base_ref = base_ref or repository_config.default_branch
         branch_plan = build_runner_branch_plan(
             task_code=task_code,
             title=task.get("title", ""),
             task_level=task["task_level"],
-            base_ref=base_ref,
+            base_ref=resolved_base_ref,
+            branch_prefix=repository_config.branch_prefix,
         )
         branch_result = create_runner_branch(
             branch_plan,
+            repo_root=repository_config.workspace_path,
             dry_run=not apply,
         )
     except (PermissionError, RuntimeError, ValueError) as exc:
@@ -1537,7 +1544,10 @@ def runner_branch_command(
         task_id=task["id"],
         agent_name=by,
         tool_name="cli.runner_branch",
-        arguments_summary=f"task_code={task_code}; base_ref={base_ref}; apply={apply}",
+        arguments_summary=(
+            f"task_code={task_code}; repository={repository_config.name}; "
+            f"base_ref={resolved_base_ref}; apply={apply}"
+        ),
         permission_policy=permission_decision["permission_policy"],
         result_status="success",
         permission_decision=permission_decision,
@@ -1552,6 +1562,7 @@ def runner_branch_command(
         data={
             "task_code": task_code,
             "event_type": event_type,
+            "repository": repository_config.to_safe_dict(),
             "branch_plan": branch_plan,
             "branch_result": branch_result,
         }
