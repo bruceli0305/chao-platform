@@ -1,7 +1,24 @@
 from typer.testing import CliRunner
 
 from app.chao import cli
+from app.chao.repositories import RepositoryConfig
 from app.chao.runner_sandbox import DEFAULT_SANDBOX_IMAGE
+
+
+def _repository_config(
+    *,
+    name: str = "chao-platform",
+    workspace_path: str = ".",
+):
+    return RepositoryConfig(
+        name=name,
+        git_url="git@github.com:example/repo.git",
+        default_branch="main",
+        workspace_path=workspace_path,
+        sandbox_root=".chao/sandboxes",
+        branch_prefix="codex/",
+        enabled=True,
+    )
 
 
 def _task():
@@ -46,6 +63,7 @@ def test_runner_sandbox_dry_run_records_event_and_tool_call(monkeypatch):
     }
 
     monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
     monkeypatch.setattr(
         cli,
         "execute_runner_sandbox_commands",
@@ -78,6 +96,7 @@ def test_runner_sandbox_apply_records_passed_event(monkeypatch):
     }
 
     monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
     monkeypatch.setattr(
         cli,
         "execute_runner_sandbox_commands",
@@ -112,6 +131,7 @@ def test_runner_sandbox_apply_exits_nonzero_for_failed_gate(monkeypatch):
     }
 
     monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
     monkeypatch.setattr(
         cli,
         "execute_runner_sandbox_commands",
@@ -150,6 +170,7 @@ def test_runner_sandbox_uses_skill_execution_plan_when_gate_omitted(monkeypatch)
         return _sandbox_result(dry_run=kwargs["dry_run"])
 
     monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task_with_skill_gates())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
     monkeypatch.setattr(cli, "execute_runner_sandbox_commands", execute_sandbox)
     monkeypatch.setattr(
         cli,
@@ -168,6 +189,47 @@ def test_runner_sandbox_uses_skill_execution_plan_when_gate_omitted(monkeypatch)
     assert calls["sandbox_gates"] == ["manual_validation", "lint", "test"]
     assert calls["events"][0]["event_type"] == "runner_sandbox_dry_run"
     assert calls["tool_calls"][0]["arguments_summary"] == (
-        "task_code=TASK-1; gates=['manual_validation', 'lint', 'test']; "
+        "task_code=TASK-1; repository=chao-platform; "
+        "gates=['manual_validation', 'lint', 'test']; "
         f"workspace_path=.; image={DEFAULT_SANDBOX_IMAGE}; apply=False"
     )
+
+
+def test_runner_sandbox_uses_explicit_repository_config(monkeypatch):
+    calls = {
+        "events": [],
+        "tool_calls": [],
+        "sandbox_kwargs": None,
+    }
+    repository = _repository_config(
+        name="server-repo",
+        workspace_path="/opt/chao/workspaces/server-repo",
+    )
+
+    def execute_sandbox(_gates, **kwargs):
+        calls["sandbox_kwargs"] = kwargs
+        return _sandbox_result(dry_run=kwargs["dry_run"])
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: repository)
+    monkeypatch.setattr(cli, "execute_runner_sandbox_commands", execute_sandbox)
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        ["runner-sandbox", "TASK-1", "--repository", "server-repo", "--gate", "compile"],
+    )
+
+    assert result.exit_code == 0
+    assert calls["sandbox_kwargs"]["repo_root"] == "/opt/chao/workspaces/server-repo"
+    assert "repository=server-repo" in calls["tool_calls"][0]["arguments_summary"]
+    assert '"name": "server-repo"' in result.output

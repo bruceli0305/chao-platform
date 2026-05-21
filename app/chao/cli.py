@@ -1667,6 +1667,7 @@ def runner_sandbox_command(
         list[str] | None,
         typer.Option("--gate", help="Validation gate to run in Docker sandbox"),
     ] = None,
+    repository: str | None = typer.Option(None, "--repository", help="Repository config name"),
     workspace_path: str = typer.Option(".", "--workspace-path", help="Workspace path to mount"),
     image: str = typer.Option(DEFAULT_SANDBOX_IMAGE, "--image", help="Docker image"),
     apply: bool = typer.Option(False, "--apply", help="Run the sandbox commands"),
@@ -1690,10 +1691,12 @@ def runner_sandbox_command(
             ),
             current_status=task["status"],
         )
+        repository_config = get_repository_config(repository)
         sandbox_gates = _resolve_task_validation_gates(task, gate)
         sandbox_result = execute_runner_sandbox_commands(
             sandbox_gates,
             workspace_path=workspace_path,
+            repo_root=repository_config.workspace_path,
             image=image,
             dry_run=not apply,
             timeout_seconds=timeout_seconds,
@@ -1724,8 +1727,8 @@ def runner_sandbox_command(
         agent_name=by,
         tool_name="cli.runner_sandbox",
         arguments_summary=(
-            f"task_code={task_code}; gates={sandbox_gates}; workspace_path={workspace_path}; "
-            f"image={image}; apply={apply}"
+            f"task_code={task_code}; repository={repository_config.name}; gates={sandbox_gates}; "
+            f"workspace_path={workspace_path}; image={image}; apply={apply}"
         ),
         permission_policy=permission_decision["permission_policy"],
         result_status=result_status,
@@ -1741,6 +1744,7 @@ def runner_sandbox_command(
         data={
             "task_code": task_code,
             "event_type": event_type,
+            "repository": repository_config.to_safe_dict(),
             "sandbox_result": sandbox_result,
         }
     )
