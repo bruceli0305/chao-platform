@@ -816,6 +816,57 @@ def test_console_github_sync_renders_sync_summary(monkeypatch):
     assert "TASK-UNLINKED" in result.output
 
 
+def test_console_repositories_renders_workspace_summary(monkeypatch):
+    repository_status = {
+        "summary": {
+            "repositories": 1,
+            "ready": 1,
+            "dirty": 0,
+            "errors": 0,
+        },
+        "repositories": [
+            {
+                "name": "chao-platform",
+                "workspace_ready": True,
+                "current_branch": "main",
+                "workspace_path": ".",
+                "dirty": False,
+                "ahead": 0,
+                "behind": 0,
+                "errors": "",
+            }
+        ],
+    }
+
+    monkeypatch.setattr(
+        cli,
+        "build_repository_status_report",
+        lambda repositories: repository_status,
+    )
+    monkeypatch.setattr(cli, "list_repository_configs", lambda: [])
+
+    result = CliRunner().invoke(cli.app, ["console-repositories"])
+
+    assert result.exit_code == 0
+    assert "Repository Workspace Summary" in result.output
+    assert "Repository Workspaces" in result.output
+    assert "chao-platform" in result.output
+
+
+def test_console_repositories_outputs_json(monkeypatch):
+    monkeypatch.setattr(
+        cli,
+        "build_repository_status_report",
+        lambda repositories: {"summary": {"repositories": 0}, "repositories": []},
+    )
+    monkeypatch.setattr(cli, "list_repository_configs", lambda: [])
+
+    result = CliRunner().invoke(cli.app, ["console-repositories", "--json"])
+
+    assert result.exit_code == 0
+    assert '"repositories": []' in result.output
+
+
 def test_tool_gateway_tools_renders_policy_metadata(monkeypatch):
     monkeypatch.setattr(
         cli,

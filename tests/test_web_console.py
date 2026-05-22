@@ -189,24 +189,28 @@ def test_build_console_response_returns_repository_status(monkeypatch):
         enabled=True,
     )
 
-    monkeypatch.setattr(web_console, "list_repository_configs", lambda: [repository])
     monkeypatch.setattr(
         web_console,
-        "inspect_repository_status",
-        lambda _repository: {
-            "repository": "demo",
-            "workspace_path": "/opt/chao/workspaces/demo",
-            "default_branch": "main",
-            "workspace_exists": True,
-            "is_git_repository": True,
-            "current_branch": "main",
-            "head_commit": "abc123",
-            "remote_url": "git@github.com:example/demo.git",
-            "dirty": False,
-            "status_lines": [],
-            "ahead": 0,
-            "behind": 1,
-            "errors": [],
+        "list_repository_configs",
+        lambda: [repository],
+    )
+    monkeypatch.setattr(
+        web_console,
+        "build_repository_status_report",
+        lambda repositories: {
+            "summary": {
+                "repositories": len(repositories),
+                "ready": 1,
+                "dirty": 0,
+                "errors": 0,
+            },
+            "repositories": [
+                {
+                    "name": "demo",
+                    "workspace_ready": True,
+                    "behind": 1,
+                }
+            ],
         },
     )
 

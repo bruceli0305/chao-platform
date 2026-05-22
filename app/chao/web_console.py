@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from app.chao.permissions import require_tool_permission
 from app.chao.repositories import list_repository_configs
-from app.chao.repository_sync import inspect_repository_status
+from app.chao.repository_sync import build_repository_status_report
 from app.chao.services.console import (
     get_console_approval_queue,
     get_console_audit,
@@ -936,43 +936,7 @@ def _build_service_error(path: str, exc: Exception) -> dict[str, Any]:
 
 
 def _build_repository_status_response() -> dict[str, Any]:
-    rows = []
-
-    for repository in list_repository_configs():
-        status = inspect_repository_status(repository)
-        workspace_ready = (
-            status["workspace_exists"] and status["is_git_repository"] and not status["errors"]
-        )
-        rows.append(
-            {
-                "name": repository.name,
-                "enabled": repository.enabled,
-                "git_url": repository.git_url,
-                "default_branch": repository.default_branch,
-                "branch_prefix": repository.branch_prefix,
-                "workspace_path": status["workspace_path"],
-                "workspace_ready": workspace_ready,
-                "workspace_exists": status["workspace_exists"],
-                "is_git_repository": status["is_git_repository"],
-                "current_branch": status["current_branch"],
-                "head_commit": status["head_commit"],
-                "remote_url": status["remote_url"],
-                "dirty": status["dirty"],
-                "ahead": status["ahead"],
-                "behind": status["behind"],
-                "errors": "; ".join(status["errors"]),
-            }
-        )
-
-    return {
-        "summary": {
-            "repositories": len(rows),
-            "ready": sum(1 for row in rows if row["workspace_ready"]),
-            "dirty": sum(1 for row in rows if row["dirty"]),
-            "errors": sum(1 for row in rows if row["errors"]),
-        },
-        "repositories": rows,
-    }
+    return build_repository_status_report(list_repository_configs())
 
 
 def _write_not_found(path: str) -> tuple[int, dict[str, Any]]:

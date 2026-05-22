@@ -231,3 +231,47 @@ def inspect_repository_status(
         "behind": behind,
         "errors": errors,
     }
+
+
+def build_repository_status_report(
+    repositories: list[RepositoryConfig],
+    *,
+    command_runner: Any = subprocess.run,
+) -> dict[str, Any]:
+    rows = []
+
+    for repository in repositories:
+        status = inspect_repository_status(repository, command_runner=command_runner)
+        workspace_ready = (
+            status["workspace_exists"] and status["is_git_repository"] and not status["errors"]
+        )
+        rows.append(
+            {
+                "name": repository.name,
+                "enabled": repository.enabled,
+                "git_url": repository.git_url,
+                "default_branch": repository.default_branch,
+                "branch_prefix": repository.branch_prefix,
+                "workspace_path": status["workspace_path"],
+                "workspace_ready": workspace_ready,
+                "workspace_exists": status["workspace_exists"],
+                "is_git_repository": status["is_git_repository"],
+                "current_branch": status["current_branch"],
+                "head_commit": status["head_commit"],
+                "remote_url": status["remote_url"],
+                "dirty": status["dirty"],
+                "ahead": status["ahead"],
+                "behind": status["behind"],
+                "errors": "; ".join(status["errors"]),
+            }
+        )
+
+    return {
+        "summary": {
+            "repositories": len(rows),
+            "ready": sum(1 for row in rows if row["workspace_ready"]),
+            "dirty": sum(1 for row in rows if row["dirty"]),
+            "errors": sum(1 for row in rows if row["errors"]),
+        },
+        "repositories": rows,
+    }

@@ -27,7 +27,11 @@ from app.chao.repositories import (
     list_repository_configs,
     validate_repository_configs,
 )
-from app.chao.repository_sync import execute_repository_sync, inspect_repository_status
+from app.chao.repository_sync import (
+    build_repository_status_report,
+    execute_repository_sync,
+    inspect_repository_status,
+)
 from app.chao.runner_artifacts import save_failure_feedback_artifact, save_patch_artifact
 from app.chao.runner_branch import create_runner_branch
 from app.chao.runner_executor import (
@@ -795,6 +799,48 @@ def console_github_sync_command(
             _display_value(link.get("status")),
         )
     console.print(failed_links)
+
+
+@app.command("console-repositories")
+def console_repositories_command(
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    repository_status = build_repository_status_report(list_repository_configs())
+
+    if as_json:
+        print_json(data=repository_status)
+        return
+
+    summary = Table(title="Repository Workspace Summary")
+    summary.add_column("Metric")
+    summary.add_column("Value")
+    for metric, count in repository_status["summary"].items():
+        summary.add_row(metric, str(count))
+    console.print(summary)
+
+    table = Table(title="Repository Workspaces")
+    table.add_column("Name", no_wrap=True)
+    table.add_column("Ready", no_wrap=True)
+    table.add_column("Branch")
+    table.add_column("Workspace")
+    table.add_column("Dirty", no_wrap=True)
+    table.add_column("Ahead", no_wrap=True)
+    table.add_column("Behind", no_wrap=True)
+    table.add_column("Errors")
+
+    for repository in repository_status["repositories"]:
+        table.add_row(
+            str(repository["name"]),
+            str(repository["workspace_ready"]),
+            str(repository["current_branch"] or ""),
+            str(repository["workspace_path"]),
+            str(repository["dirty"]),
+            str(repository["ahead"] if repository["ahead"] is not None else ""),
+            str(repository["behind"] if repository["behind"] is not None else ""),
+            str(repository["errors"]),
+        )
+
+    console.print(table)
 
 
 @app.command("web-console")

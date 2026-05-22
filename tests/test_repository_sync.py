@@ -1,5 +1,6 @@
 from app.chao.repositories import RepositoryConfig
 from app.chao.repository_sync import (
+    build_repository_status_report,
     build_repository_sync_plan,
     execute_repository_sync,
     inspect_repository_status,
@@ -162,3 +163,46 @@ def test_inspect_repository_status_rejects_non_git_directory(tmp_path):
     assert result["workspace_exists"] is True
     assert result["is_git_repository"] is False
     assert result["errors"] == [f"repository workspace is not a git repository: {workspace}"]
+
+
+def test_build_repository_status_report_summarizes_workspaces(tmp_path):
+    ready_workspace = tmp_path / "ready"
+    dirty_workspace = tmp_path / "dirty"
+    (ready_workspace / ".git").mkdir(parents=True)
+    (dirty_workspace / ".git").mkdir(parents=True)
+    repositories = [
+        _repository_config(name="ready", workspace_path=str(ready_workspace)),
+        _repository_config(name="dirty", workspace_path=str(dirty_workspace)),
+    ]
+
+    class Completed:
+        def __init__(self, stdout: str, returncode: int = 0, stderr: str = ""):
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = stderr
+
+    def fake_runner(command, **_kwargs):
+        workspace = command[2]
+        if command[-2:] == ["branch", "--show-current"]:
+            return Completed("main\n")
+        if command[-2:] == ["rev-parse", "HEAD"]:
+            return Completed("abc123\n")
+        if command[-3:] == ["config", "--get", "remote.origin.url"]:
+            return Completed("git@github.com:example/demo.git\n")
+        if command[-2:] == ["status", "--short"]:
+            return Completed(" M app/chao/demo.py\n" if workspace == str(dirty_workspace) else "")
+        if command[-4:] == ["rev-list", "--left-right", "--count", "HEAD...origin/main"]:
+            return Completed("0\t1\n")
+        raise AssertionError(command)
+
+    report = build_repository_status_report(repositories, command_runner=fake_runner)
+
+    assert report["summary"] == {
+        "repositories": 2,
+        "ready": 2,
+        "dirty": 1,
+        "errors": 0,
+    }
+    assert report["repositories"][0]["workspace_ready"] is True
+    assert report["repositories"][1]["dirty"] is True
+    assert report["repositories"][1]["behind"] == 1
