@@ -43,6 +43,17 @@ class RepositoryStatusResult(TypedDict):
     errors: list[str]
 
 
+class RepositoryDoctorResult(TypedDict):
+    repository: str
+    status: str
+    runner_ready: bool
+    suggested_action: str
+    config: dict[str, Any]
+    workspace_status: RepositoryStatusResult
+    sync_plan: RepositorySyncResult
+    errors: list[str]
+
+
 def _run_command(
     command: list[str],
     *,
@@ -274,4 +285,48 @@ def build_repository_status_report(
             "errors": sum(1 for row in rows if row["errors"]),
         },
         "repositories": rows,
+    }
+
+
+def build_repository_doctor_report(
+    repository: RepositoryConfig,
+    *,
+    mode: RepositorySyncMode = "fetch",
+    command_runner: Any = subprocess.run,
+) -> RepositoryDoctorResult:
+    workspace_status = inspect_repository_status(repository, command_runner=command_runner)
+    sync_plan = build_repository_sync_plan(repository, mode=mode)
+    errors = [*workspace_status["errors"], *sync_plan["errors"]]
+    runner_ready = (
+        repository.enabled
+        and workspace_status["workspace_exists"]
+        and workspace_status["is_git_repository"]
+        and not workspace_status["dirty"]
+        and not errors
+    )
+
+    if not repository.enabled:
+        suggested_action = "enable_repository"
+    elif errors:
+        suggested_action = "fix_workspace"
+    elif not workspace_status["workspace_exists"]:
+        suggested_action = "run_repository_sync_apply"
+    elif not workspace_status["is_git_repository"]:
+        suggested_action = "fix_workspace"
+    elif workspace_status["dirty"]:
+        suggested_action = "review_local_changes"
+    elif workspace_status["behind"] and workspace_status["behind"] > 0:
+        suggested_action = "run_repository_sync_pull_ff_only"
+    else:
+        suggested_action = "ready"
+
+    return {
+        "repository": repository.name,
+        "status": "ready" if runner_ready else "blocked",
+        "runner_ready": runner_ready,
+        "suggested_action": suggested_action,
+        "config": repository.to_safe_dict(),
+        "workspace_status": workspace_status,
+        "sync_plan": sync_plan,
+        "errors": errors,
     }

@@ -162,3 +162,58 @@ def test_repository_status_exits_nonzero_on_workspace_error(monkeypatch):
 
     assert result.exit_code == 1
     assert "repository workspace is not a git repository" in result.output
+
+
+def test_repository_doctor_outputs_json(monkeypatch):
+    calls = []
+
+    def fake_build_repository_doctor_report(repository_config, **kwargs):
+        calls.append((repository_config, kwargs))
+        return {
+            "repository": repository_config.name,
+            "status": "ready",
+            "runner_ready": True,
+            "suggested_action": "ready",
+            "config": repository_config.to_safe_dict(),
+            "workspace_status": {
+                "workspace_path": repository_config.workspace_path,
+                "errors": [],
+            },
+            "sync_plan": {"action": "fetch"},
+            "errors": [],
+        }
+
+    monkeypatch.setattr(cli, "build_repository_doctor_report", fake_build_repository_doctor_report)
+
+    result = CliRunner().invoke(cli.app, ["repository-doctor", "chao-platform", "--json"])
+
+    assert result.exit_code == 0
+    assert calls[0][1] == {"mode": "fetch"}
+    assert '"runner_ready": true' in result.output
+    assert '"suggested_action": "ready"' in result.output
+
+
+def test_repository_doctor_renders_summary_and_supports_pull_plan(monkeypatch):
+    def fake_build_repository_doctor_report(repository_config, **kwargs):
+        return {
+            "repository": repository_config.name,
+            "status": "blocked",
+            "runner_ready": False,
+            "suggested_action": "run_repository_sync_pull_ff_only",
+            "config": repository_config.to_safe_dict(),
+            "workspace_status": {
+                "workspace_path": repository_config.workspace_path,
+                "errors": [],
+            },
+            "sync_plan": {"action": "pull-ff-only"},
+            "errors": [],
+        }
+
+    monkeypatch.setattr(cli, "build_repository_doctor_report", fake_build_repository_doctor_report)
+
+    result = CliRunner().invoke(cli.app, ["repository-doctor", "--pull-ff-only"])
+
+    assert result.exit_code == 0
+    assert "Repository Doctor" in result.output
+    assert "run_repository_sync_pull_ff_only" in result.output
+    assert "pull-ff-only" in result.output

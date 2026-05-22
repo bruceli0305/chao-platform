@@ -1,5 +1,6 @@
 from app.chao.repositories import RepositoryConfig
 from app.chao.repository_sync import (
+    build_repository_doctor_report,
     build_repository_status_report,
     build_repository_sync_plan,
     execute_repository_sync,
@@ -206,3 +207,76 @@ def test_build_repository_status_report_summarizes_workspaces(tmp_path):
     assert report["repositories"][0]["workspace_ready"] is True
     assert report["repositories"][1]["dirty"] is True
     assert report["repositories"][1]["behind"] == 1
+
+
+def test_build_repository_doctor_report_marks_clean_workspace_ready(tmp_path):
+    workspace = tmp_path / "demo"
+    (workspace / ".git").mkdir(parents=True)
+    repository = _repository_config(workspace_path=str(workspace))
+
+    class Completed:
+        def __init__(self, stdout: str, returncode: int = 0, stderr: str = ""):
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = stderr
+
+    def fake_runner(command, **_kwargs):
+        if command[-2:] == ["branch", "--show-current"]:
+            return Completed("main\n")
+        if command[-2:] == ["rev-parse", "HEAD"]:
+            return Completed("abc123\n")
+        if command[-3:] == ["config", "--get", "remote.origin.url"]:
+            return Completed("git@github.com:example/demo.git\n")
+        if command[-2:] == ["status", "--short"]:
+            return Completed("")
+        if command[-4:] == ["rev-list", "--left-right", "--count", "HEAD...origin/main"]:
+            return Completed("0\t0\n")
+        raise AssertionError(command)
+
+    report = build_repository_doctor_report(repository, command_runner=fake_runner)
+
+    assert report["status"] == "ready"
+    assert report["runner_ready"] is True
+    assert report["suggested_action"] == "ready"
+    assert report["sync_plan"]["action"] == "fetch"
+
+
+def test_build_repository_doctor_report_suggests_clone_for_missing_workspace(tmp_path):
+    repository = _repository_config(workspace_path=str(tmp_path / "missing"))
+
+    report = build_repository_doctor_report(repository)
+
+    assert report["status"] == "blocked"
+    assert report["runner_ready"] is False
+    assert report["suggested_action"] == "run_repository_sync_apply"
+    assert report["sync_plan"]["action"] == "clone"
+
+
+def test_build_repository_doctor_report_blocks_dirty_workspace(tmp_path):
+    workspace = tmp_path / "demo"
+    (workspace / ".git").mkdir(parents=True)
+    repository = _repository_config(workspace_path=str(workspace))
+
+    class Completed:
+        def __init__(self, stdout: str, returncode: int = 0, stderr: str = ""):
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = stderr
+
+    def fake_runner(command, **_kwargs):
+        if command[-2:] == ["branch", "--show-current"]:
+            return Completed("main\n")
+        if command[-2:] == ["rev-parse", "HEAD"]:
+            return Completed("abc123\n")
+        if command[-3:] == ["config", "--get", "remote.origin.url"]:
+            return Completed("git@github.com:example/demo.git\n")
+        if command[-2:] == ["status", "--short"]:
+            return Completed(" M app/chao/demo.py\n")
+        if command[-4:] == ["rev-list", "--left-right", "--count", "HEAD...origin/main"]:
+            return Completed("0\t0\n")
+        raise AssertionError(command)
+
+    report = build_repository_doctor_report(repository, command_runner=fake_runner)
+
+    assert report["runner_ready"] is False
+    assert report["suggested_action"] == "review_local_changes"

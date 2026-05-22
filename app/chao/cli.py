@@ -28,6 +28,7 @@ from app.chao.repositories import (
     validate_repository_configs,
 )
 from app.chao.repository_sync import (
+    build_repository_doctor_report,
     build_repository_status_report,
     execute_repository_sync,
     inspect_repository_status,
@@ -1197,6 +1198,45 @@ def repository_status_command(
     print_json(data={"repository": repository_config.to_safe_dict(), "workspace_status": status})
 
     if status["errors"]:
+        raise typer.Exit(code=1)
+
+
+@app.command("repository-doctor")
+def repository_doctor_command(
+    repository: str | None = typer.Argument(None, help="Repository name"),
+    pull_ff_only: bool = typer.Option(
+        False,
+        "--pull-ff-only",
+        help="Plan git pull --ff-only instead of git fetch for existing workspaces",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    try:
+        repository_config = get_repository_config(repository)
+        report = build_repository_doctor_report(
+            repository_config,
+            mode="pull-ff-only" if pull_ff_only else "fetch",
+        )
+    except ValueError as exc:
+        print_json(data={"status": "failed", "error": str(exc)})
+        raise typer.Exit(code=1) from exc
+
+    if as_json:
+        print_json(data=report)
+    else:
+        summary = Table(title="Repository Doctor")
+        summary.add_column("Field")
+        summary.add_column("Value")
+        summary.add_row("Repository", report["repository"])
+        summary.add_row("Status", report["status"])
+        summary.add_row("Runner Ready", str(report["runner_ready"]))
+        summary.add_row("Suggested Action", report["suggested_action"])
+        summary.add_row("Workspace", report["workspace_status"]["workspace_path"])
+        summary.add_row("Sync Action", report["sync_plan"]["action"])
+        summary.add_row("Errors", "; ".join(report["errors"]))
+        console.print(summary)
+
+    if report["errors"]:
         raise typer.Exit(code=1)
 
 
