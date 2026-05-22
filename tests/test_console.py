@@ -450,6 +450,14 @@ def test_get_console_risks_returns_risk_summary(monkeypatch):
         ],
         [
             (
+                "TASK-PREFLIGHT",
+                "Runner preflight blocked: demo; errors=repository is not runner ready",
+                "gongbu",
+                "2026-05-14 00:00:02",
+            )
+        ],
+        [
+            (
                 "TASK-TOOL",
                 "shangshu",
                 "cli.new",
@@ -543,6 +551,7 @@ def test_get_console_risks_returns_risk_summary(monkeypatch):
     assert risks["blocked_tasks"][0]["task_code"] == "TASK-BLOCKED"
     assert risks["failed_gates"][0]["gate_name"] == "pytest"
     assert risks["runner_failures"][0]["artifact_type"] == "runner_failure_feedback"
+    assert risks["runner_preflight_blocks"][0]["task_code"] == "TASK-PREFLIGHT"
     assert risks["tool_risks"][0]["tool_name"] == "cli.new"
     assert risks["pending_tool_calls"][0]["task_code"] == "TASK-PENDING"
     assert risks["stale_tool_calls"][0]["task_code"] == "TASK-STALE"
@@ -557,6 +566,7 @@ def test_get_console_risks_returns_risk_summary(monkeypatch):
         "blocked_task_count": 1,
         "failed_gate_count": 1,
         "runner_failure_count": 1,
+        "runner_preflight_block_count": 1,
         "tool_risk_count": 1,
         "pending_tool_call_count": 1,
         "stale_tool_call_count": 1,
@@ -977,6 +987,13 @@ def test_console_risks_renders_risk_summary(monkeypatch):
                 "artifact_uri": ".ai-agents/records/failures/TASK-RUNNER-FAIL-failure-feedback.md",
             }
         ],
+        "runner_preflight_blocks": [
+            {
+                "task_code": "TASK-PREFLIGHT",
+                "summary": "Runner preflight blocked: demo",
+                "created_by": "gongbu",
+            }
+        ],
         "tool_risks": [
             {
                 "task_code": "TASK-TOOL",
@@ -1026,6 +1043,7 @@ def test_console_risks_renders_risk_summary(monkeypatch):
             "blocked_task_count": 1,
             "failed_gate_count": 1,
             "runner_failure_count": 1,
+            "runner_preflight_block_count": 1,
             "tool_risk_count": 1,
             "pending_tool_call_count": 1,
             "stale_tool_call_count": 1,
@@ -1044,6 +1062,8 @@ def test_console_risks_renders_risk_summary(monkeypatch):
     assert "Blocked Tasks" in result.output
     assert "TASK-BLOCKED" in result.output
     assert "runner_failure_feedback" in result.output
+    assert "Runner Preflight Blocks" in result.output
+    assert "TASK-PREFLIGHT" in result.output
     assert "pytest" in result.output
     assert "Stale Tool Calls" in result.output
     assert "schema_check" in result.output

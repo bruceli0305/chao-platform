@@ -348,6 +348,13 @@ def build_console_index_html() -> str:
           { key: "artifact_type", label: "Artifact" },
           { key: "artifact_uri", label: "URI" }
         ]),
+        renderRiskTable("Runner Preflight Blocks", risks.runner_preflight_blocks ?? [
+        ], [
+          { key: "task_code", label: "Task" },
+          { key: "summary", label: "Summary" },
+          { key: "created_by", label: "By" },
+          { key: "created_at", label: "Created" }
+        ]),
         renderRiskTable("Failed Gates", risks.failed_gates ?? [
         ], [
           { key: "task_code", label: "Task" },

@@ -793,6 +793,23 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
                 """
                 select
                     t.task_code,
+                    e.summary,
+                    e.created_by,
+                    e.created_at::text
+                from task_events e
+                join tasks t on t.id = e.task_id
+                where e.event_type = 'runner_preflight_blocked'
+                order by e.created_at desc
+                limit %s
+                """,
+                (limit,),
+            )
+            runner_preflight_block_rows = cur.fetchall()
+
+            cur.execute(
+                """
+                select
+                    t.task_code,
                     tc.agent_name,
                     tc.tool_name,
                     tc.permission_policy,
@@ -965,6 +982,15 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
             }
             for row in runner_failure_rows
         ],
+        "runner_preflight_blocks": [
+            {
+                "task_code": row[0],
+                "summary": row[1],
+                "created_by": row[2],
+                "created_at": row[3],
+            }
+            for row in runner_preflight_block_rows
+        ],
         "tool_risks": [
             {
                 "task_code": row[0],
@@ -1028,6 +1054,7 @@ def get_console_risks(limit: int = 20) -> dict[str, Any]:
             "blocked_task_count": len(blocked_task_rows),
             "failed_gate_count": len(failed_gate_rows),
             "runner_failure_count": len(runner_failure_rows),
+            "runner_preflight_block_count": len(runner_preflight_block_rows),
             "tool_risk_count": len(tool_risk_rows),
             "pending_tool_call_count": len(pending_tool_call_rows),
             "stale_tool_call_count": len(stale_tool_call_rows),

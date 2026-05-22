@@ -74,6 +74,7 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "buildTaskUrl" in html
     assert "gate_results" in html
     assert "Runner Failures" in html
+    assert "Runner Preflight Blocks" in html
     assert "Stale Tool Calls" in html
     assert "Pending Tool Calls" in html
     assert "Recent GitHub Sync Links" in html

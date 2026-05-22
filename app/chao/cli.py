@@ -654,6 +654,20 @@ def console_risks_command(
         )
     console.print(runner_failures)
 
+    preflight_blocks = Table(title="Runner Preflight Blocks")
+    preflight_blocks.add_column("Task")
+    preflight_blocks.add_column("Summary")
+    preflight_blocks.add_column("By")
+    preflight_blocks.add_column("Created At")
+    for block in risks["runner_preflight_blocks"]:
+        preflight_blocks.add_row(
+            _display_value(block.get("task_code")),
+            _display_value(block.get("summary")),
+            _display_value(block.get("created_by")),
+            _display_value(block.get("created_at")),
+        )
+    console.print(preflight_blocks)
+
     stale_tools = Table(title="Stale Tool Calls")
     stale_tools.add_column("Task")
     stale_tools.add_column("Agent")
@@ -1773,12 +1787,16 @@ def runner_preflight_command(
     event_type = (
         "runner_preflight_ready" if result_status == "success" else "runner_preflight_blocked"
     )
+    preflight_summary = f"Runner preflight {preflight['status']}: {repository_config.name}"
+    if preflight["errors"]:
+        preflight_summary = f"{preflight_summary}; errors={'; '.join(preflight['errors'])}"
+
     record_task_event(
         task_id=task["id"],
         event_type=event_type,
         from_status=task["status"],
         to_status=task["status"],
-        summary=f"Runner preflight {preflight['status']}: {repository_config.name}",
+        summary=preflight_summary,
         created_by=by,
     )
     record_tool_call(
