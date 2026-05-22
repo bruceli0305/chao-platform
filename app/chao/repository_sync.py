@@ -191,7 +191,9 @@ def inspect_repository_status(
 
         for key, command in commands.items():
             completed = _run_command(command, command_runner=command_runner)
-            output = completed.stdout.strip()
+            output = (
+                completed.stdout.rstrip("\r\n") if key == "status" else completed.stdout.strip()
+            )
 
             if completed.returncode != 0:
                 if key == "divergence":
