@@ -40,6 +40,7 @@ from app.chao.runner_executor import (
     build_implementation_result_from_execution,
 )
 from app.chao.runner_policy import build_runner_branch_plan, build_runner_workspace_plan
+from app.chao.runner_preflight import build_runner_preflight_result
 from app.chao.runner_sandbox import DEFAULT_SANDBOX_IMAGE, execute_runner_sandbox_commands
 from app.chao.runner_validation import execute_runner_validation_commands
 from app.chao.runner_workspace import create_runner_workspace
@@ -1698,6 +1699,58 @@ def runner_branch_command(
             "branch_result": branch_result,
         }
     )
+
+
+@app.command("runner-preflight")
+def runner_preflight_command(
+    task_code: str,
+    gate: Annotated[
+        list[str] | None,
+        typer.Option("--gate", help="Validation gate expected for runner execution"),
+    ] = None,
+    repository: str | None = typer.Option(None, "--repository", help="Repository config name"),
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    try:
+        repository_config = get_repository_config(repository)
+        validation_gates = _resolve_task_validation_gates(task, gate)
+        preflight = build_runner_preflight_result(
+            task,
+            repository_config,
+            validation_gates,
+        )
+    except ValueError as exc:
+        print_json(data={"status": "failed", "error": str(exc)})
+        raise typer.Exit(code=1) from exc
+
+    if as_json:
+        print_json(data=preflight)
+    else:
+        summary = Table(title="Runner Preflight")
+        summary.add_column("Field")
+        summary.add_column("Value")
+        summary.add_row("Task", preflight["task_code"])
+        summary.add_row("Level", preflight["task_level"])
+        summary.add_row("Repository", preflight["repository"])
+        summary.add_row("Status", preflight["status"])
+        summary.add_row("Runner Allowed", str(preflight["runner_allowed"]))
+        summary.add_row("Repository Ready", str(preflight["repository_ready"]))
+        summary.add_row("Validation Gates", ", ".join(preflight["validation_gates"]))
+        summary.add_row("Errors", "; ".join(preflight["errors"]))
+        summary.add_row(
+            "Suggested Action",
+            preflight["repository_doctor"]["suggested_action"],
+        )
+        console.print(summary)
+
+    if preflight["errors"]:
+        raise typer.Exit(code=1)
 
 
 @app.command("runner-workspace")
