@@ -1,5 +1,8 @@
 from app.chao.repositories import RepositoryConfig
-from app.chao.runner_preflight import build_runner_preflight_result
+from app.chao.runner_preflight import (
+    build_runner_preflight_result,
+    require_runner_preflight_ready,
+)
 
 
 def _repository_config() -> RepositoryConfig:
@@ -98,3 +101,42 @@ def test_build_runner_preflight_result_blocks_unready_repository(monkeypatch):
     assert result["status"] == "blocked"
     assert result["repository_ready"] is False
     assert "repository is not runner ready: review_local_changes" in result["errors"]
+
+
+def test_build_runner_preflight_can_skip_validation_gate_requirement(monkeypatch):
+    monkeypatch.setattr(
+        "app.chao.runner_preflight.build_repository_doctor_report",
+        lambda _repository: _doctor(),
+    )
+
+    result = build_runner_preflight_result(
+        _task(),
+        _repository_config(),
+        [],
+        require_validation_gates=False,
+    )
+
+    assert result["status"] == "ready"
+    assert result["validation_gates"] == []
+    assert result["errors"] == []
+
+
+def test_require_runner_preflight_ready_raises_for_blocked_result():
+    preflight = {
+        "task_code": "TASK-1",
+        "task_level": "L2",
+        "repository": "demo",
+        "status": "blocked",
+        "runner_allowed": True,
+        "repository_ready": False,
+        "validation_gates": ["lint"],
+        "repository_doctor": _doctor(False, "review_local_changes"),
+        "errors": ["repository is not runner ready: review_local_changes"],
+    }
+
+    try:
+        require_runner_preflight_ready(preflight)
+    except PermissionError as exc:
+        assert str(exc) == "repository is not runner ready: review_local_changes"
+    else:
+        raise AssertionError("expected blocked runner preflight to raise")

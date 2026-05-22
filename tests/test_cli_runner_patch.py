@@ -1,3 +1,4 @@
+import pytest
 from typer.testing import CliRunner
 
 from app.chao import cli
@@ -17,6 +18,15 @@ def _repository_config(
         sandbox_root=".chao/sandboxes",
         branch_prefix="codex/",
         enabled=True,
+    )
+
+
+@pytest.fixture(autouse=True)
+def allow_runner_preflight(monkeypatch):
+    monkeypatch.setattr(
+        cli,
+        "_require_runner_repository_preflight",
+        lambda *_args, **_kwargs: None,
     )
 
 
@@ -134,6 +144,47 @@ def test_runner_patch_apply_records_apply_event(monkeypatch):
     assert calls["events"][0]["event_type"] == "runner_patch_applied"
     assert calls["tool_calls"][0]["result_status"] == "success"
     assert '"applied": true' in result.output
+
+
+def test_runner_patch_apply_blocks_failed_preflight(monkeypatch):
+    calls = {"patches": []}
+    task = {
+        "id": "task-1",
+        "task_code": "TASK-1",
+        "task_level": "L1",
+        "status": "DELIVERED",
+        "route_result": {"required_confirmation": "none"},
+    }
+
+    def fail_preflight(*_args, **_kwargs):
+        raise PermissionError("repository is not runner ready: review_local_changes")
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: task)
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
+    monkeypatch.setattr(cli, "_require_runner_repository_preflight", fail_preflight)
+    monkeypatch.setattr(
+        cli,
+        "apply_text_patch_operations",
+        lambda *_args, **_kwargs: calls["patches"].append("called"),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "runner-patch",
+            "TASK-1",
+            "app/chao/demo.txt",
+            "--old-text",
+            "old",
+            "--new-text",
+            "new",
+            "--apply",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "repository is not runner ready: review_local_changes" in result.output
+    assert calls["patches"] == []
 
 
 def test_runner_patch_rejects_l4_task(monkeypatch):

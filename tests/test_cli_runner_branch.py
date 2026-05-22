@@ -1,3 +1,4 @@
+import pytest
 from typer.testing import CliRunner
 
 from app.chao import cli
@@ -20,6 +21,15 @@ def _repository_config(
         sandbox_root=sandbox_root,
         branch_prefix=branch_prefix,
         enabled=True,
+    )
+
+
+@pytest.fixture(autouse=True)
+def allow_runner_preflight(monkeypatch):
+    monkeypatch.setattr(
+        cli,
+        "_require_runner_repository_preflight",
+        lambda *_args, **_kwargs: None,
     )
 
 

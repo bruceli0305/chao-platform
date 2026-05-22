@@ -40,7 +40,10 @@ from app.chao.runner_executor import (
     build_implementation_result_from_execution,
 )
 from app.chao.runner_policy import build_runner_branch_plan, build_runner_workspace_plan
-from app.chao.runner_preflight import build_runner_preflight_result
+from app.chao.runner_preflight import (
+    build_runner_preflight_result,
+    require_runner_preflight_ready,
+)
 from app.chao.runner_sandbox import DEFAULT_SANDBOX_IMAGE, execute_runner_sandbox_commands
 from app.chao.runner_validation import execute_runner_validation_commands
 from app.chao.runner_workspace import create_runner_workspace
@@ -120,6 +123,23 @@ def _resolve_task_validation_gates(
         return [str(gate) for gate in required_gates]
 
     raise ValueError("No validation gates provided or recorded for this task.")
+
+
+def _require_runner_repository_preflight(
+    task: dict[str, object],
+    repository_config,
+    validation_gates: list[str] | None = None,
+    *,
+    require_validation_gates: bool = True,
+):
+    return require_runner_preflight_ready(
+        build_runner_preflight_result(
+            task,
+            repository_config,
+            validation_gates,
+            require_validation_gates=require_validation_gates,
+        )
+    )
 
 
 @app.command()
@@ -1640,6 +1660,12 @@ def runner_branch_command(
             current_status=task["status"],
         )
         repository_config = get_repository_config(repository)
+        if apply:
+            _require_runner_repository_preflight(
+                task,
+                repository_config,
+                require_validation_gates=False,
+            )
         resolved_base_ref = base_ref or repository_config.default_branch
         branch_plan = build_runner_branch_plan(
             task_code=task_code,
@@ -1781,6 +1807,12 @@ def runner_workspace_command(
             current_status=task["status"],
         )
         repository_config = get_repository_config(repository)
+        if apply:
+            _require_runner_repository_preflight(
+                task,
+                repository_config,
+                require_validation_gates=False,
+            )
         resolved_base_ref = base_ref or repository_config.default_branch
         workspace_plan = build_runner_workspace_plan(
             task_code=task_code,
@@ -1877,6 +1909,8 @@ def runner_sandbox_command(
         )
         repository_config = get_repository_config(repository)
         sandbox_gates = _resolve_task_validation_gates(task, gate)
+        if apply:
+            _require_runner_repository_preflight(task, repository_config, sandbox_gates)
         sandbox_result = execute_runner_sandbox_commands(
             sandbox_gates,
             workspace_path=workspace_path,
@@ -1969,6 +2003,12 @@ def runner_patch_command(
             current_status=task["status"],
         )
         repository_config = get_repository_config(repository)
+        if apply:
+            _require_runner_repository_preflight(
+                task,
+                repository_config,
+                require_validation_gates=False,
+            )
         execution_result = apply_text_patch_operations(
             [
                 {
@@ -2051,6 +2091,7 @@ def runner_validate_command(
         )
         repository_config = get_repository_config(repository)
         validation_gates = _resolve_task_validation_gates(task, gate)
+        _require_runner_repository_preflight(task, repository_config, validation_gates)
         validation_result = execute_runner_validation_commands(
             validation_gates,
             repo_root=repository_config.workspace_path,
@@ -2148,6 +2189,8 @@ def runner_attempt_command(
             current_status=task["status"],
         )
         repository_config = get_repository_config(repository)
+        validation_gates = _resolve_task_validation_gates(task, gate)
+        _require_runner_repository_preflight(task, repository_config, validation_gates)
         execution_result = apply_text_patch_operations(
             [
                 {
@@ -2159,7 +2202,6 @@ def runner_attempt_command(
             repo_root=repository_config.workspace_path,
             dry_run=not apply,
         )
-        validation_gates = _resolve_task_validation_gates(task, gate)
         validation_result = execute_runner_validation_commands(
             validation_gates,
             repo_root=repository_config.workspace_path,

@@ -19,8 +19,11 @@ class RunnerPreflightResult(TypedDict):
 def build_runner_preflight_result(
     task: dict[str, Any],
     repository: RepositoryConfig,
-    validation_gates: list[str],
+    validation_gates: list[str] | None,
+    *,
+    require_validation_gates: bool = True,
 ) -> RunnerPreflightResult:
+    validation_gates = validation_gates or []
     repository_doctor = build_repository_doctor_report(repository)
     errors: list[str] = []
     task_level = str(task.get("task_level", ""))
@@ -32,7 +35,7 @@ def build_runner_preflight_result(
     if not repository_doctor["runner_ready"]:
         errors.append(f"repository is not runner ready: {repository_doctor['suggested_action']}")
 
-    if not validation_gates:
+    if require_validation_gates and not validation_gates:
         errors.append("No validation gates provided or recorded for this task.")
 
     return {
@@ -46,3 +49,12 @@ def build_runner_preflight_result(
         "repository_doctor": repository_doctor,
         "errors": errors,
     }
+
+
+def require_runner_preflight_ready(
+    preflight: RunnerPreflightResult,
+) -> RunnerPreflightResult:
+    if preflight["errors"]:
+        raise PermissionError("; ".join(preflight["errors"]))
+
+    return preflight
