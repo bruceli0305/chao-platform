@@ -16,6 +16,7 @@ def test_tool_registry_contains_first_batch():
         "cli.bind_github",
         "cli.runner_branch",
         "cli.runner_patch",
+        "cli.runner_preflight",
         "cli.runner_sandbox",
         "cli.runner_validate",
         "cli.runner_workspace",
@@ -102,6 +103,20 @@ def test_gongbu_can_create_controlled_runner_workspace():
     assert decision["risk_flag"] is None
 
 
+def test_gongbu_can_run_controlled_runner_preflight():
+    decision = evaluate_tool_permission(
+        agent_name="gongbu",
+        tool_name="cli.runner_preflight",
+        task_level="L2",
+        required_confirmation="B",
+        current_status="DELIVERED",
+    )
+
+    assert decision["allowed"] is True
+    assert decision["permission_policy"] == "controlled-runner-preflight"
+    assert decision["risk_flag"] is None
+
+
 def test_gongbu_can_run_controlled_runner_sandbox():
     decision = evaluate_tool_permission(
         agent_name="gongbu",
@@ -113,6 +128,20 @@ def test_gongbu_can_run_controlled_runner_sandbox():
 
     assert decision["allowed"] is True
     assert decision["permission_policy"] == "controlled-runner-sandbox"
+    assert decision["risk_flag"] is None
+
+
+def test_xingbu_can_run_controlled_runner_preflight():
+    decision = evaluate_tool_permission(
+        agent_name="xingbu",
+        tool_name="cli.runner_preflight",
+        task_level="L2",
+        required_confirmation="B",
+        current_status="DELIVERED",
+    )
+
+    assert decision["allowed"] is True
+    assert decision["permission_policy"] == "controlled-runner-preflight"
     assert decision["risk_flag"] is None
 
 

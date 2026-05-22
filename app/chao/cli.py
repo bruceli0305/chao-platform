@@ -1736,6 +1736,7 @@ def runner_preflight_command(
     ] = None,
     repository: str | None = typer.Option(None, "--repository", help="Repository config name"),
     as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+    by: str = typer.Option("gongbu", "--by", help="Runner agent name"),
 ):
     task = get_task_detail(task_code)
 
@@ -1744,16 +1745,59 @@ def runner_preflight_command(
         raise typer.Exit(code=1)
 
     try:
+        permission_decision = require_tool_permission(
+            agent_name=by,
+            tool_name="cli.runner_preflight",
+            task_level=task["task_level"],
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
+            current_status=task["status"],
+        )
         repository_config = get_repository_config(repository)
-        validation_gates = _resolve_task_validation_gates(task, gate)
+        try:
+            validation_gates = _resolve_task_validation_gates(task, gate)
+        except ValueError:
+            validation_gates = []
         preflight = build_runner_preflight_result(
             task,
             repository_config,
             validation_gates,
         )
-    except ValueError as exc:
+    except (PermissionError, ValueError) as exc:
         print_json(data={"status": "failed", "error": str(exc)})
         raise typer.Exit(code=1) from exc
+
+    result_status = "success" if not preflight["errors"] else "failed"
+    event_type = (
+        "runner_preflight_ready" if result_status == "success" else "runner_preflight_blocked"
+    )
+    record_task_event(
+        task_id=task["id"],
+        event_type=event_type,
+        from_status=task["status"],
+        to_status=task["status"],
+        summary=f"Runner preflight {preflight['status']}: {repository_config.name}",
+        created_by=by,
+    )
+    record_tool_call(
+        task_id=task["id"],
+        agent_name=by,
+        tool_name="cli.runner_preflight",
+        arguments_summary=(
+            f"task_code={task_code}; repository={repository_config.name}; gates={validation_gates}"
+        ),
+        permission_policy=permission_decision["permission_policy"],
+        result_status=result_status,
+        permission_decision=permission_decision,
+        output_summary=(
+            f"status={preflight['status']}; "
+            f"suggested_action={preflight['repository_doctor']['suggested_action']}; "
+            f"errors={preflight['errors']}"
+        ),
+        risk_flag=permission_decision["risk_flag"],
+    )
 
     if as_json:
         print_json(data=preflight)

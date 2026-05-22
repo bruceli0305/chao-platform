@@ -64,6 +64,13 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         "description": "Create or inspect the isolated Agent Runner worktree.",
         "permission_policy": "controlled-runner-workspace",
     },
+    "cli.runner_preflight": {
+        "name": "cli.runner_preflight",
+        "category": "git.read",
+        "risk": "medium",
+        "description": "Check task, repository, and gate readiness before Runner execution.",
+        "permission_policy": "controlled-runner-preflight",
+    },
     "cli.runner_sandbox": {
         "name": "cli.runner_sandbox",
         "category": "docker.execute",
@@ -121,12 +128,14 @@ ROLE_ALLOWED_TOOLS: dict[str, set[str]] = {
     "gongbu": {
         "cli.runner_branch",
         "cli.runner_patch",
+        "cli.runner_preflight",
         "cli.runner_sandbox",
         "cli.runner_workspace",
     },
     "xingbu": {
         "schema_check",
         "data_boundary_check",
+        "cli.runner_preflight",
         "cli.runner_validate",
         "cli.audit_llm_egress_authorizations",
     },
