@@ -525,3 +525,149 @@ def test_self_upgrade_create_pr_records_github_link(monkeypatch):
     ]
     assert calls["events"][-1]["event_type"] == "self_upgrade_pr_created"
     assert '"status": "pr_created"' in result.output
+
+
+def test_self_upgrade_check_ci_records_ci_links(monkeypatch):
+    calls = {
+        "preflight": [],
+        "tool_calls": [],
+        "events": [],
+        "deliveries": [],
+        "prs": [],
+        "github_links": [],
+        "ci": [],
+    }
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
+    monkeypatch.setattr(
+        cli,
+        "execute_llm_chat_completion",
+        lambda *_args, **_kwargs: _llm_result(dry_run=False, response=_plan_response()),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_require_runner_repository_preflight",
+        lambda *args, **kwargs: calls["preflight"].append((args, kwargs)),
+    )
+    monkeypatch.setattr(
+        cli,
+        "apply_text_patch_operations",
+        lambda *_args, **kwargs: {
+            "summary": "Applied 1 controlled text patch operation(s).",
+            "changed_files": ["app/chao/demo.py"],
+            "operations": [],
+            "applied": not kwargs["dry_run"],
+            "dry_run": kwargs["dry_run"],
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "execute_runner_validation_commands",
+        lambda gates, **_kwargs: {
+            "quality": "deliverable",
+            "checks": gates,
+            "plan": [],
+            "command_results": [],
+            "deliverable": True,
+            "note": "passed",
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "execute_self_upgrade_delivery",
+        lambda repository, **kwargs: {
+            "repository": repository.name,
+            "workspace_path": repository.workspace_path,
+            "changed_files": kwargs["changed_files"],
+            "commit_message": kwargs["commit_message"],
+            "status_lines": [" M app/chao/demo.py"],
+            "dry_run": kwargs["dry_run"],
+            "committed": True,
+            "pushed": kwargs["push"],
+            "commit_sha": "abc123",
+            "commands": [],
+            "errors": [],
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "execute_github_pr_create",
+        lambda repository, **kwargs: {
+            "repository": repository.name,
+            "workspace_path": repository.workspace_path,
+            "title": kwargs["title"],
+            "body": kwargs["body"],
+            "base_ref": kwargs["base_ref"],
+            "head_ref": "codex/task-1-demo",
+            "dry_run": kwargs["dry_run"],
+            "created": True,
+            "url": "https://github.com/example/repo/pull/42",
+            "external_id": "42",
+            "commands": [],
+            "errors": [],
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "execute_github_pr_checks",
+        lambda repository, **kwargs: (
+            calls["ci"].append((repository, kwargs))
+            or {
+                "repository": repository.name,
+                "workspace_path": repository.workspace_path,
+                "pr_ref": kwargs["pr_ref"],
+                "status": "passed",
+                "deliverable": True,
+                "dry_run": kwargs["dry_run"],
+                "checks": [
+                    {
+                        "name": "pytest",
+                        "state": "SUCCESS",
+                        "link": "https://github.com/example/repo/actions/runs/99",
+                        "workflow": "CI",
+                        "bucket": "pass",
+                    }
+                ],
+                "commands": [],
+                "errors": [],
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_github_link",
+        lambda **kwargs: calls["github_links"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "self-upgrade",
+            "TASK-1",
+            "--execute",
+            "--apply",
+            "--commit",
+            "--push",
+            "--create-pr",
+            "--check-ci",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert calls["ci"][0][1]["pr_ref"] == "https://github.com/example/repo/pull/42"
+    assert calls["github_links"][1]["link_type"] == "ci_run"
+    assert calls["github_links"][1]["status"] == "success"
+    assert calls["tool_calls"][-1]["tool_name"] == "cli.github_ci_check"
+    assert calls["events"][-1]["event_type"] == "self_upgrade_ci_passed"
+    assert '"status": "ci_passed"' in result.output

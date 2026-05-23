@@ -50,6 +50,13 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         "description": "Create a GitHub pull request for validated self-upgrade changes.",
         "permission_policy": "controlled-github-pr-create",
     },
+    "cli.github_ci_check": {
+        "name": "cli.github_ci_check",
+        "category": "github.ci.read",
+        "risk": "medium",
+        "description": "Read GitHub pull request check status for delivery feedback.",
+        "permission_policy": "controlled-github-ci-check",
+    },
     "cli.runner_patch": {
         "name": "cli.runner_patch",
         "category": "filesystem.write",
@@ -153,6 +160,7 @@ ROLE_ALLOWED_TOOLS: dict[str, set[str]] = {
         "cli.runner_preflight",
         "cli.runner_validate",
         "cli.audit_llm_egress_authorizations",
+        "cli.github_ci_check",
     },
     "hubu": {"data_boundary_check"},
     "menxia": {"schema_check", "data_boundary_check"},

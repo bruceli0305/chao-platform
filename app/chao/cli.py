@@ -8,6 +8,7 @@ from rich import print, print_json
 from rich.console import Console
 from rich.table import Table
 
+from app.chao.github_ci import execute_github_pr_checks
 from app.chao.github_pr import build_self_upgrade_pr_body, execute_github_pr_create
 from app.chao.graph.main_graph import build_graph
 from app.chao.llm_client import execute_llm_chat_completion
@@ -1710,6 +1711,11 @@ def self_upgrade_command(
         "--create-pr",
         help="Create and bind a GitHub PR after pushing the self-upgrade branch",
     ),
+    check_ci: bool = typer.Option(
+        False,
+        "--check-ci",
+        help="Read GitHub PR checks after creating the self-upgrade PR",
+    ),
     allow_governed_egress: bool = typer.Option(
         False,
         "--allow-governed-egress",
@@ -1723,6 +1729,7 @@ def self_upgrade_command(
     validate_by: str = typer.Option("xingbu", "--validate-by", help="Validation agent name"),
     delivery_by: str = typer.Option("gongbu", "--delivery-by", help="Delivery agent name"),
     pr_by: str = typer.Option("shangshu", "--pr-by", help="GitHub PR agent name"),
+    ci_by: str = typer.Option("xingbu", "--ci-by", help="GitHub CI check agent name"),
 ):
     task = get_task_detail(task_code)
 
@@ -1744,6 +1751,9 @@ def self_upgrade_command(
         raise typer.Exit(code=1)
     if create_pr and not push:
         print("[red]--create-pr requires --push.[/red]")
+        raise typer.Exit(code=1)
+    if check_ci and not create_pr:
+        print("[red]--check-ci requires --create-pr.[/red]")
         raise typer.Exit(code=1)
 
     try:
@@ -1824,7 +1834,7 @@ def self_upgrade_command(
             f"model={provider_config.model}; user_request_chars={len(request)}; "
             f"llm_prompt_chars={len(llm_prompt)}; data_classification={resolved_classification}; "
             f"execute={execute}; apply={apply}; validate={validate}; branch={branch}; "
-            f"commit={commit}; push={push}; create_pr={create_pr}; "
+            f"commit={commit}; push={push}; create_pr={create_pr}; check_ci={check_ci}; "
             f"allow_governed_egress={allow_governed_egress}"
         ),
         permission_policy=llm_permission["permission_policy"],
@@ -1871,6 +1881,7 @@ def self_upgrade_command(
         delivery_result = None
         branch_result = None
         pr_result = None
+        ci_result = None
 
         if plan["operations"]:
             if branch and apply:
@@ -2129,6 +2140,69 @@ def self_upgrade_command(
                 risk_flag=pr_permission["risk_flag"] or not pr_success,
             )
 
+        pr_delivered = pr_result is None or (not pr_result["errors"] and bool(pr_result["url"]))
+        if plan["operations"] and check_ci and pr_result and pr_delivered:
+            ci_permission = require_tool_permission(
+                agent_name=ci_by,
+                tool_name="cli.github_ci_check",
+                task_level=task["task_level"],
+                required_confirmation=task.get("route_result", {}).get(
+                    "required_confirmation",
+                    "none",
+                ),
+                current_status=task["status"],
+            )
+            ci_result = execute_github_pr_checks(
+                repository_config,
+                pr_ref=pr_result["url"] or pr_result["external_id"] or "",
+                dry_run=False,
+            )
+            for check in ci_result["checks"]:
+                if not check["link"]:
+                    continue
+                record_github_link(
+                    task_id=task["id"],
+                    link_type="ci_run",
+                    external_id=f"{pr_result['external_id'] or pr_result['url']}:{check['name']}",
+                    url=check["link"],
+                    title=check["name"],
+                    status=check["state"].lower(),
+                    metadata={
+                        "source": "self_upgrade_ci_check",
+                        "pr_url": pr_result["url"],
+                        "workflow": check["workflow"],
+                        "bucket": check["bucket"],
+                    },
+                    created_by=ci_by,
+                )
+            record_task_event(
+                task_id=task["id"],
+                event_type=f"self_upgrade_ci_{ci_result['status']}",
+                from_status=task["status"],
+                to_status=task["status"],
+                summary=(
+                    f"Self-upgrade CI {ci_result['status']}: {len(ci_result['checks'])} check(s)."
+                ),
+                created_by=ci_by,
+            )
+            record_tool_call(
+                task_id=task["id"],
+                agent_name=ci_by,
+                tool_name="cli.github_ci_check",
+                arguments_summary=(
+                    f"task_code={task_code}; repository={repository_config.name}; "
+                    f"pr_ref={ci_result['pr_ref']}"
+                ),
+                permission_policy=ci_permission["permission_policy"],
+                result_status="success" if ci_result["deliverable"] else ci_result["status"],
+                permission_decision=ci_permission,
+                output_summary=(
+                    f"status={ci_result['status']}; checks={len(ci_result['checks'])}; "
+                    f"errors={ci_result['errors']}"
+                ),
+                risk_flag=ci_permission["risk_flag"] or not ci_result["deliverable"],
+            )
+
         if not plan["operations"]:
             record_task_event(
                 task_id=task["id"],
@@ -2145,6 +2219,7 @@ def self_upgrade_command(
     deliverable = validation_result is None or validation_result["deliverable"]
     delivered = delivery_result is None or not delivery_result["errors"]
     pr_delivered = pr_result is None or (not pr_result["errors"] and bool(pr_result["url"]))
+    ci_delivered = ci_result is None or ci_result["deliverable"]
     status = "no_patch"
     if plan["operations"]:
         status = "planned"
@@ -2154,6 +2229,14 @@ def self_upgrade_command(
             status = "delivered" if deliverable and delivered else "delivery_failed"
         if create_pr:
             status = "pr_created" if deliverable and delivered and pr_delivered else "pr_failed"
+        if check_ci:
+            status = (
+                "ci_passed"
+                if deliverable and delivered and pr_delivered and ci_delivered
+                else f"ci_{ci_result['status']}"
+                if ci_result
+                else "ci_failed"
+            )
 
     print_json(
         data={
@@ -2167,10 +2250,11 @@ def self_upgrade_command(
             "validation_result": validation_result,
             "delivery_result": delivery_result,
             "pr_result": pr_result,
+            "ci_result": ci_result,
         }
     )
 
-    if not deliverable or not delivered or not pr_delivered:
+    if not deliverable or not delivered or not pr_delivered or not ci_delivered:
         raise typer.Exit(code=1)
 
 
