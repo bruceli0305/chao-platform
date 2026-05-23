@@ -119,3 +119,20 @@ def test_build_self_upgrade_prompt_redacts_user_request_secret():
 
     assert "super-secret-value" not in prompt
     assert "<redacted-secret>" in prompt
+
+
+def test_build_self_upgrade_prompt_includes_repository_patch_hints():
+    prompt = build_self_upgrade_prompt(
+        {
+            "task_code": "TASK-1",
+            "title": "Patch homepage",
+            "task_level": "L1",
+            "status": "NEW",
+            "raw_request": "把首页标题从系统管理改成项目管理",
+        },
+        "",
+    )
+
+    assert "app/chao/web_console.py" in prompt
+    assert "build_console_index_html" in prompt
+    assert "does not use app/templates/index.html" in prompt

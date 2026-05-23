@@ -47,6 +47,13 @@ EXECUTABLE_SELF_UPGRADE_GATES = {
 
 DEFAULT_SELF_UPGRADE_GATES = ["lint", "test"]
 
+SELF_UPGRADE_REPOSITORY_HINTS = """Repository patch hints:
+- The Web Console homepage is built in app/chao/web_console.py by build_console_index_html().
+- This repository does not use app/templates/index.html or a top-level templates/ directory.
+- For homepage title or header text changes, use app/chao/web_console.py.
+- The old_text must be exact text from that file.
+"""
+
 
 def build_self_upgrade_prompt(task: dict[str, Any], user_request: str) -> str:
     request = user_request.strip() or str(task.get("raw_request") or "")
@@ -64,7 +71,10 @@ def build_self_upgrade_prompt(task: dict[str, Any], user_request: str) -> str:
         "If the task cannot be changed safely with exact text replacements, return operations "
         "as an empty array and explain why in summary."
     )
-    return build_llm_task_prompt(task, f"{request}\n\n{plan_contract}")
+    return build_llm_task_prompt(
+        task,
+        f"{request}\n\n{SELF_UPGRADE_REPOSITORY_HINTS}\n{plan_contract}",
+    )
 
 
 def extract_llm_response_text(response: dict[str, Any] | None) -> str:
