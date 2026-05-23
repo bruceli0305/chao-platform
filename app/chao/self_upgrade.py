@@ -64,7 +64,7 @@ SELF_UPGRADE_SOURCE_CONTEXT_PATHS = [
     "app/chao/web_console.py",
 ]
 
-MAX_SELF_UPGRADE_SOURCE_CONTEXT_CHARS = 24000
+MAX_SELF_UPGRADE_SOURCE_CONTEXT_CHARS = 120000
 
 
 def build_self_upgrade_prompt(task: dict[str, Any], user_request: str) -> str:
