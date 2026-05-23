@@ -1,11 +1,12 @@
 import json
+from collections import defaultdict
 from typing import Any, TypedDict
 
 from app.chao.llm_context import build_llm_task_prompt, redact_sensitive_text
 from app.chao.runner_policy import normalize_repo_path, require_change_scope_allowed
 from app.chao.self_upgrade_context import (
     build_self_upgrade_source_context,
-    resolve_candidate_patch,
+    resolve_candidate_patches,
 )
 
 
@@ -235,36 +236,55 @@ def _parse_operations(value: object) -> list[SelfUpgradePatchOperation]:
     if not isinstance(value, list):
         raise ValueError("self-upgrade operations must be a list")
 
-    operations: list[SelfUpgradePatchOperation] = []
+    candidate_operations_by_path: dict[str, list[dict[str, str]]] = defaultdict(list)
+    direct_operations: list[SelfUpgradePatchOperation] = []
+
     for index, operation in enumerate(value, start=1):
         if not isinstance(operation, dict):
             raise ValueError(f"self-upgrade operation {index} must be an object")
 
-        normalized_operation = _parse_operation(operation, index)
-        operations.append(normalized_operation)
+        path = operation.get("path")
+        if not isinstance(path, str) or not path.strip():
+            raise ValueError(f"self-upgrade operation {index} requires path")
+        normalized_path = normalize_repo_path(path)
+
+        candidate_id = operation.get("candidate_id")
+        translated_text = operation.get("translated_text")
+        if candidate_id is not None or translated_text is not None:
+            if not isinstance(candidate_id, str) or not candidate_id.strip():
+                raise ValueError(f"self-upgrade operation {index} requires candidate_id")
+            if not isinstance(translated_text, str) or not translated_text.strip():
+                raise ValueError(f"self-upgrade operation {index} requires translated_text")
+            candidate_operations_by_path[normalized_path].append(
+                {
+                    "candidate_id": candidate_id,
+                    "translated_text": translated_text,
+                }
+            )
+            continue
+
+        direct_operations.append(_parse_direct_operation(operation, index, normalized_path))
+
+    operations: list[SelfUpgradePatchOperation] = []
+    operations.extend(direct_operations)
+    for path, candidate_operations in candidate_operations_by_path.items():
+        resolved = resolve_candidate_patches(path, candidate_operations)
+        operations.append(
+            {
+                "path": normalize_repo_path(resolved["path"]),
+                "old_text": _reject_sensitive_text(resolved["old_text"]),
+                "new_text": _reject_sensitive_text(resolved["new_text"]),
+            }
+        )
 
     return operations
 
 
-def _parse_operation(operation: dict[str, object], index: int) -> SelfUpgradePatchOperation:
-    path = operation.get("path")
-    if not isinstance(path, str) or not path.strip():
-        raise ValueError(f"self-upgrade operation {index} requires path")
-
-    candidate_id = operation.get("candidate_id")
-    translated_text = operation.get("translated_text")
-    if candidate_id is not None or translated_text is not None:
-        if not isinstance(candidate_id, str) or not candidate_id.strip():
-            raise ValueError(f"self-upgrade operation {index} requires candidate_id")
-        if not isinstance(translated_text, str) or not translated_text.strip():
-            raise ValueError(f"self-upgrade operation {index} requires translated_text")
-        resolved = resolve_candidate_patch(path, candidate_id, translated_text)
-        return {
-            "path": normalize_repo_path(resolved["path"]),
-            "old_text": _reject_sensitive_text(resolved["old_text"]),
-            "new_text": _reject_sensitive_text(resolved["new_text"]),
-        }
-
+def _parse_direct_operation(
+    operation: dict[str, object],
+    index: int,
+    normalized_path: str,
+) -> SelfUpgradePatchOperation:
     old_text = operation.get("old_text")
     new_text = operation.get("new_text")
     if not isinstance(old_text, str) or not old_text:
@@ -273,7 +293,7 @@ def _parse_operation(operation: dict[str, object], index: int) -> SelfUpgradePat
         raise ValueError(f"self-upgrade operation {index} requires new_text")
 
     return {
-        "path": normalize_repo_path(path),
+        "path": normalized_path,
         "old_text": _reject_sensitive_text(old_text),
         "new_text": _reject_sensitive_text(new_text),
     }
