@@ -31,8 +31,8 @@ The JSON object must contain:
 Rules:
 - Use repository-relative paths only.
 - old_text must be exact text that appears once in the target file.
-- Do not include secrets, tokens, private keys, or production data.
-- Do not modify forbidden paths such as .env, data/, logs/, .venv/, or __pycache__/.
+- Do not include restricted data.
+- Do not modify forbidden paths such as environment files, data/, logs/, .venv/, or __pycache__/.
 - Prefer the smallest safe patch that satisfies the task.
 """
 
@@ -182,12 +182,53 @@ def _load_json_object(text: str) -> dict[str, Any]:
     try:
         data = json.loads(candidate)
     except json.JSONDecodeError as exc:
-        raise ValueError(f"self-upgrade plan is not valid JSON: {exc.msg}") from exc
+        json_object = _extract_first_json_object(candidate)
+        if json_object is None:
+            raise ValueError(f"self-upgrade plan is not valid JSON: {exc.msg}") from exc
+        try:
+            data = json.loads(json_object)
+        except json.JSONDecodeError as nested_exc:
+            raise ValueError(
+                f"self-upgrade plan is not valid JSON: {nested_exc.msg}"
+            ) from nested_exc
 
     if not isinstance(data, dict):
         raise ValueError("self-upgrade plan must be a JSON object")
 
     return data
+
+
+def _extract_first_json_object(text: str) -> str | None:
+    start = text.find("{")
+    if start < 0:
+        return None
+
+    depth = 0
+    in_string = False
+    escaped = False
+
+    for index in range(start, len(text)):
+        char = text[index]
+
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : index + 1]
+
+    return None
 
 
 def _strip_markdown_fence(text: str) -> str:
@@ -269,6 +310,6 @@ def _parse_validation_gates(
 
 def _reject_sensitive_text(value: str) -> str:
     if redact_sensitive_text(value) != value:
-        raise ValueError("self-upgrade plan contains sensitive text")
+        raise ValueError("self-upgrade plan contains redacted text")
 
     return value
