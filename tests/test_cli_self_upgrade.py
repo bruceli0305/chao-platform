@@ -107,13 +107,17 @@ def test_self_upgrade_dry_run_records_llm_tool_call(monkeypatch):
     monkeypatch.setattr(cli, "execute_llm_chat_completion", fake_execute)
     monkeypatch.setattr(cli, "record_tool_call", lambda **kwargs: calls.append(kwargs))
 
-    result = CliRunner().invoke(cli.app, ["self-upgrade", "TASK-1", "rename title"])
+    result = CliRunner().invoke(
+        cli.app,
+        ["self-upgrade", "TASK-1", "rename title", "--timeout", "300"],
+    )
 
     assert result.exit_code == 0
     assert calls[0]["tool_name"] == "llm.chat_completion"
     assert calls[0]["result_status"] == "success"
     assert "rename title" in prompts[0][0]
     assert prompts[0][1]["dry_run"] is True
+    assert prompts[0][1]["timeout_seconds"] == 300
     assert '"status": "dry_run"' in result.output
 
 

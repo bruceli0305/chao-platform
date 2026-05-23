@@ -3,7 +3,6 @@ from pathlib import Path
 
 from app.chao.runner_policy import normalize_repo_path
 
-
 SELF_UPGRADE_SOURCE_CONTEXT_PATHS = [
     "app/chao/web_console.py",
 ]
@@ -148,7 +147,8 @@ def build_candidate_replacement(old_text: str, translated_text: str) -> str:
     if _BUTTON_TEXT_PATTERN.match(old_text.strip()):
         prefix_len = len(old_text) - len(old_text.lstrip())
         suffix_len = len(old_text) - len(old_text.rstrip())
-        return old_text[:prefix_len] + translated + (old_text[len(old_text) - suffix_len :] if suffix_len else "")
+        suffix = old_text[len(old_text) - suffix_len :] if suffix_len else ""
+        return old_text[:prefix_len] + translated + suffix
 
     raise ValueError("candidate old_text does not contain a supported visible text segment")
 
@@ -212,7 +212,9 @@ def _format_extracted_source_context(path: str, content: str) -> str:
             f"### Candidate {index:03d}: {path}:{candidate['start_line']}-{candidate['end_line']}\n"
             f"visible_text: {candidate['visible_text']}\n"
             "To change this text, return an operation using candidate_id and translated_text.\n"
-            "Example operation shape: {\"path\": \"app/chao/web_console.py\", \"candidate_id\": \"001\", \"translated_text\": \"中文译文\"}\n"
+            "Example operation shape: "
+            '{"path": "app/chao/web_console.py", '
+            '"candidate_id": "001", "translated_text": "中文译文"}\n'
         )
         if total_chars + len(block) > MAX_EXTRACTED_CONTEXT_CHARS:
             break
@@ -222,8 +224,10 @@ def _format_extracted_source_context(path: str, content: str) -> str:
     return (
         "## Source File Context\n"
         f"### {path}\n"
-        "The file is large, so the complete source is not included. Instead, the local runner extracted candidate user-visible text units.\n"
-        "For this task, use candidate_id plus translated_text instead of copying HTML or JavaScript lines into old_text.\n"
+        "The file is large, so the complete source is not included. "
+        "Instead, the local runner extracted candidate user-visible text units.\n"
+        "For this task, use candidate_id plus translated_text instead of copying "
+        "HTML or JavaScript lines into old_text.\n"
         "Do not output old_text for candidates in this extracted context.\n\n"
         + "\n\n".join(candidate_blocks)
     )
@@ -297,15 +301,18 @@ def _line_may_contain_user_visible_text(line: str) -> bool:
     if not _USER_VISIBLE_HINT_PATTERN.search(stripped):
         return False
 
-    return any(
-        pattern.search(stripped)
-        for pattern in [
-            _TEXT_BETWEEN_TAGS_PATTERN,
-            _PLACEHOLDER_PATTERN,
-            _ARIA_LABEL_PATTERN,
-            _JS_LABEL_PATTERN,
-            _TITLE_PATTERN,
-            _OPTION_PATTERN,
-            _ANCHOR_TEXT_PATTERN,
-        ]
-    ) or _BUTTON_TEXT_PATTERN.match(stripped) is not None
+    return (
+        any(
+            pattern.search(stripped)
+            for pattern in [
+                _TEXT_BETWEEN_TAGS_PATTERN,
+                _PLACEHOLDER_PATTERN,
+                _ARIA_LABEL_PATTERN,
+                _JS_LABEL_PATTERN,
+                _TITLE_PATTERN,
+                _OPTION_PATTERN,
+                _ANCHOR_TEXT_PATTERN,
+            ]
+        )
+        or _BUTTON_TEXT_PATTERN.match(stripped) is not None
+    )

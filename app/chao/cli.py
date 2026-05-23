@@ -1722,6 +1722,7 @@ def llm_chat_command(
     ),
     temperature: float = typer.Option(0.2, "--temperature", min=0.0, max=2.0),
     max_tokens: int = typer.Option(1024, "--max-tokens", min=1),
+    timeout_seconds: int = typer.Option(120, "--timeout", help="LLM HTTP timeout seconds"),
     execute: bool = typer.Option(False, "--execute", help="Call the external provider"),
     allow_governed_egress: bool = typer.Option(
         False,
@@ -1772,6 +1773,7 @@ def llm_chat_command(
                 system_prompt=system_prompt,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                timeout_seconds=timeout_seconds,
                 dry_run=not execute,
             )
             result_payload = result.to_safe_dict()
@@ -1946,6 +1948,7 @@ def self_upgrade_command(
                 system_prompt=SELF_UPGRADE_SYSTEM_PROMPT,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                timeout_seconds=timeout_seconds,
                 dry_run=not execute,
             )
             llm_payload = llm_result.to_safe_dict()

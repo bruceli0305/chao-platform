@@ -59,16 +59,17 @@ def test_parse_self_upgrade_plan_rejects_forbidden_paths():
         )
 
 
-def test_parse_self_upgrade_plan_rejects_manual_gate():
-    with pytest.raises(ValueError, match="unsupported self-upgrade validation gate"):
-        parse_self_upgrade_plan(
-            json.dumps(
-                {
-                    "operations": [],
-                    "validation_gates": ["manual_validation"],
-                }
-            )
+def test_parse_self_upgrade_plan_filters_manual_gate():
+    plan = parse_self_upgrade_plan(
+        json.dumps(
+            {
+                "operations": [],
+                "validation_gates": ["manual_validation"],
+            }
         )
+    )
+
+    assert plan["validation_gates"] == ["lint", "test"]
 
 
 def test_parse_self_upgrade_plan_can_ignore_manual_gate_when_validation_is_skipped():

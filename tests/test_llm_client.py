@@ -17,7 +17,7 @@ def test_build_deepseek_chat_request_uses_openai_compatible_shape(monkeypatch):
         {"role": "user", "content": "hello"},
     ]
     assert request.payload["thinking"] == {"type": "enabled"}
-    assert request.payload["reasoning_effort"] == "high"
+    assert request.payload["reasoning_effort"] == "low"
     assert "temperature" not in request.payload
     assert request.to_safe_dict()["headers"]["Authorization"] == "<redacted>"
     assert request.to_safe_dict()["payload"]["messages"] == [
@@ -45,6 +45,28 @@ def test_execute_llm_chat_completion_execute_requires_api_key(monkeypatch):
 
     assert result.status == "failed"
     assert result.error == "missing API key environment variable: DEEPSEEK_API_KEY"
+
+
+def test_execute_llm_chat_completion_uses_configured_timeout(monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    captured = {}
+    config = build_llm_provider_config(environ=os.environ)
+
+    def fake_post_json(_request, *, timeout_seconds=120):
+        captured["timeout_seconds"] = timeout_seconds
+        return {"choices": []}
+
+    monkeypatch.setattr("app.chao.llm_client._post_json", fake_post_json)
+
+    result = execute_llm_chat_completion(
+        config,
+        "hello",
+        dry_run=False,
+        timeout_seconds=300,
+    )
+
+    assert result.status == "success"
+    assert captured["timeout_seconds"] == 300
 
 
 def test_build_anthropic_chat_request_uses_messages_endpoint(monkeypatch):

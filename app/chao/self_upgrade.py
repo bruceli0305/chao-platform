@@ -33,8 +33,10 @@ The JSON object must contain:
 - commit_message: concise git commit message
 
 Operation forms:
-- For complete source context: {"path": "app/example.py", "old_text": "exact old text", "new_text": "replacement"}
-- For extracted candidate context: {"path": "app/example.py", "candidate_id": "001", "translated_text": "中文译文"}
+- For complete source context:
+  {"path": "app/example.py", "old_text": "exact old text", "new_text": "replacement"}
+- For extracted candidate context:
+  {"path": "app/example.py", "candidate_id": "001", "translated_text": "中文译文"}
 
 Rules:
 - Use repository-relative paths only.
@@ -64,7 +66,7 @@ SELF_UPGRADE_REPOSITORY_HINTS = """Repository patch hints:
 - The Web Console homepage is built in app/chao/web_console.py by build_console_index_html().
 - This repository does not use app/templates/index.html or a top-level templates/ directory.
 - For homepage title or header text changes, use app/chao/web_console.py.
-- If Source File Context lists candidates, return candidate_id and translated_text instead of old_text/new_text.
+- If Source File Context lists candidates, return candidate_id and translated_text.
 """
 
 
@@ -82,8 +84,10 @@ def build_self_upgrade_prompt(task: dict[str, Any], user_request: str) -> str:
         '  "validation_gates": ["lint", "test"],\n'
         '  "commit_message": "type: concise summary"\n'
         "}\n"
-        "For extracted candidate context, do not output old_text/new_text; output candidate_id and translated_text.\n"
-        "If the task cannot be changed safely, return operations as an empty array and explain why in summary."
+        "For extracted candidate context, do not output old_text/new_text; "
+        "output candidate_id and translated_text.\n"
+        "If the task cannot be changed safely, return operations as an empty array "
+        "and explain why in summary."
     )
     return build_llm_task_prompt(
         task,

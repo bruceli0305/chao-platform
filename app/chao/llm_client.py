@@ -88,6 +88,7 @@ def execute_llm_chat_completion(
     system_prompt: str | None = None,
     temperature: float = 0.2,
     max_tokens: int = 1024,
+    timeout_seconds: int = 120,
     dry_run: bool = True,
 ) -> LLMChatResult:
     try:
@@ -122,7 +123,7 @@ def execute_llm_chat_completion(
         )
 
     try:
-        response = _post_json(request)
+        response = _post_json(request, timeout_seconds=timeout_seconds)
     except Exception as exc:
         return LLMChatResult(
             provider=config.name,
@@ -224,7 +225,7 @@ def _build_anthropic_request(
     )
 
 
-def _post_json(request: LLMChatRequest) -> dict[str, Any]:
+def _post_json(request: LLMChatRequest, *, timeout_seconds: int = 120) -> dict[str, Any]:
     payload = json.dumps(request.payload).encode("utf-8")
     http_request = urllib.request.Request(
         request.url,
@@ -234,7 +235,7 @@ def _post_json(request: LLMChatRequest) -> dict[str, Any]:
     )
 
     try:
-        with urllib.request.urlopen(http_request, timeout=60) as response:
+        with urllib.request.urlopen(http_request, timeout=timeout_seconds) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")

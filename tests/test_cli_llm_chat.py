@@ -6,6 +6,7 @@ from app.chao import cli
 def test_llm_chat_dry_run_records_tool_call(monkeypatch):
     calls = []
     prompts = []
+    execute_kwargs = []
     task = {
         "id": "task-1",
         "task_code": "TASK-1",
@@ -18,6 +19,7 @@ def test_llm_chat_dry_run_records_tool_call(monkeypatch):
 
     def fake_execute(_config, prompt, **_kwargs):
         prompts.append(prompt)
+        execute_kwargs.append(_kwargs)
 
         class Result:
             status = "dry_run"
@@ -47,6 +49,8 @@ def test_llm_chat_dry_run_records_tool_call(monkeypatch):
             "llm-chat",
             "TASK-1",
             "summarize the task",
+            "--timeout",
+            "300",
         ],
     )
 
@@ -57,6 +61,7 @@ def test_llm_chat_dry_run_records_tool_call(monkeypatch):
     assert "summarize the task" not in calls[0]["arguments_summary"]
     assert "Summarize console delivery." in prompts[0]
     assert "summarize the task" in prompts[0]
+    assert execute_kwargs[0]["timeout_seconds"] == 300
 
 
 def test_llm_chat_denies_unapproved_role(monkeypatch):
