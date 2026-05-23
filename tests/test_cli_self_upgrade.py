@@ -217,6 +217,98 @@ def test_self_upgrade_apply_runs_preflight_and_validation(monkeypatch):
     assert '"status": "applied"' in result.output
 
 
+def test_self_upgrade_branch_creates_runner_branch_before_patch(monkeypatch):
+    calls = {
+        "preflight": [],
+        "branch_plans": [],
+        "branch_results": [],
+        "tool_calls": [],
+        "events": [],
+    }
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
+    monkeypatch.setattr(
+        cli,
+        "execute_llm_chat_completion",
+        lambda *_args, **_kwargs: _llm_result(dry_run=False, response=_plan_response()),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_require_runner_repository_preflight",
+        lambda *args, **kwargs: calls["preflight"].append((args, kwargs)),
+    )
+
+    def fake_create_runner_branch(branch_plan, **kwargs):
+        calls["branch_plans"].append(branch_plan)
+        result = {
+            "branch_required": True,
+            "branch_name": branch_plan["branch_name"],
+            "base_ref": branch_plan["base_ref"],
+            "create_command": branch_plan["create_command"],
+            "current_branch": "main",
+            "branch_exists": False,
+            "created": True,
+            "dry_run": kwargs["dry_run"],
+            "errors": [],
+        }
+        calls["branch_results"].append(result)
+        return result
+
+    monkeypatch.setattr(cli, "create_runner_branch", fake_create_runner_branch)
+    monkeypatch.setattr(
+        cli,
+        "apply_text_patch_operations",
+        lambda *_args, **kwargs: {
+            "summary": "Applied 1 controlled text patch operation(s).",
+            "changed_files": ["app/chao/demo.py"],
+            "operations": [],
+            "applied": not kwargs["dry_run"],
+            "dry_run": kwargs["dry_run"],
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "execute_runner_validation_commands",
+        lambda gates, **_kwargs: {
+            "quality": "deliverable",
+            "checks": gates,
+            "plan": [],
+            "command_results": [],
+            "deliverable": True,
+            "note": "passed",
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        ["self-upgrade", "TASK-1", "--execute", "--apply", "--branch", "--base-ref", "main"],
+    )
+
+    assert result.exit_code == 0
+    assert calls["preflight"][0][0][2] == ["lint"]
+    assert calls["branch_plans"][0]["base_ref"] == "main"
+    assert calls["branch_results"][0]["dry_run"] is False
+    assert [call["tool_name"] for call in calls["tool_calls"]] == [
+        "llm.chat_completion",
+        "cli.runner_branch",
+        "cli.runner_patch",
+        "cli.runner_validate",
+    ]
+    assert calls["events"][0]["event_type"] == "self_upgrade_branch_created"
+    assert '"branch_result"' in result.output
+
+
 def test_self_upgrade_commit_records_delivery(monkeypatch):
     calls = {
         "preflight": [],

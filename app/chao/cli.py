@@ -1698,6 +1698,10 @@ def self_upgrade_command(
         "--validate/--skip-validation",
         help="Run validation gates after applying the patch",
     ),
+    branch: bool = typer.Option(False, "--branch", help="Create a runner branch before applying"),
+    base_ref: str | None = typer.Option(
+        None, "--base-ref", help="Git base ref for branch creation"
+    ),
     commit: bool = typer.Option(False, "--commit", help="Commit applied self-upgrade changes"),
     push: bool = typer.Option(False, "--push", help="Push the self-upgrade commit to origin HEAD"),
     allow_governed_egress: bool = typer.Option(
@@ -1721,6 +1725,9 @@ def self_upgrade_command(
 
     if task["task_level"] == "L4" and apply:
         print("[red]L4 tasks cannot execute self-upgrade patches.[/red]")
+        raise typer.Exit(code=1)
+    if branch and not apply:
+        print("[red]--branch requires --apply.[/red]")
         raise typer.Exit(code=1)
     if commit and not apply:
         print("[red]--commit requires --apply.[/red]")
@@ -1806,7 +1813,8 @@ def self_upgrade_command(
             f"task_code={task_code}; provider={provider_config.name}; "
             f"model={provider_config.model}; user_request_chars={len(request)}; "
             f"llm_prompt_chars={len(llm_prompt)}; data_classification={resolved_classification}; "
-            f"execute={execute}; apply={apply}; validate={validate}; commit={commit}; push={push}; "
+            f"execute={execute}; apply={apply}; validate={validate}; branch={branch}; "
+            f"commit={commit}; push={push}; "
             f"allow_governed_egress={allow_governed_egress}"
         ),
         permission_policy=llm_permission["permission_policy"],
@@ -1851,8 +1859,66 @@ def self_upgrade_command(
         execution_result = None
         validation_result = None
         delivery_result = None
+        branch_result = None
 
         if plan["operations"]:
+            if branch and apply:
+                branch_permission = require_tool_permission(
+                    agent_name=patch_by,
+                    tool_name="cli.runner_branch",
+                    task_level=task["task_level"],
+                    required_confirmation=task.get("route_result", {}).get(
+                        "required_confirmation",
+                        "none",
+                    ),
+                    current_status=task["status"],
+                )
+                _require_runner_repository_preflight(
+                    task,
+                    repository_config,
+                    plan["validation_gates"] if validate else None,
+                    require_validation_gates=validate,
+                    by=patch_by,
+                )
+                resolved_base_ref = base_ref or repository_config.default_branch
+                branch_plan = build_runner_branch_plan(
+                    task_code=task_code,
+                    title=task.get("title", ""),
+                    task_level=task["task_level"],
+                    base_ref=resolved_base_ref,
+                    branch_prefix=repository_config.branch_prefix,
+                )
+                branch_result = create_runner_branch(
+                    branch_plan,
+                    repo_root=repository_config.workspace_path,
+                    dry_run=False,
+                )
+                record_task_event(
+                    task_id=task["id"],
+                    event_type="self_upgrade_branch_created",
+                    from_status=task["status"],
+                    to_status=task["status"],
+                    summary=f"Self-upgrade runner branch created: {branch_result['branch_name']}",
+                    created_by=patch_by,
+                )
+                record_tool_call(
+                    task_id=task["id"],
+                    agent_name=patch_by,
+                    tool_name="cli.runner_branch",
+                    arguments_summary=(
+                        f"task_code={task_code}; repository={repository_config.name}; "
+                        f"base_ref={resolved_base_ref}; apply=True"
+                    ),
+                    permission_policy=branch_permission["permission_policy"],
+                    result_status="success",
+                    permission_decision=branch_permission,
+                    output_summary=(
+                        f"branch_name={branch_result['branch_name']}; "
+                        f"created={branch_result['created']}; errors={branch_result['errors']}"
+                    ),
+                    risk_flag=branch_permission["risk_flag"],
+                )
+
             patch_permission = require_tool_permission(
                 agent_name=patch_by,
                 tool_name="cli.runner_patch",
@@ -1863,7 +1929,7 @@ def self_upgrade_command(
                 ),
                 current_status=task["status"],
             )
-            if apply:
+            if apply and not branch:
                 _require_runner_repository_preflight(
                     task,
                     repository_config,
@@ -2016,6 +2082,7 @@ def self_upgrade_command(
             "status": status,
             "repository": repository_config.to_safe_dict(),
             "llm_result": llm_payload,
+            "branch_result": branch_result,
             "plan": plan,
             "execution_result": execution_result,
             "validation_result": validation_result,
