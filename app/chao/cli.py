@@ -3144,6 +3144,10 @@ def runner_validate_command(
         print(f"[red]Task not found:[/red] {task_code}")
         raise typer.Exit(code=1)
 
+    if task["task_level"] == "L4":
+        print("[red]L4 tasks cannot execute runner validation.[/red]")
+        raise typer.Exit(code=1)
+
     try:
         permission_decision = require_tool_permission(
             agent_name=by,
@@ -3157,12 +3161,6 @@ def runner_validate_command(
         )
         repository_config = get_repository_config(repository)
         validation_gates = _resolve_task_validation_gates(task, gate)
-        _require_runner_repository_preflight(
-            task,
-            repository_config,
-            validation_gates,
-            by=by,
-        )
         validation_result = execute_runner_validation_commands(
             validation_gates,
             repo_root=repository_config.workspace_path,

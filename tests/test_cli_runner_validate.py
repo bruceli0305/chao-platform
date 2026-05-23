@@ -99,6 +99,74 @@ def test_runner_validate_records_success(monkeypatch):
     assert "repository=chao-platform" in calls["tool_calls"][0]["arguments_summary"]
 
 
+def test_runner_validate_does_not_require_clean_repository_preflight(monkeypatch):
+    task = {
+        "id": "task-1",
+        "task_code": "TASK-1",
+        "task_level": "L1",
+        "status": "DELIVERED",
+        "route_result": {"required_confirmation": "none"},
+    }
+
+    def fail_preflight(*_args, **_kwargs):
+        raise AssertionError("runner validation should not require clean repository preflight")
+
+    monkeypatch.setattr(cli, "_require_runner_repository_preflight", fail_preflight)
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: task)
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
+    monkeypatch.setattr(
+        cli,
+        "execute_runner_validation_commands",
+        lambda gates, **_kwargs: {
+            "quality": "deliverable",
+            "checks": gates,
+            "plan": [],
+            "command_results": [],
+            "deliverable": True,
+            "note": "passed",
+        },
+    )
+    monkeypatch.setattr(cli, "record_task_event", lambda **_kwargs: None)
+    monkeypatch.setattr(cli, "record_tool_call", lambda **_kwargs: None)
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "runner-validate",
+            "TASK-1",
+            "--gate",
+            "compile",
+        ],
+    )
+
+    assert result.exit_code == 0
+
+
+def test_runner_validate_rejects_l4_task(monkeypatch):
+    task = {
+        "id": "task-1",
+        "task_code": "TASK-1",
+        "task_level": "L4",
+        "status": "MILESTONE_PLANNING",
+        "route_result": {"required_confirmation": "A"},
+    }
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: task)
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "runner-validate",
+            "TASK-1",
+            "--gate",
+            "compile",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "L4 tasks cannot execute runner validation" in result.output
+
+
 def test_runner_validate_uses_skill_execution_plan_when_gate_omitted(monkeypatch):
     calls = {
         "events": [],
