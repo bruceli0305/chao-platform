@@ -84,7 +84,7 @@ def build_console_index_html() -> str:
 </head>
 <body>
   <header>
-    <h1>Chao Console</h1>
+    <h1>Chao Control Center</h1>
     <div class="muted">Local control plane</div>
     <nav aria-label="Console sections">
       <a href="#controls-section">Controls</a>
