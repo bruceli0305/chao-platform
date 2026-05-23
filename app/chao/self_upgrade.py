@@ -59,7 +59,7 @@ SELF_UPGRADE_SOURCE_CONTEXT_PATHS = [
     "app/chao/web_console.py",
 ]
 
-MAX_SELF_UPGRADE_SOURCE_CONTEXT_CHARS = 60000
+MAX_SELF_UPGRADE_SOURCE_CONTEXT_CHARS = 24000
 
 
 def build_self_upgrade_prompt(task: dict[str, Any], user_request: str) -> str:
@@ -94,24 +94,31 @@ def extract_llm_response_text(response: dict[str, Any] | None) -> str:
         first_choice = choices[0]
         if isinstance(first_choice, dict):
             message = first_choice.get("message")
-            if isinstance(message, dict) and isinstance(message.get("content"), str):
-                return message["content"]
-            if isinstance(first_choice.get("text"), str):
-                return first_choice["text"]
+            if isinstance(message, dict):
+                content = message.get("content")
+                if isinstance(content, str) and content.strip():
+                    return content
+            text = first_choice.get("text")
+            if isinstance(text, str) and text.strip():
+                return text
 
     content = response.get("content")
-    if isinstance(content, str):
+    if isinstance(content, str) and content.strip():
         return content
     if isinstance(content, list):
         text_parts = [
             part.get("text")
             for part in content
-            if isinstance(part, dict) and isinstance(part.get("text"), str)
+            if isinstance(part, dict)
+            and isinstance(part.get("text"), str)
+            and part.get("text", "").strip()
         ]
         if text_parts:
             return "\n".join(text_parts)
 
-    raise ValueError("LLM response does not contain text content")
+    raise ValueError(
+        "LLM response text is empty; try rerunning with --max-tokens 8192 or a smaller request."
+    )
 
 
 def parse_self_upgrade_plan(
@@ -179,6 +186,9 @@ def _build_source_file_context(user_request: str) -> str:
 
 def _load_json_object(text: str) -> dict[str, Any]:
     candidate = _strip_markdown_fence(text).strip()
+    if not candidate:
+        raise ValueError("self-upgrade plan text is empty")
+
     try:
         data = json.loads(candidate)
     except json.JSONDecodeError as exc:
