@@ -6,6 +6,9 @@ from typing import Any
 
 from app.chao.llm_providers import LLMProviderConfig
 
+DEEPSEEK_THINKING_MODELS = {"deepseek-v4-pro"}
+DEEPSEEK_DEFAULT_REASONING_EFFORT = "high"
+
 
 @dataclass(frozen=True)
 class LLMChatRequest:
@@ -165,19 +168,29 @@ def _build_openai_compatible_request(
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
 
+    payload: dict[str, Any] = {
+        "model": config.model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+    }
+    if _uses_deepseek_thinking_mode(config):
+        payload["reasoning_effort"] = DEEPSEEK_DEFAULT_REASONING_EFFORT
+        payload["thinking"] = {"type": "enabled"}
+    else:
+        payload["temperature"] = temperature
+
     return LLMChatRequest(
         url=f"{config.base_url.rstrip('/')}/chat/completions",
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         },
-        payload={
-            "model": config.model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        },
+        payload=payload,
     )
+
+
+def _uses_deepseek_thinking_mode(config: LLMProviderConfig) -> bool:
+    return config.name == "deepseek" and config.model in DEEPSEEK_THINKING_MODELS
 
 
 def _build_anthropic_request(

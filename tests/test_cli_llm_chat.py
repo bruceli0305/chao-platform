@@ -179,7 +179,7 @@ def test_llm_chat_execute_allows_l3_with_governed_approval(monkeypatch):
         "llm_egress_authorizations": [
             {
                 "provider": "deepseek",
-                "model": "deepseek-chat",
+                "model": "deepseek-v4-pro",
                 "data_classification": "D1",
                 "status": "APPROVED",
                 "active": True,
@@ -198,7 +198,7 @@ def test_llm_chat_execute_allows_l3_with_governed_approval(monkeypatch):
             def to_safe_dict(self):
                 return {
                     "provider": "deepseek",
-                    "model": "deepseek-chat",
+                    "model": "deepseek-v4-pro",
                     "status": "success",
                     "dry_run": False,
                     "request": {},
@@ -298,7 +298,7 @@ def test_authorize_llm_egress_records_time_limited_authorization(monkeypatch):
             "--provider",
             "deepseek",
             "--model",
-            "deepseek-chat",
+            "deepseek-v4-pro",
             "--ttl-hours",
             "2",
         ],

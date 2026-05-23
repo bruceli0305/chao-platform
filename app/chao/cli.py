@@ -1545,7 +1545,7 @@ def llm_provider_doctor_command(
 def authorize_llm_egress_command(
     task_code: str,
     provider: str = typer.Option("deepseek", "--provider", help="LLM provider"),
-    model: str = typer.Option("deepseek-chat", "--model", help="LLM model"),
+    model: str = typer.Option("deepseek-v4-pro", "--model", help="LLM model"),
     data_classification: str = typer.Option(
         "D1",
         "--data-classification",

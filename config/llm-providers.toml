@@ -5,8 +5,8 @@ api_style = "openai-compatible"
 base_url = "https://api.deepseek.com"
 key_env = "DEEPSEEK_API_KEY"
 model_env = "DEEPSEEK_MODEL"
-default_model = "deepseek-chat"
-notes = "DeepSeek official API is OpenAI-compatible."
+default_model = "deepseek-v4-pro"
+notes = "DeepSeek official API is OpenAI-compatible. Default model uses V4 Pro thinking mode."
 
 [providers.openai]
 api_style = "openai"

@@ -8,7 +8,7 @@ def test_llm_egress_policy_allows_l1_d1_execute():
         task_level="L1",
         data_classification="D1",
         provider="deepseek",
-        model="deepseek-chat",
+        model="deepseek-v4-pro",
         execute=True,
     )
 
@@ -34,7 +34,7 @@ def test_llm_egress_policy_denies_l3_execute():
         task_level="L3",
         data_classification="D1",
         provider="deepseek",
-        model="deepseek-chat",
+        model="deepseek-v4-pro",
         execute=True,
     )
 
@@ -47,7 +47,7 @@ def test_llm_egress_policy_allows_l3_execute_with_governed_approval():
         task_level="L3",
         data_classification="D1",
         provider="deepseek",
-        model="deepseek-chat",
+        model="deepseek-v4-pro",
         execute=True,
         governed_egress_approved=True,
     )
@@ -62,7 +62,7 @@ def test_llm_egress_policy_denies_d2_execute():
         task_level="L2",
         data_classification="D2",
         provider="deepseek",
-        model="deepseek-chat",
+        model="deepseek-v4-pro",
         execute=True,
     )
 

@@ -15,7 +15,7 @@ def test_default_llm_provider_is_deepseek_without_exposing_key():
         "api_style": "openai-compatible",
         "base_url": "https://api.deepseek.com",
         "api_key_env": "DEEPSEEK_API_KEY",
-        "model": "deepseek-chat",
+        "model": "deepseek-v4-pro",
         "api_key_set": False,
     }
 

@@ -6,7 +6,7 @@ GOVERNED_EXECUTE_TASK_LEVELS = {"L3", "L4"}
 ALLOWED_EXECUTE_DATA_CLASSIFICATIONS = {"D0", "D1"}
 ALLOWED_EXECUTE_PROVIDER_MODELS = {
     "anthropic": {"claude-3-5-sonnet-latest"},
-    "deepseek": {"deepseek-chat"},
+    "deepseek": {"deepseek-v4-pro"},
     "openai": {"gpt-4.1-mini"},
 }
 DATA_CLASSIFICATION_ORDER = {"D0": 0, "D1": 1, "D2": 2, "D3": 3, "D4": 4}

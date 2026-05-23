@@ -11,11 +11,14 @@ def test_build_deepseek_chat_request_uses_openai_compatible_shape(monkeypatch):
     request = build_llm_chat_request(config, "hello", system_prompt="system")
 
     assert request.url == "https://api.deepseek.com/chat/completions"
-    assert request.payload["model"] == "deepseek-chat"
+    assert request.payload["model"] == "deepseek-v4-pro"
     assert request.payload["messages"] == [
         {"role": "system", "content": "system"},
         {"role": "user", "content": "hello"},
     ]
+    assert request.payload["thinking"] == {"type": "enabled"}
+    assert request.payload["reasoning_effort"] == "high"
+    assert "temperature" not in request.payload
     assert request.to_safe_dict()["headers"]["Authorization"] == "<redacted>"
     assert request.to_safe_dict()["payload"]["messages"] == [
         {"role": "system", "content": "<redacted>", "content_chars": 6},

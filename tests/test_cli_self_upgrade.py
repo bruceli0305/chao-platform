@@ -57,7 +57,7 @@ def _llm_result(*, dry_run: bool, response: dict | None = None):
         def to_safe_dict(self):
             return {
                 "provider": "deepseek",
-                "model": "deepseek-chat",
+                "model": "deepseek-v4-pro",
                 "status": self.status,
                 "dry_run": self.dry_run,
                 "request": {},

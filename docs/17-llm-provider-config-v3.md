@@ -19,7 +19,9 @@ deepseek：
   base_url = https://api.deepseek.com
   api_key_env = DEEPSEEK_API_KEY
   model_env = DEEPSEEK_MODEL
-  default_model = deepseek-chat
+  default_model = deepseek-v4-pro
+  thinking = enabled
+  reasoning_effort = high
 
 openai：
   api_style = openai
@@ -49,7 +51,7 @@ uv run python main.py llm-providers --provider openai-compatible
 uv run python main.py llm-chat TASK-xxxx "summarize this task"
 uv run python main.py llm-chat TASK-xxxx "summarize this task" --execute
 uv run python main.py llm-chat TASK-xxxx "summarize this task" --data-classification D1 --execute
-uv run python main.py authorize-llm-egress TASK-xxxx --provider deepseek --model deepseek-chat --ttl-hours 24
+uv run python main.py authorize-llm-egress TASK-xxxx --provider deepseek --model deepseek-v4-pro --ttl-hours 24
 uv run python main.py llm-chat TASK-xxxx "summarize this task" --execute --allow-governed-egress
 uv run python main.py audit-llm-egress-authorizations
 uv run python main.py audit-llm-egress-authorizations --apply
@@ -120,7 +122,7 @@ D2 / D3 / D4、未授权的 L3 / L4、未知分级或未登记模型会被拒绝
 当前真实外发 allowlist：
 
 ```text
-deepseek / deepseek-chat；
+deepseek / deepseek-v4-pro；
 openai / gpt-4.1-mini；
 anthropic / claude-3-5-sonnet-latest。
 ```
