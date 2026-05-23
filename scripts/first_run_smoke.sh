@@ -30,5 +30,6 @@ uv run python main.py self-upgrade --help >/dev/null
 uv run python main.py self-upgrade-status --help >/dev/null
 uv run python main.py self-upgrade-watch --help >/dev/null
 uv run python main.py governance-check --help >/dev/null
+bash scripts/self_upgrade_e2e_smoke.sh --help >/dev/null
 
 echo "== First-run smoke passed =="

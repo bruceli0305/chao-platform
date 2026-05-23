@@ -89,7 +89,31 @@ uv run python main.py governance-check "$TASK_CODE" --agent hubu
 uv run python main.py governance-check "$TASK_CODE" --agent bingbu
 ```
 
+During `self-upgrade --apply`, L3 tasks automatically run the same governance chain before any
+patch is written. Missing governance artifacts return `governance_blocked` and stop execution.
+
 ## 5. Self-Upgrade Flow
+
+For the first-version end-to-end smoke, prefer the wrapper script:
+
+```bash
+bash scripts/self_upgrade_e2e_smoke.sh "$TASK_CODE" "upgrade request"
+```
+
+The default wrapper mode is non-mutating and only runs a self-upgrade dry-run after doctor,
+agent, and skill checks. To execute the full chain, pass `--apply`:
+
+```bash
+bash scripts/self_upgrade_e2e_smoke.sh --apply "$TASK_CODE" "upgrade request"
+```
+
+The apply mode runs doctor, agent and skill checks, then executes:
+
+```text
+self-upgrade --execute --apply --branch --commit --push --create-pr --check-ci
+```
+
+If CI is still pending, the wrapper runs `self-upgrade-watch` unless `--no-watch` is passed.
 
 Create or choose a task, then run:
 

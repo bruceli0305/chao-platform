@@ -27,6 +27,27 @@ def test_first_run_smoke_covers_doctor_and_self_upgrade_commands():
     assert "uv run python main.py self-upgrade-status --help" in script
     assert "uv run python main.py self-upgrade-watch --help" in script
     assert "uv run python main.py governance-check --help" in script
+    assert "bash scripts/self_upgrade_e2e_smoke.sh --help" in script
+
+
+def test_self_upgrade_e2e_smoke_defaults_to_dry_run_and_guards_apply():
+    script = (REPO_ROOT / "scripts" / "self_upgrade_e2e_smoke.sh").read_text(encoding="utf-8")
+
+    assert "uv run python main.py doctor --json" in script
+    assert "uv run python main.py agents-validate --json" in script
+    assert "uv run python main.py skills-validate --json" in script
+    assert "apply=false" in script
+    assert 'if [[ "${apply}" == "true" ]]; then' in script
+    assert 'uv run python main.py self-upgrade "${task_code}" "${request}" \\' in script
+    assert "--execute" in script
+    assert "--apply" in script
+    assert "--branch" in script
+    assert "--commit" in script
+    assert "--push" in script
+    assert "--create-pr" in script
+    assert "--check-ci" in script
+    assert 'uv run python main.py self-upgrade-watch "${task_code}"' in script
+    assert 'uv run python main.py self-upgrade "${task_code}" "${request}"' in script
 
 
 def test_first_run_runbook_documents_bootstrap_smoke_and_upgrade_flow():
@@ -37,4 +58,5 @@ def test_first_run_runbook_documents_bootstrap_smoke_and_upgrade_flow():
     assert "bash scripts/bootstrap_db.sh" in runbook
     assert "uv run python main.py doctor --json" in runbook
     assert "bash scripts/first_run_smoke.sh" in runbook
+    assert "bash scripts/self_upgrade_e2e_smoke.sh" in runbook
     assert "--execute --apply --branch --commit --push --create-pr --check-ci" in runbook

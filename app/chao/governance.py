@@ -1,6 +1,7 @@
 from typing import Any, Literal, TypedDict
 
 GovernanceAgent = Literal["menxia", "hubu", "bingbu"]
+SELF_UPGRADE_GOVERNANCE_AGENTS: tuple[GovernanceAgent, ...] = ("menxia", "hubu", "bingbu")
 
 
 class RequiredArtifactCheck(TypedDict):
@@ -25,6 +26,13 @@ GOVERNANCE_REQUIRED_ARTIFACTS: dict[GovernanceAgent, list[str]] = {
     "hubu": ["l3_design_plan", "l3_menxia_review"],
     "bingbu": ["l3_design_plan", "l3_menxia_review", "l3_hubu_review"],
 }
+
+
+def list_self_upgrade_governance_agents(task: dict[str, Any]) -> list[GovernanceAgent]:
+    if task.get("task_level") != "L3":
+        return []
+
+    return list(SELF_UPGRADE_GOVERNANCE_AGENTS)
 
 
 def build_governance_check_result(

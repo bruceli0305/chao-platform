@@ -6,15 +6,16 @@ from app.chao import cli
 from app.chao.repositories import RepositoryConfig
 
 
-def _task():
+def _task(*, task_level="L1", status="DELIVERED", artifacts=None):
     return {
         "id": "task-1",
         "task_code": "TASK-1",
         "title": "Self upgrade demo",
         "raw_request": "Rename a heading.",
-        "task_level": "L1",
-        "status": "DELIVERED",
-        "route_result": {"required_confirmation": "none"},
+        "task_level": task_level,
+        "status": status,
+        "route_result": {"required_confirmation": "A" if task_level in {"L3", "L4"} else "none"},
+        "artifacts": artifacts or [],
     }
 
 
@@ -229,6 +230,143 @@ def test_self_upgrade_apply_runs_preflight_and_validation(monkeypatch):
         "cli.runner_patch",
         "cli.runner_validate",
     ]
+    assert '"status": "applied"' in result.output
+
+
+def test_self_upgrade_l3_apply_blocks_when_governance_artifacts_are_missing(monkeypatch):
+    calls = {"tool_calls": [], "events": [], "patches": []}
+
+    monkeypatch.setattr(
+        cli,
+        "get_task_detail",
+        lambda _task_code: _task(task_level="L3", status="DESIGNING"),
+    )
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
+    monkeypatch.setattr(cli, "_has_active_llm_egress_authorization", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        cli,
+        "execute_llm_chat_completion",
+        lambda *_args, **_kwargs: _llm_result(dry_run=False, response=_plan_response()),
+    )
+    monkeypatch.setattr(
+        cli,
+        "apply_text_patch_operations",
+        lambda *_args, **_kwargs: calls["patches"].append(True),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        ["self-upgrade", "TASK-1", "--execute", "--apply", "--allow-governed-egress"],
+    )
+
+    assert result.exit_code == 1
+    assert calls["patches"] == []
+    assert [call["tool_name"] for call in calls["tool_calls"]] == [
+        "llm.chat_completion",
+        "cli.governance_check",
+        "cli.governance_check",
+        "cli.governance_check",
+    ]
+    assert calls["tool_calls"][1]["agent_name"] == "menxia"
+    assert calls["tool_calls"][1]["result_status"] == "blocked"
+    assert calls["events"][0]["event_type"] == "menxia_governance_blocked"
+    assert '"status": "governance_blocked"' in result.output
+
+
+def test_self_upgrade_l3_apply_runs_governance_before_patch(monkeypatch):
+    calls = {
+        "preflight": [],
+        "tool_calls": [],
+        "events": [],
+        "patches": [],
+    }
+    artifacts = [
+        {"artifact_type": "l3_design_plan", "artifact_uri": "design.md"},
+        {"artifact_type": "l3_menxia_review", "artifact_uri": "review.md"},
+        {"artifact_type": "l3_hubu_review", "artifact_uri": "hubu.md"},
+    ]
+
+    monkeypatch.setattr(
+        cli,
+        "get_task_detail",
+        lambda _task_code: _task(task_level="L3", status="DESIGNING", artifacts=artifacts),
+    )
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
+    monkeypatch.setattr(cli, "_has_active_llm_egress_authorization", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        cli,
+        "execute_llm_chat_completion",
+        lambda *_args, **_kwargs: _llm_result(dry_run=False, response=_plan_response()),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_require_runner_repository_preflight",
+        lambda *args, **kwargs: calls["preflight"].append((args, kwargs)),
+    )
+    monkeypatch.setattr(
+        cli,
+        "apply_text_patch_operations",
+        lambda *_args, **kwargs: (
+            calls["patches"].append(kwargs)
+            or {
+                "summary": "Applied 1 controlled text patch operation(s).",
+                "changed_files": ["app/chao/demo.py"],
+                "operations": [],
+                "applied": not kwargs["dry_run"],
+                "dry_run": kwargs["dry_run"],
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "self-upgrade",
+            "TASK-1",
+            "--execute",
+            "--apply",
+            "--skip-validation",
+            "--allow-governed-egress",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert calls["patches"][0]["dry_run"] is False
+    assert [call["tool_name"] for call in calls["tool_calls"]] == [
+        "llm.chat_completion",
+        "cli.governance_check",
+        "cli.governance_check",
+        "cli.governance_check",
+        "cli.runner_patch",
+    ]
+    assert [call["agent_name"] for call in calls["tool_calls"][1:4]] == [
+        "menxia",
+        "hubu",
+        "bingbu",
+    ]
+    assert all(call["result_status"] == "success" for call in calls["tool_calls"][1:4])
+    assert calls["preflight"][0][1]["require_validation_gates"] is False
+    assert '"governance_results"' in result.output
     assert '"status": "applied"' in result.output
 
 

@@ -13,7 +13,7 @@ from app.chao.agents import list_agents, validate_agent_registry, validate_self_
 from app.chao.doctor import run_chao_doctor
 from app.chao.github_ci import execute_github_pr_checks
 from app.chao.github_pr import build_self_upgrade_pr_body, execute_github_pr_create
-from app.chao.governance import build_governance_check_result
+from app.chao.governance import build_governance_check_result, list_self_upgrade_governance_agents
 from app.chao.graph.main_graph import build_graph
 from app.chao.llm_client import execute_llm_chat_completion
 from app.chao.llm_context import build_llm_task_prompt
@@ -1235,33 +1235,18 @@ def agents_validate_command(
         raise typer.Exit(code=1)
 
 
-@app.command("governance-check")
-def governance_check_command(
-    task_code: str,
-    agent: str = typer.Option(..., "--agent", help="Governance agent: menxia, hubu, bingbu"),
-    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
-):
-    task = get_task_detail(task_code)
-
-    if not task:
-        print(f"[red]Task not found:[/red] {task_code}")
-        raise typer.Exit(code=1)
-
-    try:
-        permission_decision = require_tool_permission(
-            agent_name=agent,
-            tool_name="cli.governance_check",
-            task_level=task["task_level"],
-            required_confirmation=task.get("route_result", {}).get(
-                "required_confirmation",
-                "none",
-            ),
-            current_status=task["status"],
-        )
-        result = build_governance_check_result(task, agent_name=agent)
-    except (PermissionError, ValueError) as exc:
-        print(f"[red]{exc}[/red]")
-        raise typer.Exit(code=1) from exc
+def _execute_governance_check(task: dict[str, object], *, agent: str) -> dict[str, object]:
+    permission_decision = require_tool_permission(
+        agent_name=agent,
+        tool_name="cli.governance_check",
+        task_level=task["task_level"],
+        required_confirmation=task.get("route_result", {}).get(
+            "required_confirmation",
+            "none",
+        ),
+        current_status=task["status"],
+    )
+    result = build_governance_check_result(task, agent_name=agent)
 
     record_task_event(
         task_id=task["id"],
@@ -1276,14 +1261,44 @@ def governance_check_command(
         agent_name=agent,
         tool_name="cli.governance_check",
         arguments_summary=(
-            f"task_code={task_code}; agent={agent}; missing_artifacts={result['missing_artifacts']}"
+            f"task_code={task['task_code']}; agent={agent}; "
+            f"missing_artifacts={result['missing_artifacts']}"
         ),
         permission_policy=permission_decision["permission_policy"],
         result_status="success" if result["deliverable"] else result["status"],
         permission_decision=permission_decision,
         output_summary=result["summary"],
-        risk_flag=permission_decision["risk_flag"] or not result["deliverable"],
+        risk_flag=permission_decision["risk_flag"]
+        or ("GOVERNANCE_BLOCKED" if not result["deliverable"] else None),
     )
+
+    return result
+
+
+def _execute_self_upgrade_governance_checks(task: dict[str, object]) -> list[dict[str, object]]:
+    return [
+        _execute_governance_check(task, agent=agent)
+        for agent in list_self_upgrade_governance_agents(task)
+    ]
+
+
+@app.command("governance-check")
+def governance_check_command(
+    task_code: str,
+    agent: str = typer.Option(..., "--agent", help="Governance agent: menxia, hubu, bingbu"),
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    try:
+        result = _execute_governance_check(task, agent=agent)
+    except (PermissionError, ValueError) as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
 
     if as_json:
         print_json(data=result)
@@ -1992,6 +2007,7 @@ def self_upgrade_command(
                 "status": llm_payload["status"],
                 "llm_result": llm_payload,
                 "plan": None,
+                "governance_results": [],
                 "execution_result": None,
                 "validation_result": None,
             }
@@ -2005,6 +2021,7 @@ def self_upgrade_command(
                 "status": "dry_run",
                 "llm_result": llm_payload,
                 "plan": None,
+                "governance_results": [],
                 "execution_result": None,
                 "validation_result": None,
             }
@@ -2020,8 +2037,30 @@ def self_upgrade_command(
         branch_result = None
         pr_result = None
         ci_result = None
+        governance_results = []
 
         if plan["operations"]:
+            if apply:
+                governance_results = _execute_self_upgrade_governance_checks(task)
+                if any(not result["deliverable"] for result in governance_results):
+                    print_json(
+                        data={
+                            "task_code": task_code,
+                            "status": "governance_blocked",
+                            "repository": repository_config.to_safe_dict(),
+                            "llm_result": llm_payload,
+                            "branch_result": branch_result,
+                            "plan": plan,
+                            "governance_results": governance_results,
+                            "execution_result": execution_result,
+                            "validation_result": validation_result,
+                            "delivery_result": delivery_result,
+                            "pr_result": pr_result,
+                            "ci_result": ci_result,
+                        }
+                    )
+                    raise typer.Exit(code=1)
+
             if branch and apply:
                 branch_permission = require_tool_permission(
                     agent_name=patch_by,
@@ -2384,6 +2423,7 @@ def self_upgrade_command(
             "llm_result": llm_payload,
             "branch_result": branch_result,
             "plan": plan,
+            "governance_results": governance_results,
             "execution_result": execution_result,
             "validation_result": validation_result,
             "delivery_result": delivery_result,
