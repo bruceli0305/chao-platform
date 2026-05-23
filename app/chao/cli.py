@@ -53,6 +53,7 @@ from app.chao.self_upgrade import (
     extract_llm_response_text,
     parse_self_upgrade_plan,
 )
+from app.chao.self_upgrade_delivery import execute_self_upgrade_delivery
 from app.chao.services.artifacts import record_artifact
 from app.chao.services.console import (
     get_console_approval_queue,
@@ -1697,6 +1698,8 @@ def self_upgrade_command(
         "--validate/--skip-validation",
         help="Run validation gates after applying the patch",
     ),
+    commit: bool = typer.Option(False, "--commit", help="Commit applied self-upgrade changes"),
+    push: bool = typer.Option(False, "--push", help="Push the self-upgrade commit to origin HEAD"),
     allow_governed_egress: bool = typer.Option(
         False,
         "--allow-governed-egress",
@@ -1708,6 +1711,7 @@ def self_upgrade_command(
     llm_by: str = typer.Option("zhongshu", "--llm-by", help="LLM planning agent name"),
     patch_by: str = typer.Option("gongbu", "--patch-by", help="Patch agent name"),
     validate_by: str = typer.Option("xingbu", "--validate-by", help="Validation agent name"),
+    delivery_by: str = typer.Option("gongbu", "--delivery-by", help="Delivery agent name"),
 ):
     task = get_task_detail(task_code)
 
@@ -1717,6 +1721,12 @@ def self_upgrade_command(
 
     if task["task_level"] == "L4" and apply:
         print("[red]L4 tasks cannot execute self-upgrade patches.[/red]")
+        raise typer.Exit(code=1)
+    if commit and not apply:
+        print("[red]--commit requires --apply.[/red]")
+        raise typer.Exit(code=1)
+    if push and not commit:
+        print("[red]--push requires --commit.[/red]")
         raise typer.Exit(code=1)
 
     try:
@@ -1796,7 +1806,7 @@ def self_upgrade_command(
             f"task_code={task_code}; provider={provider_config.name}; "
             f"model={provider_config.model}; user_request_chars={len(request)}; "
             f"llm_prompt_chars={len(llm_prompt)}; data_classification={resolved_classification}; "
-            f"execute={execute}; apply={apply}; validate={validate}; "
+            f"execute={execute}; apply={apply}; validate={validate}; commit={commit}; push={push}; "
             f"allow_governed_egress={allow_governed_egress}"
         ),
         permission_policy=llm_permission["permission_policy"],
@@ -1840,6 +1850,7 @@ def self_upgrade_command(
         repository_config = get_repository_config(repository)
         execution_result = None
         validation_result = None
+        delivery_result = None
 
         if plan["operations"]:
             patch_permission = require_tool_permission(
@@ -1925,6 +1936,57 @@ def self_upgrade_command(
                 risk_flag=validation_permission["risk_flag"],
             )
 
+        deliverable = validation_result is None or validation_result["deliverable"]
+        if plan["operations"] and commit and deliverable and execution_result:
+            delivery_permission = require_tool_permission(
+                agent_name=delivery_by,
+                tool_name="cli.self_upgrade_delivery",
+                task_level=task["task_level"],
+                required_confirmation=task.get("route_result", {}).get(
+                    "required_confirmation",
+                    "none",
+                ),
+                current_status=task["status"],
+            )
+            delivery_result = execute_self_upgrade_delivery(
+                repository_config,
+                changed_files=execution_result["changed_files"],
+                commit_message=plan["commit_message"],
+                dry_run=False,
+                push=push,
+            )
+            delivery_success = not delivery_result["errors"]
+            record_task_event(
+                task_id=task["id"],
+                event_type=(
+                    "self_upgrade_delivered" if delivery_success else "self_upgrade_delivery_failed"
+                ),
+                from_status=task["status"],
+                to_status=task["status"],
+                summary=(
+                    f"Self-upgrade delivery committed={delivery_result['committed']}; "
+                    f"pushed={delivery_result['pushed']}; sha={delivery_result['commit_sha']}"
+                ),
+                created_by=delivery_by,
+            )
+            record_tool_call(
+                task_id=task["id"],
+                agent_name=delivery_by,
+                tool_name="cli.self_upgrade_delivery",
+                arguments_summary=(
+                    f"task_code={task_code}; repository={repository_config.name}; "
+                    f"changed_files={delivery_result['changed_files']}; push={push}"
+                ),
+                permission_policy=delivery_permission["permission_policy"],
+                result_status="success" if delivery_success else "failed",
+                permission_decision=delivery_permission,
+                output_summary=(
+                    f"committed={delivery_result['committed']}; "
+                    f"pushed={delivery_result['pushed']}; errors={delivery_result['errors']}"
+                ),
+                risk_flag=delivery_permission["risk_flag"] or not delivery_success,
+            )
+
         if not plan["operations"]:
             record_task_event(
                 task_id=task["id"],
@@ -1939,9 +2001,14 @@ def self_upgrade_command(
         raise typer.Exit(code=1) from exc
 
     deliverable = validation_result is None or validation_result["deliverable"]
+    delivered = delivery_result is None or not delivery_result["errors"]
     status = "no_patch"
     if plan["operations"]:
-        status = "applied" if apply and deliverable else "validation_failed" if apply else "planned"
+        status = "planned"
+        if apply:
+            status = "applied" if deliverable else "validation_failed"
+        if commit:
+            status = "delivered" if deliverable and delivered else "delivery_failed"
 
     print_json(
         data={
@@ -1952,10 +2019,11 @@ def self_upgrade_command(
             "plan": plan,
             "execution_result": execution_result,
             "validation_result": validation_result,
+            "delivery_result": delivery_result,
         }
     )
 
-    if not deliverable:
+    if not deliverable or not delivered:
         raise typer.Exit(code=1)
 
 

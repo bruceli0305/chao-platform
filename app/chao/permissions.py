@@ -85,6 +85,13 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         "description": "Execute allowlisted Agent Runner validation gates.",
         "permission_policy": "controlled-runner-validation",
     },
+    "cli.self_upgrade_delivery": {
+        "name": "cli.self_upgrade_delivery",
+        "category": "git.write",
+        "risk": "medium",
+        "description": "Commit and optionally push validated self-upgrade changes.",
+        "permission_policy": "controlled-self-upgrade-delivery",
+    },
     "schema_check": {
         "name": "schema_check",
         "category": "postgres.read",
@@ -131,6 +138,7 @@ ROLE_ALLOWED_TOOLS: dict[str, set[str]] = {
         "cli.runner_preflight",
         "cli.runner_sandbox",
         "cli.runner_workspace",
+        "cli.self_upgrade_delivery",
     },
     "xingbu": {
         "schema_check",

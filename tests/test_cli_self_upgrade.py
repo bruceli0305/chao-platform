@@ -215,3 +215,93 @@ def test_self_upgrade_apply_runs_preflight_and_validation(monkeypatch):
         "cli.runner_validate",
     ]
     assert '"status": "applied"' in result.output
+
+
+def test_self_upgrade_commit_records_delivery(monkeypatch):
+    calls = {
+        "preflight": [],
+        "tool_calls": [],
+        "events": [],
+        "deliveries": [],
+    }
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
+    monkeypatch.setattr(
+        cli,
+        "execute_llm_chat_completion",
+        lambda *_args, **_kwargs: _llm_result(dry_run=False, response=_plan_response()),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_require_runner_repository_preflight",
+        lambda *args, **kwargs: calls["preflight"].append((args, kwargs)),
+    )
+    monkeypatch.setattr(
+        cli,
+        "apply_text_patch_operations",
+        lambda *_args, **kwargs: {
+            "summary": "Applied 1 controlled text patch operation(s).",
+            "changed_files": ["app/chao/demo.py"],
+            "operations": [],
+            "applied": not kwargs["dry_run"],
+            "dry_run": kwargs["dry_run"],
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "execute_runner_validation_commands",
+        lambda gates, **_kwargs: {
+            "quality": "deliverable",
+            "checks": gates,
+            "plan": [],
+            "command_results": [],
+            "deliverable": True,
+            "note": "passed",
+        },
+    )
+
+    def fake_delivery(repository, **kwargs):
+        calls["deliveries"].append((repository, kwargs))
+        return {
+            "repository": repository.name,
+            "workspace_path": repository.workspace_path,
+            "changed_files": kwargs["changed_files"],
+            "commit_message": kwargs["commit_message"],
+            "status_lines": [" M app/chao/demo.py"],
+            "dry_run": kwargs["dry_run"],
+            "committed": True,
+            "pushed": kwargs["push"],
+            "commit_sha": "abc123",
+            "commands": [],
+            "errors": [],
+        }
+
+    monkeypatch.setattr(cli, "execute_self_upgrade_delivery", fake_delivery)
+    monkeypatch.setattr(
+        cli,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        ["self-upgrade", "TASK-1", "--execute", "--apply", "--commit", "--push"],
+    )
+
+    assert result.exit_code == 0
+    assert calls["deliveries"][0][1]["push"] is True
+    assert calls["deliveries"][0][1]["dry_run"] is False
+    assert [call["tool_name"] for call in calls["tool_calls"]] == [
+        "llm.chat_completion",
+        "cli.runner_patch",
+        "cli.runner_validate",
+        "cli.self_upgrade_delivery",
+    ]
+    assert calls["events"][-1]["event_type"] == "self_upgrade_delivered"
+    assert '"status": "delivered"' in result.output
