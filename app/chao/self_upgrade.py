@@ -1,9 +1,9 @@
 import json
-from pathlib import Path
 from typing import Any, TypedDict
 
 from app.chao.llm_context import build_llm_task_prompt, redact_sensitive_text
 from app.chao.runner_policy import normalize_repo_path, require_change_scope_allowed
+from app.chao.self_upgrade_context import build_self_upgrade_source_context
 
 
 class SelfUpgradePatchOperation(TypedDict):
@@ -57,19 +57,13 @@ SELF_UPGRADE_REPOSITORY_HINTS = """Repository patch hints:
 - The Web Console homepage is built in app/chao/web_console.py by build_console_index_html().
 - This repository does not use app/templates/index.html or a top-level templates/ directory.
 - For homepage title or header text changes, use app/chao/web_console.py.
-- The old_text must be exact text from that file.
+- The old_text must be exact text from the source context candidate block.
 """
-
-SELF_UPGRADE_SOURCE_CONTEXT_PATHS = [
-    "app/chao/web_console.py",
-]
-
-MAX_SELF_UPGRADE_SOURCE_CONTEXT_CHARS = 120000
 
 
 def build_self_upgrade_prompt(task: dict[str, Any], user_request: str) -> str:
     request = user_request.strip() or str(task.get("raw_request") or "")
-    source_context = _build_source_file_context(request)
+    source_context = build_self_upgrade_source_context(request)
     plan_contract = (
         "Produce a controlled patch plan for this task.\n"
         "Return only JSON with this exact shape:\n"
@@ -81,6 +75,7 @@ def build_self_upgrade_prompt(task: dict[str, Any], user_request: str) -> str:
         '  "validation_gates": ["lint", "test"],\n'
         '  "commit_message": "type: concise summary"\n'
         "}\n"
+        "For large source files, only use exact old_text blocks from Source File Context candidates.\n"
         "If the task cannot be changed safely with exact text replacements, return operations "
         "as an empty array and explain why in summary."
     )
@@ -151,42 +146,6 @@ def parse_self_upgrade_plan(
         "validation_gates": validation_gates,
         "commit_message": commit_message,
     }
-
-
-def _build_source_file_context(user_request: str) -> str:
-    blocks: list[str] = []
-
-    for path in SELF_UPGRADE_SOURCE_CONTEXT_PATHS:
-        if path not in user_request:
-            continue
-
-        normalized_path = normalize_repo_path(path)
-        source_path = Path(normalized_path)
-        if not source_path.is_file():
-            blocks.append(
-                "## Source File Context\n"
-                f"### {normalized_path}\n"
-                "Source file was requested but could not be found in the workspace."
-            )
-            continue
-
-        content = source_path.read_text(encoding="utf-8")
-        if len(content) > MAX_SELF_UPGRADE_SOURCE_CONTEXT_CHARS:
-            content = (
-                content[:MAX_SELF_UPGRADE_SOURCE_CONTEXT_CHARS].rstrip()
-                + "\n[Source file context truncated]"
-            )
-
-        blocks.append(
-            "## Source File Context\n"
-            f"### {normalized_path}\n"
-            "The following source file content is provided so old_text values can be exact.\n"
-            "```python\n"
-            f"{content}\n"
-            "```"
-        )
-
-    return "\n\n".join(blocks)
 
 
 def _load_json_object(text: str) -> dict[str, Any]:
