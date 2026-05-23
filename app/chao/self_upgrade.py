@@ -31,8 +31,8 @@ The JSON object must contain:
 Rules:
 - Use repository-relative paths only.
 - old_text must be exact text that appears once in the target file.
-- Do not include restricted data.
-- Do not modify forbidden paths such as environment files, data/, logs/, .venv/, or __pycache__/.
+- Do not include private values.
+- Do not modify forbidden paths such as env files, data/, logs/, .venv/, or __pycache__/.
 - Prefer the smallest safe patch that satisfies the task.
 """
 
@@ -44,6 +44,11 @@ EXECUTABLE_SELF_UPGRADE_GATES = {
     "schema_check",
     "test",
     "typecheck",
+}
+
+NON_EXECUTABLE_SELF_UPGRADE_GATES = {
+    "manual_validation",
+    "milestone_review",
 }
 
 DEFAULT_SELF_UPGRADE_GATES = ["lint", "test"]
@@ -308,6 +313,8 @@ def _parse_validation_gates(
         if not isinstance(gate, str) or not gate.strip():
             raise ValueError("self-upgrade validation_gates must contain strings")
         normalized_gate = gate.strip()
+        if normalized_gate in NON_EXECUTABLE_SELF_UPGRADE_GATES:
+            continue
         if normalized_gate not in EXECUTABLE_SELF_UPGRADE_GATES:
             if allow_unsupported:
                 continue
