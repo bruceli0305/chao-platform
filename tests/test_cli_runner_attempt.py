@@ -290,6 +290,44 @@ def test_runner_attempt_dry_run_skips_artifact_recording(monkeypatch):
     assert '"artifact_type": null' in result.output
 
 
+def test_runner_attempt_dry_run_does_not_require_clean_repository_preflight(monkeypatch):
+    def fail_preflight(*_args, **_kwargs):
+        raise AssertionError("runner attempt dry-run should not require clean repository preflight")
+
+    monkeypatch.setattr(cli, "_require_runner_repository_preflight", fail_preflight)
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
+    monkeypatch.setattr(
+        cli,
+        "apply_text_patch_operations",
+        lambda operations, dry_run=True, **_kwargs: _execution_result(applied=not dry_run),
+    )
+    monkeypatch.setattr(
+        cli,
+        "execute_runner_validation_commands",
+        lambda gates, **_kwargs: _validation_result(deliverable=True),
+    )
+    monkeypatch.setattr(cli, "record_task_event", lambda **_kwargs: None)
+    monkeypatch.setattr(cli, "record_tool_call", lambda **_kwargs: None)
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "runner-attempt",
+            "TASK-1",
+            "app/chao/demo.txt",
+            "--old-text",
+            "old",
+            "--new-text",
+            "new",
+            "--gate",
+            "compile",
+        ],
+    )
+
+    assert result.exit_code == 0
+
+
 def test_runner_attempt_uses_skill_execution_plan_when_gate_omitted(monkeypatch):
     calls = {
         "events": [],

@@ -3259,12 +3259,13 @@ def runner_attempt_command(
         )
         repository_config = get_repository_config(repository)
         validation_gates = _resolve_task_validation_gates(task, gate)
-        _require_runner_repository_preflight(
-            task,
-            repository_config,
-            validation_gates,
-            by=patch_by,
-        )
+        if apply:
+            _require_runner_repository_preflight(
+                task,
+                repository_config,
+                validation_gates,
+                by=patch_by,
+            )
         execution_result = apply_text_patch_operations(
             [
                 {
