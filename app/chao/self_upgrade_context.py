@@ -61,26 +61,55 @@ def resolve_candidate_patch(
     candidate_id: str,
     translated_text: str,
 ) -> dict[str, str]:
+    return resolve_candidate_patches(
+        path,
+        [{"candidate_id": candidate_id, "translated_text": translated_text}],
+    )
+
+
+def resolve_candidate_patches(
+    path: str,
+    candidate_operations: list[dict[str, str]],
+) -> dict[str, str]:
     normalized_path = normalize_repo_path(path)
     source_path = Path(normalized_path)
     if not source_path.is_file():
         raise FileNotFoundError(f"self-upgrade candidate source not found: {normalized_path}")
 
-    content = source_path.read_text(encoding="utf-8")
-    candidate = _find_candidate_from_content(source_path, candidate_id, content)
-    line_number = int(candidate["start_line"])
-    old_line = str(candidate["old_text"])
-    new_line = build_candidate_replacement(old_line, translated_text)
-    old_text, new_text = _build_unique_replacement_block(
-        content,
-        line_number=line_number,
-        new_line=new_line,
-    )
+    old_content = source_path.read_text(encoding="utf-8")
+    lines = old_content.splitlines()
+    candidates = extract_user_visible_text_candidates(old_content)
+    touched_lines: set[int] = set()
+
+    for operation in candidate_operations:
+        candidate = _find_candidate_in_list(
+            source_path,
+            operation["candidate_id"],
+            candidates,
+        )
+        line_number = int(candidate["start_line"])
+        target_index = line_number - 1
+        if target_index in touched_lines:
+            raise ValueError(f"duplicate candidate translation for line {line_number}")
+
+        old_line = str(candidate["old_text"])
+        if lines[target_index].rstrip() != old_line:
+            raise ValueError(f"candidate line drifted before patch resolution: {line_number}")
+
+        lines[target_index] = build_candidate_replacement(
+            old_line,
+            operation["translated_text"],
+        )
+        touched_lines.add(target_index)
+
+    new_content = "\n".join(lines)
+    if old_content.endswith("\n"):
+        new_content += "\n"
 
     return {
         "path": normalized_path,
-        "old_text": old_text,
-        "new_text": new_text,
+        "old_text": old_content,
+        "new_text": new_content,
     }
 
 
@@ -124,34 +153,6 @@ def build_candidate_replacement(old_text: str, translated_text: str) -> str:
     raise ValueError("candidate old_text does not contain a supported visible text segment")
 
 
-def _build_unique_replacement_block(
-    content: str,
-    *,
-    line_number: int,
-    new_line: str,
-) -> tuple[str, str]:
-    lines = content.splitlines()
-    target_index = line_number - 1
-    if target_index < 0 or target_index >= len(lines):
-        raise ValueError(f"candidate line_number out of range: {line_number}")
-
-    for radius in range(0, len(lines)):
-        start = max(0, target_index - radius)
-        end = min(len(lines), target_index + radius + 1)
-        old_block_lines = lines[start:end]
-        old_block = "\n".join(old_block_lines)
-
-        if content.count(old_block) != 1:
-            continue
-
-        new_block_lines = list(old_block_lines)
-        new_block_lines[target_index - start] = new_line
-        new_block = "\n".join(new_block_lines)
-        return old_block, new_block
-
-    raise ValueError(f"candidate context is not unique around line {line_number}")
-
-
 def _find_candidate(source_path: Path, candidate_id: str) -> dict[str, object]:
     content = source_path.read_text(encoding="utf-8")
     return _find_candidate_from_content(source_path, candidate_id, content)
@@ -162,6 +163,18 @@ def _find_candidate_from_content(
     candidate_id: str,
     content: str,
 ) -> dict[str, object]:
+    return _find_candidate_in_list(
+        source_path,
+        candidate_id,
+        extract_user_visible_text_candidates(content),
+    )
+
+
+def _find_candidate_in_list(
+    source_path: Path,
+    candidate_id: str,
+    candidates: list[dict[str, object]],
+) -> dict[str, object]:
     normalized_id = candidate_id.strip().lstrip("#")
     if not normalized_id.isdigit():
         raise ValueError(f"candidate_id must be a number-like value: {candidate_id}")
@@ -170,7 +183,6 @@ def _find_candidate_from_content(
     if index <= 0:
         raise ValueError(f"candidate_id must be positive: {candidate_id}")
 
-    candidates = extract_user_visible_text_candidates(content)
     if index > len(candidates):
         raise ValueError(
             f"candidate_id out of range for {source_path}: {candidate_id}; total={len(candidates)}"
