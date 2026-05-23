@@ -14,12 +14,16 @@ def test_tool_registry_contains_first_batch():
         "cli.audit_llm_egress_authorizations",
         "cli.authorize_llm_egress",
         "cli.bind_github",
+        "cli.create_github_pr",
+        "cli.github_ci_check",
+        "cli.governance_check",
         "cli.runner_branch",
         "cli.runner_patch",
         "cli.runner_preflight",
         "cli.runner_sandbox",
         "cli.runner_validate",
         "cli.runner_workspace",
+        "cli.self_upgrade_delivery",
         "schema_check",
         "data_boundary_check",
         "llm.chat_completion",
@@ -185,6 +189,21 @@ def test_zhongshu_can_call_configured_llm_provider():
     assert decision["allowed"] is True
     assert decision["permission_policy"] == "llm-provider-chat-completion"
     assert decision["risk_flag"] is None
+
+
+def test_governance_agents_can_run_governance_check():
+    for agent_name in ["menxia", "hubu", "bingbu"]:
+        decision = evaluate_tool_permission(
+            agent_name=agent_name,
+            tool_name="cli.governance_check",
+            task_level="L3",
+            required_confirmation="A",
+            current_status="DESIGNING",
+        )
+
+        assert decision["allowed"] is True
+        assert decision["permission_policy"] == "controlled-governance-check"
+        assert decision["risk_flag"] is None
 
 
 def test_emperor_can_approve_l3_waiting_task():

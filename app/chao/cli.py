@@ -13,6 +13,7 @@ from app.chao.agents import list_agents, validate_agent_registry, validate_self_
 from app.chao.doctor import run_chao_doctor
 from app.chao.github_ci import execute_github_pr_checks
 from app.chao.github_pr import build_self_upgrade_pr_body, execute_github_pr_create
+from app.chao.governance import build_governance_check_result
 from app.chao.graph.main_graph import build_graph
 from app.chao.llm_client import execute_llm_chat_completion
 from app.chao.llm_context import build_llm_task_prompt
@@ -1231,6 +1232,76 @@ def agents_validate_command(
         print(f"[green]Agent registry validation passed:[/green] {payload['agent_count']} agents")
 
     if errors:
+        raise typer.Exit(code=1)
+
+
+@app.command("governance-check")
+def governance_check_command(
+    task_code: str,
+    agent: str = typer.Option(..., "--agent", help="Governance agent: menxia, hubu, bingbu"),
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    try:
+        permission_decision = require_tool_permission(
+            agent_name=agent,
+            tool_name="cli.governance_check",
+            task_level=task["task_level"],
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
+            current_status=task["status"],
+        )
+        result = build_governance_check_result(task, agent_name=agent)
+    except (PermissionError, ValueError) as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    record_task_event(
+        task_id=task["id"],
+        event_type=f"{agent}_governance_{result['status']}",
+        from_status=task["status"],
+        to_status=task["status"],
+        summary=result["summary"],
+        created_by=agent,
+    )
+    record_tool_call(
+        task_id=task["id"],
+        agent_name=agent,
+        tool_name="cli.governance_check",
+        arguments_summary=(
+            f"task_code={task_code}; agent={agent}; missing_artifacts={result['missing_artifacts']}"
+        ),
+        permission_policy=permission_decision["permission_policy"],
+        result_status="success" if result["deliverable"] else result["status"],
+        permission_decision=permission_decision,
+        output_summary=result["summary"],
+        risk_flag=permission_decision["risk_flag"] or not result["deliverable"],
+    )
+
+    if as_json:
+        print_json(data=result)
+    else:
+        table = Table(title=f"{agent} Governance Check")
+        table.add_column("Artifact")
+        table.add_column("Present")
+        table.add_column("URI")
+        for artifact in result["required_artifacts"]:
+            table.add_row(
+                artifact["artifact_type"],
+                "yes" if artifact["present"] else "no",
+                _display_value(artifact["artifact_uri"]),
+            )
+        console.print(table)
+        print(result["summary"])
+
+    if not result["deliverable"]:
         raise typer.Exit(code=1)
 
 

@@ -81,6 +81,14 @@ shangshu -> PR creation and GitHub binding
 
 The first execution skill batch is owned by `gongbu` and checked through `skill.toml`.
 
+For governed L3 tasks, the first callable governance checks are:
+
+```bash
+uv run python main.py governance-check "$TASK_CODE" --agent menxia
+uv run python main.py governance-check "$TASK_CODE" --agent hubu
+uv run python main.py governance-check "$TASK_CODE" --agent bingbu
+```
+
 ## 5. Self-Upgrade Flow
 
 Create or choose a task, then run:

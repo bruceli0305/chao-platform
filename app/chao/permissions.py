@@ -57,6 +57,13 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         "description": "Read GitHub pull request check status for delivery feedback.",
         "permission_policy": "controlled-github-ci-check",
     },
+    "cli.governance_check": {
+        "name": "cli.governance_check",
+        "category": "governance.read",
+        "risk": "medium",
+        "description": "Run an agent governance readiness check against task artifacts.",
+        "permission_policy": "controlled-governance-check",
+    },
     "cli.runner_patch": {
         "name": "cli.runner_patch",
         "category": "filesystem.write",
@@ -162,8 +169,9 @@ ROLE_ALLOWED_TOOLS: dict[str, set[str]] = {
         "cli.audit_llm_egress_authorizations",
         "cli.github_ci_check",
     },
-    "hubu": {"data_boundary_check"},
-    "menxia": {"schema_check", "data_boundary_check"},
+    "hubu": {"data_boundary_check", "cli.governance_check"},
+    "menxia": {"schema_check", "data_boundary_check", "cli.governance_check"},
+    "bingbu": {"cli.governance_check"},
     "zhongshu": {"llm.chat_completion"},
 }
 

@@ -39,6 +39,14 @@ def test_agent_registry_validates_docs_tools_and_owned_skills():
         assert Path(agent["role_doc"]).is_file()
 
 
+def test_governance_agents_can_run_governance_check_tool():
+    agents = {agent["name"]: agent for agent in list_agents()}
+
+    assert "cli.governance_check" in agents["menxia"]["default_tools"]
+    assert "cli.governance_check" in agents["hubu"]["default_tools"]
+    assert "cli.governance_check" in agents["bingbu"]["default_tools"]
+
+
 def test_gongbu_owns_first_batch_skills_for_execution():
     gongbu = get_agent("gongbu")
 

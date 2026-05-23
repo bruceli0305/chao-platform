@@ -29,5 +29,6 @@ echo "== Self-upgrade commands are available =="
 uv run python main.py self-upgrade --help >/dev/null
 uv run python main.py self-upgrade-status --help >/dev/null
 uv run python main.py self-upgrade-watch --help >/dev/null
+uv run python main.py governance-check --help >/dev/null
 
 echo "== First-run smoke passed =="

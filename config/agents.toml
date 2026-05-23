@@ -30,7 +30,7 @@ role_type = "governance"
 runtime_ready = false
 required_for_self_upgrade = false
 role_doc = ".ai-agents/roles/menxia-reviewer.md"
-default_tools = ["schema_check", "data_boundary_check"]
+default_tools = ["schema_check", "data_boundary_check", "cli.governance_check"]
 owned_skills = []
 
 [agents.gongbu]
@@ -85,7 +85,7 @@ role_type = "review"
 runtime_ready = false
 required_for_self_upgrade = false
 role_doc = ".ai-agents/modes/hubu-resource-secret.md"
-default_tools = ["data_boundary_check"]
+default_tools = ["data_boundary_check", "cli.governance_check"]
 owned_skills = []
 
 [agents.bingbu]
@@ -96,7 +96,7 @@ role_type = "review"
 runtime_ready = false
 required_for_self_upgrade = false
 role_doc = ".ai-agents/modes/bingbu-deploy.md"
-default_tools = []
+default_tools = ["cli.governance_check"]
 owned_skills = []
 
 [agents.libu-personnel]
