@@ -8,6 +8,7 @@ from rich import print, print_json
 from rich.console import Console
 from rich.table import Table
 
+from app.chao.github_pr import build_self_upgrade_pr_body, execute_github_pr_create
 from app.chao.graph.main_graph import build_graph
 from app.chao.llm_client import execute_llm_chat_completion
 from app.chao.llm_context import build_llm_task_prompt
@@ -1704,6 +1705,11 @@ def self_upgrade_command(
     ),
     commit: bool = typer.Option(False, "--commit", help="Commit applied self-upgrade changes"),
     push: bool = typer.Option(False, "--push", help="Push the self-upgrade commit to origin HEAD"),
+    create_pr: bool = typer.Option(
+        False,
+        "--create-pr",
+        help="Create and bind a GitHub PR after pushing the self-upgrade branch",
+    ),
     allow_governed_egress: bool = typer.Option(
         False,
         "--allow-governed-egress",
@@ -1716,6 +1722,7 @@ def self_upgrade_command(
     patch_by: str = typer.Option("gongbu", "--patch-by", help="Patch agent name"),
     validate_by: str = typer.Option("xingbu", "--validate-by", help="Validation agent name"),
     delivery_by: str = typer.Option("gongbu", "--delivery-by", help="Delivery agent name"),
+    pr_by: str = typer.Option("shangshu", "--pr-by", help="GitHub PR agent name"),
 ):
     task = get_task_detail(task_code)
 
@@ -1734,6 +1741,9 @@ def self_upgrade_command(
         raise typer.Exit(code=1)
     if push and not commit:
         print("[red]--push requires --commit.[/red]")
+        raise typer.Exit(code=1)
+    if create_pr and not push:
+        print("[red]--create-pr requires --push.[/red]")
         raise typer.Exit(code=1)
 
     try:
@@ -1814,7 +1824,7 @@ def self_upgrade_command(
             f"model={provider_config.model}; user_request_chars={len(request)}; "
             f"llm_prompt_chars={len(llm_prompt)}; data_classification={resolved_classification}; "
             f"execute={execute}; apply={apply}; validate={validate}; branch={branch}; "
-            f"commit={commit}; push={push}; "
+            f"commit={commit}; push={push}; create_pr={create_pr}; "
             f"allow_governed_egress={allow_governed_egress}"
         ),
         permission_policy=llm_permission["permission_policy"],
@@ -1860,6 +1870,7 @@ def self_upgrade_command(
         validation_result = None
         delivery_result = None
         branch_result = None
+        pr_result = None
 
         if plan["operations"]:
             if branch and apply:
@@ -2053,6 +2064,71 @@ def self_upgrade_command(
                 risk_flag=delivery_permission["risk_flag"] or not delivery_success,
             )
 
+        delivered = delivery_result is None or not delivery_result["errors"]
+        if plan["operations"] and create_pr and deliverable and delivered and execution_result:
+            pr_permission = require_tool_permission(
+                agent_name=pr_by,
+                tool_name="cli.create_github_pr",
+                task_level=task["task_level"],
+                required_confirmation=task.get("route_result", {}).get(
+                    "required_confirmation",
+                    "none",
+                ),
+                current_status=task["status"],
+            )
+            pr_body = build_self_upgrade_pr_body(
+                task_code=task_code,
+                summary=plan["summary"],
+                changed_files=execution_result["changed_files"],
+                validation_gates=plan["validation_gates"],
+            )
+            pr_result = execute_github_pr_create(
+                repository_config,
+                title=plan["commit_message"],
+                body=pr_body,
+                base_ref=repository_config.default_branch,
+                dry_run=False,
+            )
+            pr_success = not pr_result["errors"] and bool(pr_result["url"])
+            if pr_success:
+                record_github_link(
+                    task_id=task["id"],
+                    link_type="pull_request",
+                    external_id=pr_result["external_id"] or pr_result["url"],
+                    url=pr_result["url"],
+                    title=pr_result["title"],
+                    status="open",
+                    metadata={
+                        "task_code": task_code,
+                        "source": "self_upgrade",
+                        "head_ref": pr_result["head_ref"],
+                        "base_ref": pr_result["base_ref"],
+                    },
+                    created_by=pr_by,
+                )
+            record_task_event(
+                task_id=task["id"],
+                event_type="self_upgrade_pr_created" if pr_success else "self_upgrade_pr_failed",
+                from_status=task["status"],
+                to_status=task["status"],
+                summary=f"Self-upgrade PR url={pr_result['url']}; errors={pr_result['errors']}",
+                created_by=pr_by,
+            )
+            record_tool_call(
+                task_id=task["id"],
+                agent_name=pr_by,
+                tool_name="cli.create_github_pr",
+                arguments_summary=(
+                    f"task_code={task_code}; repository={repository_config.name}; "
+                    f"base_ref={pr_result['base_ref']}; head_ref={pr_result['head_ref']}"
+                ),
+                permission_policy=pr_permission["permission_policy"],
+                result_status="success" if pr_success else "failed",
+                permission_decision=pr_permission,
+                output_summary=f"url={pr_result['url']}; errors={pr_result['errors']}",
+                risk_flag=pr_permission["risk_flag"] or not pr_success,
+            )
+
         if not plan["operations"]:
             record_task_event(
                 task_id=task["id"],
@@ -2068,6 +2144,7 @@ def self_upgrade_command(
 
     deliverable = validation_result is None or validation_result["deliverable"]
     delivered = delivery_result is None or not delivery_result["errors"]
+    pr_delivered = pr_result is None or (not pr_result["errors"] and bool(pr_result["url"]))
     status = "no_patch"
     if plan["operations"]:
         status = "planned"
@@ -2075,6 +2152,8 @@ def self_upgrade_command(
             status = "applied" if deliverable else "validation_failed"
         if commit:
             status = "delivered" if deliverable and delivered else "delivery_failed"
+        if create_pr:
+            status = "pr_created" if deliverable and delivered and pr_delivered else "pr_failed"
 
     print_json(
         data={
@@ -2087,10 +2166,11 @@ def self_upgrade_command(
             "execution_result": execution_result,
             "validation_result": validation_result,
             "delivery_result": delivery_result,
+            "pr_result": pr_result,
         }
     )
 
-    if not deliverable or not delivered:
+    if not deliverable or not delivered or not pr_delivered:
         raise typer.Exit(code=1)
 
 

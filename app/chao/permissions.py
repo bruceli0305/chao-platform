@@ -43,6 +43,13 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         "description": "将 GitHub issue / PR / commit / CI run 绑定到任务。",
         "permission_policy": "local-cli-github-link-bind",
     },
+    "cli.create_github_pr": {
+        "name": "cli.create_github_pr",
+        "category": "github.pr",
+        "risk": "medium",
+        "description": "Create a GitHub pull request for validated self-upgrade changes.",
+        "permission_policy": "controlled-github-pr-create",
+    },
     "cli.runner_patch": {
         "name": "cli.runner_patch",
         "category": "filesystem.write",
@@ -130,7 +137,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
 }
 
 ROLE_ALLOWED_TOOLS: dict[str, set[str]] = {
-    "shangshu": {"cli.new", "cli.bind_github"},
+    "shangshu": {"cli.new", "cli.bind_github", "cli.create_github_pr"},
     "emperor": {"cli.approve", "cli.authorize_llm_egress"},
     "gongbu": {
         "cli.runner_branch",

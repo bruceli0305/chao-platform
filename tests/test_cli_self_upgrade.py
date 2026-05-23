@@ -397,3 +397,131 @@ def test_self_upgrade_commit_records_delivery(monkeypatch):
     ]
     assert calls["events"][-1]["event_type"] == "self_upgrade_delivered"
     assert '"status": "delivered"' in result.output
+
+
+def test_self_upgrade_create_pr_records_github_link(monkeypatch):
+    calls = {
+        "preflight": [],
+        "tool_calls": [],
+        "events": [],
+        "deliveries": [],
+        "prs": [],
+        "github_links": [],
+    }
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
+    monkeypatch.setattr(
+        cli,
+        "execute_llm_chat_completion",
+        lambda *_args, **_kwargs: _llm_result(dry_run=False, response=_plan_response()),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_require_runner_repository_preflight",
+        lambda *args, **kwargs: calls["preflight"].append((args, kwargs)),
+    )
+    monkeypatch.setattr(
+        cli,
+        "apply_text_patch_operations",
+        lambda *_args, **kwargs: {
+            "summary": "Applied 1 controlled text patch operation(s).",
+            "changed_files": ["app/chao/demo.py"],
+            "operations": [],
+            "applied": not kwargs["dry_run"],
+            "dry_run": kwargs["dry_run"],
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "execute_runner_validation_commands",
+        lambda gates, **_kwargs: {
+            "quality": "deliverable",
+            "checks": gates,
+            "plan": [],
+            "command_results": [],
+            "deliverable": True,
+            "note": "passed",
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "execute_self_upgrade_delivery",
+        lambda repository, **kwargs: (
+            calls["deliveries"].append((repository, kwargs))
+            or {
+                "repository": repository.name,
+                "workspace_path": repository.workspace_path,
+                "changed_files": kwargs["changed_files"],
+                "commit_message": kwargs["commit_message"],
+                "status_lines": [" M app/chao/demo.py"],
+                "dry_run": kwargs["dry_run"],
+                "committed": True,
+                "pushed": kwargs["push"],
+                "commit_sha": "abc123",
+                "commands": [],
+                "errors": [],
+            }
+        ),
+    )
+
+    def fake_pr(repository, **kwargs):
+        calls["prs"].append((repository, kwargs))
+        return {
+            "repository": repository.name,
+            "workspace_path": repository.workspace_path,
+            "title": kwargs["title"],
+            "body": kwargs["body"],
+            "base_ref": kwargs["base_ref"],
+            "head_ref": "codex/task-1-demo",
+            "dry_run": kwargs["dry_run"],
+            "created": True,
+            "url": "https://github.com/example/repo/pull/42",
+            "external_id": "42",
+            "commands": [],
+            "errors": [],
+        }
+
+    monkeypatch.setattr(cli, "execute_github_pr_create", fake_pr)
+    monkeypatch.setattr(
+        cli,
+        "record_github_link",
+        lambda **kwargs: calls["github_links"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "self-upgrade",
+            "TASK-1",
+            "--execute",
+            "--apply",
+            "--commit",
+            "--push",
+            "--create-pr",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Task Code: TASK-1" in calls["prs"][0][1]["body"]
+    assert calls["github_links"][0]["link_type"] == "pull_request"
+    assert calls["github_links"][0]["external_id"] == "42"
+    assert [call["tool_name"] for call in calls["tool_calls"]] == [
+        "llm.chat_completion",
+        "cli.runner_patch",
+        "cli.runner_validate",
+        "cli.self_upgrade_delivery",
+        "cli.create_github_pr",
+    ]
+    assert calls["events"][-1]["event_type"] == "self_upgrade_pr_created"
+    assert '"status": "pr_created"' in result.output
