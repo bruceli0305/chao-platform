@@ -3,7 +3,10 @@ from typing import Any, TypedDict
 
 from app.chao.llm_context import build_llm_task_prompt, redact_sensitive_text
 from app.chao.runner_policy import normalize_repo_path, require_change_scope_allowed
-from app.chao.self_upgrade_context import build_self_upgrade_source_context
+from app.chao.self_upgrade_context import (
+    build_self_upgrade_source_context,
+    resolve_candidate_patch,
+)
 
 
 class SelfUpgradePatchOperation(TypedDict):
@@ -23,14 +26,17 @@ SELF_UPGRADE_SYSTEM_PROMPT = """You are the Chao self-upgrade planner.
 Return JSON only. Do not wrap the JSON in markdown.
 The JSON object must contain:
 - summary: short implementation summary
-- operations: array of controlled text replacements with path, old_text, new_text
+- operations: array of patch operations
 - validation_gates: executable gates from lint, test, compile, build, typecheck,
   data_boundary_check, schema_check
 - commit_message: concise git commit message
 
+Operation forms:
+- For complete source context: {"path": "app/example.py", "old_text": "exact old text", "new_text": "replacement"}
+- For extracted candidate context: {"path": "app/example.py", "candidate_id": "001", "translated_text": "中文译文"}
+
 Rules:
 - Use repository-relative paths only.
-- old_text must be exact text that appears once in the target file.
 - Do not include private values.
 - Do not modify forbidden paths such as env files, data/, logs/, .venv/, or __pycache__/.
 - Prefer the smallest safe patch that satisfies the task.
@@ -57,7 +63,7 @@ SELF_UPGRADE_REPOSITORY_HINTS = """Repository patch hints:
 - The Web Console homepage is built in app/chao/web_console.py by build_console_index_html().
 - This repository does not use app/templates/index.html or a top-level templates/ directory.
 - For homepage title or header text changes, use app/chao/web_console.py.
-- The old_text must be exact text from the source context candidate block.
+- If Source File Context lists candidates, return candidate_id and translated_text instead of old_text/new_text.
 """
 
 
@@ -70,14 +76,13 @@ def build_self_upgrade_prompt(task: dict[str, Any], user_request: str) -> str:
         "{\n"
         '  "summary": "what will change",\n'
         '  "operations": [\n'
-        '    {"path": "app/example.py", "old_text": "exact old text", "new_text": "replacement"}\n'
+        '    {"path": "app/example.py", "candidate_id": "001", "translated_text": "中文译文"}\n'
         "  ],\n"
         '  "validation_gates": ["lint", "test"],\n'
         '  "commit_message": "type: concise summary"\n'
         "}\n"
-        "For large source files, only use exact old_text blocks from Source File Context candidates.\n"
-        "If the task cannot be changed safely with exact text replacements, return operations "
-        "as an empty array and explain why in summary."
+        "For extracted candidate context, do not output old_text/new_text; output candidate_id and translated_text.\n"
+        "If the task cannot be changed safely, return operations as an empty array and explain why in summary."
     )
     return build_llm_task_prompt(
         task,
@@ -235,26 +240,43 @@ def _parse_operations(value: object) -> list[SelfUpgradePatchOperation]:
         if not isinstance(operation, dict):
             raise ValueError(f"self-upgrade operation {index} must be an object")
 
-        path = operation.get("path")
-        old_text = operation.get("old_text")
-        new_text = operation.get("new_text")
-
-        if not isinstance(path, str) or not path.strip():
-            raise ValueError(f"self-upgrade operation {index} requires path")
-        if not isinstance(old_text, str) or not old_text:
-            raise ValueError(f"self-upgrade operation {index} requires old_text")
-        if not isinstance(new_text, str):
-            raise ValueError(f"self-upgrade operation {index} requires new_text")
-
-        operations.append(
-            {
-                "path": normalize_repo_path(path),
-                "old_text": _reject_sensitive_text(old_text),
-                "new_text": _reject_sensitive_text(new_text),
-            }
-        )
+        normalized_operation = _parse_operation(operation, index)
+        operations.append(normalized_operation)
 
     return operations
+
+
+def _parse_operation(operation: dict[str, object], index: int) -> SelfUpgradePatchOperation:
+    path = operation.get("path")
+    if not isinstance(path, str) or not path.strip():
+        raise ValueError(f"self-upgrade operation {index} requires path")
+
+    candidate_id = operation.get("candidate_id")
+    translated_text = operation.get("translated_text")
+    if candidate_id is not None or translated_text is not None:
+        if not isinstance(candidate_id, str) or not candidate_id.strip():
+            raise ValueError(f"self-upgrade operation {index} requires candidate_id")
+        if not isinstance(translated_text, str) or not translated_text.strip():
+            raise ValueError(f"self-upgrade operation {index} requires translated_text")
+        resolved = resolve_candidate_patch(path, candidate_id, translated_text)
+        return {
+            "path": normalize_repo_path(resolved["path"]),
+            "old_text": _reject_sensitive_text(resolved["old_text"]),
+            "new_text": _reject_sensitive_text(resolved["new_text"]),
+        }
+
+    old_text = operation.get("old_text")
+    new_text = operation.get("new_text")
+    if not isinstance(old_text, str) or not old_text:
+        raise ValueError(f"self-upgrade operation {index} requires old_text")
+    if not isinstance(new_text, str):
+        raise ValueError(f"self-upgrade operation {index} requires new_text")
+
+    return {
+        "path": normalize_repo_path(path),
+        "old_text": _reject_sensitive_text(old_text),
+        "new_text": _reject_sensitive_text(new_text),
+    }
 
 
 def _parse_validation_gates(
