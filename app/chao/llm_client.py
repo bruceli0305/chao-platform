@@ -7,7 +7,8 @@ from typing import Any
 from app.chao.llm_providers import LLMProviderConfig
 
 DEEPSEEK_THINKING_MODELS = {"deepseek-v4-pro"}
-DEEPSEEK_DEFAULT_REASONING_EFFORT = "high"
+DEEPSEEK_DEFAULT_REASONING_EFFORT = "low"
+DEEPSEEK_MIN_THINKING_MAX_TOKENS = 8192
 
 
 @dataclass(frozen=True)
@@ -174,6 +175,7 @@ def _build_openai_compatible_request(
         "max_tokens": max_tokens,
     }
     if _uses_deepseek_thinking_mode(config):
+        payload["max_tokens"] = max(max_tokens, DEEPSEEK_MIN_THINKING_MAX_TOKENS)
         payload["reasoning_effort"] = DEEPSEEK_DEFAULT_REASONING_EFFORT
         payload["thinking"] = {"type": "enabled"}
     else:
