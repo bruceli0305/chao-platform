@@ -671,3 +671,112 @@ def test_self_upgrade_check_ci_records_ci_links(monkeypatch):
     assert calls["tool_calls"][-1]["tool_name"] == "cli.github_ci_check"
     assert calls["events"][-1]["event_type"] == "self_upgrade_ci_passed"
     assert '"status": "ci_passed"' in result.output
+
+
+def test_self_upgrade_status_checks_explicit_pr_ref(monkeypatch):
+    calls = {"events": [], "tool_calls": [], "github_links": [], "ci": []}
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
+    monkeypatch.setattr(
+        cli,
+        "execute_github_pr_checks",
+        lambda repository, **kwargs: (
+            calls["ci"].append((repository, kwargs))
+            or {
+                "repository": repository.name,
+                "workspace_path": repository.workspace_path,
+                "pr_ref": kwargs["pr_ref"],
+                "status": "passed",
+                "deliverable": True,
+                "dry_run": kwargs["dry_run"],
+                "checks": [
+                    {
+                        "name": "pytest",
+                        "state": "SUCCESS",
+                        "link": "https://github.com/example/repo/actions/runs/99",
+                        "workflow": "CI",
+                        "bucket": "pass",
+                    }
+                ],
+                "commands": [],
+                "errors": [],
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_github_link",
+        lambda **kwargs: calls["github_links"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        ["self-upgrade-status", "TASK-1", "--pr-ref", "42"],
+    )
+
+    assert result.exit_code == 0
+    assert calls["ci"][0][1]["pr_ref"] == "42"
+    assert calls["github_links"][0]["link_type"] == "ci_run"
+    assert calls["tool_calls"][0]["tool_name"] == "cli.github_ci_check"
+    assert calls["events"][0]["event_type"] == "self_upgrade_ci_passed"
+    assert '"status": "ci_passed"' in result.output
+
+
+def test_self_upgrade_status_uses_bound_pr_and_exits_pending(monkeypatch):
+    calls = {"events": [], "tool_calls": []}
+    task = {
+        **_task(),
+        "github_links": [
+            {
+                "link_type": "pull_request",
+                "external_id": "42",
+                "url": "https://github.com/example/repo/pull/42",
+            }
+        ],
+    }
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: task)
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
+    monkeypatch.setattr(
+        cli,
+        "execute_github_pr_checks",
+        lambda repository, **kwargs: {
+            "repository": repository.name,
+            "workspace_path": repository.workspace_path,
+            "pr_ref": kwargs["pr_ref"],
+            "status": "pending",
+            "deliverable": False,
+            "dry_run": kwargs["dry_run"],
+            "checks": [{"name": "pytest", "state": "PENDING", "link": None}],
+            "commands": [],
+            "errors": [],
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+
+    result = CliRunner().invoke(cli.app, ["self-upgrade-status", "TASK-1"])
+
+    assert result.exit_code == 1
+    assert calls["events"][0]["event_type"] == "self_upgrade_ci_pending"
+    assert calls["tool_calls"][0]["result_status"] == "pending"
+    assert '"status": "ci_pending"' in result.output

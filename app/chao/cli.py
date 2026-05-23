@@ -2258,6 +2258,120 @@ def self_upgrade_command(
         raise typer.Exit(code=1)
 
 
+def _resolve_task_pull_request_ref(task: dict[str, object]) -> str:
+    github_links = task.get("github_links") or []
+    for link in reversed(github_links):
+        if not isinstance(link, dict):
+            continue
+        if link.get("link_type") != "pull_request":
+            continue
+        url = link.get("url")
+        external_id = link.get("external_id")
+        if isinstance(url, str) and url:
+            return url
+        if isinstance(external_id, str) and external_id:
+            return external_id
+
+    raise ValueError("No pull_request github link found for this task. Pass --pr-ref explicitly.")
+
+
+@app.command("self-upgrade-status")
+def self_upgrade_status_command(
+    task_code: str,
+    pr_ref: str | None = typer.Option(
+        None,
+        "--pr-ref",
+        help="GitHub PR number or URL. Defaults to the latest bound pull_request link.",
+    ),
+    repository: str | None = typer.Option(None, "--repository", help="Repository config name"),
+    by: str = typer.Option("xingbu", "--by", help="GitHub CI check agent name"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    try:
+        repository_config = get_repository_config(repository)
+        resolved_pr_ref = pr_ref or _resolve_task_pull_request_ref(task)
+        permission_decision = require_tool_permission(
+            agent_name=by,
+            tool_name="cli.github_ci_check",
+            task_level=task["task_level"],
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
+            current_status=task["status"],
+        )
+        ci_result = execute_github_pr_checks(
+            repository_config,
+            pr_ref=resolved_pr_ref,
+            dry_run=False,
+        )
+    except (PermissionError, ValueError) as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    for check in ci_result["checks"]:
+        if not check["link"]:
+            continue
+        record_github_link(
+            task_id=task["id"],
+            link_type="ci_run",
+            external_id=f"{resolved_pr_ref}:{check['name']}",
+            url=check["link"],
+            title=check["name"],
+            status=check["state"].lower(),
+            metadata={
+                "source": "self_upgrade_status",
+                "pr_ref": resolved_pr_ref,
+                "workflow": check["workflow"],
+                "bucket": check["bucket"],
+            },
+            created_by=by,
+        )
+
+    record_task_event(
+        task_id=task["id"],
+        event_type=f"self_upgrade_ci_{ci_result['status']}",
+        from_status=task["status"],
+        to_status=task["status"],
+        summary=f"Self-upgrade CI {ci_result['status']}: {len(ci_result['checks'])} check(s).",
+        created_by=by,
+    )
+    record_tool_call(
+        task_id=task["id"],
+        agent_name=by,
+        tool_name="cli.github_ci_check",
+        arguments_summary=(
+            f"task_code={task_code}; repository={repository_config.name}; "
+            f"pr_ref={ci_result['pr_ref']}"
+        ),
+        permission_policy=permission_decision["permission_policy"],
+        result_status="success" if ci_result["deliverable"] else ci_result["status"],
+        permission_decision=permission_decision,
+        output_summary=(
+            f"status={ci_result['status']}; checks={len(ci_result['checks'])}; "
+            f"errors={ci_result['errors']}"
+        ),
+        risk_flag=permission_decision["risk_flag"] or not ci_result["deliverable"],
+    )
+
+    print_json(
+        data={
+            "task_code": task_code,
+            "status": f"ci_{ci_result['status']}",
+            "repository": repository_config.to_safe_dict(),
+            "ci_result": ci_result,
+        }
+    )
+
+    if not ci_result["deliverable"]:
+        raise typer.Exit(code=1)
+
+
 def _has_approved_a_confirmation(task: dict[str, object]) -> bool:
     for confirmation in task.get("confirmations", []) or []:
         if (
