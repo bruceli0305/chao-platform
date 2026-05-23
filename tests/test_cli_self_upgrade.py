@@ -30,6 +30,21 @@ def _repository_config():
     )
 
 
+def test_self_upgrade_blocks_when_agent_or_skill_readiness_fails(monkeypatch):
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(
+        cli,
+        "validate_self_upgrade_readiness",
+        lambda: ["missing self-upgrade skill: bugfix"],
+    )
+
+    result = CliRunner().invoke(cli.app, ["self-upgrade", "TASK-1"])
+
+    assert result.exit_code == 1
+    assert "Self-upgrade readiness check failed" in result.output
+    assert "missing self-upgrade skill: bugfix" in result.output
+
+
 def _llm_result(*, dry_run: bool, response: dict | None = None):
     class Result:
         status = "dry_run" if dry_run else "success"

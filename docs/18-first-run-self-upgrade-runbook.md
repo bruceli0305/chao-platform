@@ -57,6 +57,7 @@ Doctor checks:
 - `DEEPSEEK_API_KEY`
 - repository configuration
 - repository workspace cleanliness
+- self-upgrade agent and skill readiness
 
 ## 4. Smoke Test
 
@@ -66,8 +67,19 @@ Run the first-run smoke:
 bash scripts/first_run_smoke.sh
 ```
 
-This checks CLI status, doctor, schema, data boundary, ruff, compile, and self-upgrade command
-availability.
+This checks CLI status, doctor, schema, data boundary, agent registry, skill registry, ruff,
+compile, and self-upgrade command availability.
+
+The self-upgrade chain requires these runtime-ready agents:
+
+```text
+zhongshu -> LLM planning
+gongbu -> patch, branch, commit, push
+xingbu -> validation and CI feedback
+shangshu -> PR creation and GitHub binding
+```
+
+The first execution skill batch is owned by `gongbu` and checked through `skill.toml`.
 
 ## 5. Self-Upgrade Flow
 

@@ -1,4 +1,5 @@
 name = "release-validation"
+owner_agent = "gongbu"
 description = "发布前检查、构建产物、健康检查和回滚确认。"
 enabled = true
 default_gates = ["build", "test", "manual_validation"]

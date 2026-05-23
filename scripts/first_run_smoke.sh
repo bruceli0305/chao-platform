@@ -13,6 +13,12 @@ uv run python scripts/schema_check.py
 echo "== Data boundary check =="
 uv run python scripts/data_boundary_check.py
 
+echo "== Agent registry =="
+uv run python main.py agents-validate --json
+
+echo "== Skill registry =="
+uv run python main.py skills-validate --json
+
 echo "== Ruff check =="
 uv run ruff check app tests main.py
 

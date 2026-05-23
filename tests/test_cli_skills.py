@@ -9,6 +9,7 @@ def test_skills_list_outputs_manifest_registry():
     assert result.exit_code == 0
     assert "bugfix" in result.output
     assert ".ai-agents/skills/bugfix/SKILL.md" in result.output
+    assert "gongbu" in result.output
     assert "manual_validation" in result.output
 
 

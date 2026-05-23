@@ -1,4 +1,5 @@
 name = "docs-generation"
+owner_agent = "gongbu"
 description = "README、API 文档、用户说明、发布说明生成。"
 enabled = true
 default_gates = ["lint", "manual_validation"]

@@ -1,4 +1,5 @@
 name = "api-development"
+owner_agent = "gongbu"
 description = "API 契约、接口实现、异常路径和接口验证。"
 enabled = true
 default_gates = ["lint", "test", "manual_validation"]

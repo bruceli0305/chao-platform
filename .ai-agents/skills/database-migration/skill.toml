@@ -1,4 +1,5 @@
 name = "database-migration"
+owner_agent = "gongbu"
 description = "数据库结构、迁移脚本、备份、回滚和验证。"
 enabled = true
 default_gates = ["schema_check", "test", "manual_validation"]

@@ -21,6 +21,8 @@ def test_first_run_smoke_covers_doctor_and_self_upgrade_commands():
     assert "uv run python main.py doctor --json" in script
     assert "uv run python scripts/schema_check.py" in script
     assert "uv run python scripts/data_boundary_check.py" in script
+    assert "uv run python main.py agents-validate --json" in script
+    assert "uv run python main.py skills-validate --json" in script
     assert "uv run python main.py self-upgrade --help" in script
     assert "uv run python main.py self-upgrade-status --help" in script
     assert "uv run python main.py self-upgrade-watch --help" in script

@@ -1,4 +1,5 @@
 name = "bugfix"
+owner_agent = "gongbu"
 description = "Bug 复现、定位、修复、回归验证。"
 enabled = true
 default_gates = ["lint", "test", "manual_validation"]

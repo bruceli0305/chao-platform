@@ -14,10 +14,18 @@ SkillName = str
 class SkillDefinition(TypedDict):
     name: str
     description: str
+    owner_agent: str
     path: str
     default_gates: list[str]
     trigger_keywords: list[str]
     allowed_task_levels: list[TaskLevel]
+
+
+def _required_str(data: dict[str, object], field_name: str, manifest_path: Path) -> str:
+    value = data.get(field_name)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{manifest_path}: {field_name} is required")
+    return value
 
 
 def _as_string_list(value: object, field_name: str, manifest_path: Path) -> list[str]:
@@ -63,6 +71,7 @@ def load_skill_manifest(manifest_path: Path) -> SkillDefinition | None:
     return {
         "name": name,
         "description": description,
+        "owner_agent": _required_str(data, "owner_agent", manifest_path),
         "path": _skill_doc_path(manifest_path),
         "default_gates": _as_string_list(
             data.get("default_gates", []),
@@ -113,6 +122,8 @@ def validate_skill_manifests(skills_root: Path = SKILLS_ROOT) -> list[str]:
             errors.append(f"{manifest_path}: default_gates must not be empty")
         if not definition["trigger_keywords"]:
             errors.append(f"{manifest_path}: trigger_keywords must not be empty")
+        if not definition["owner_agent"]:
+            errors.append(f"{manifest_path}: owner_agent must not be empty")
 
     if not list(skills_root.glob(f"*/{SKILL_MANIFEST_NAME}")):
         errors.append(f"{skills_root}: no skill manifests found")

@@ -28,6 +28,7 @@ def test_skill_registry_contains_first_batch_and_skill_files():
         assert definition["default_gates"]
         assert definition["trigger_keywords"]
         assert definition["allowed_task_levels"]
+        assert definition["owner_agent"] == "gongbu"
 
 
 def test_skill_registry_is_loaded_from_manifests():
@@ -42,6 +43,7 @@ def test_get_skill_returns_definition():
 
     assert skill["name"] == "database-migration"
     assert skill["path"] == ".ai-agents/skills/database-migration/SKILL.md"
+    assert skill["owner_agent"] == "gongbu"
 
 
 def test_describe_required_skills_returns_paths():

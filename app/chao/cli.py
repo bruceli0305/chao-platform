@@ -9,6 +9,7 @@ from rich import print, print_json
 from rich.console import Console
 from rich.table import Table
 
+from app.chao.agents import list_agents, validate_agent_registry, validate_self_upgrade_readiness
 from app.chao.doctor import run_chao_doctor
 from app.chao.github_ci import execute_github_pr_checks
 from app.chao.github_pr import build_self_upgrade_pr_body, execute_github_pr_create
@@ -1159,6 +1160,7 @@ def skills_list_command(
 
     table = Table(title="Skills")
     table.add_column("Name", no_wrap=True)
+    table.add_column("Owner", no_wrap=True)
     table.add_column("Path", no_wrap=True)
     table.add_column("Gates")
     table.add_column("Levels")
@@ -1167,6 +1169,7 @@ def skills_list_command(
     for skill in skills:
         table.add_row(
             skill["name"],
+            skill["owner_agent"],
             skill["path"],
             ", ".join(skill["default_gates"]),
             ", ".join(skill["allowed_task_levels"]),
@@ -1174,6 +1177,61 @@ def skills_list_command(
         )
 
     console.print(table)
+
+
+@app.command("agents-list")
+def agents_list_command(
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    agents = list_agents()
+
+    if as_json:
+        print_json(data={"agents": agents})
+        return
+
+    table = Table(title="Agents")
+    table.add_column("Name", no_wrap=True)
+    table.add_column("Branch")
+    table.add_column("Runtime")
+    table.add_column("Self-Upgrade")
+    table.add_column("Tools")
+    table.add_column("Skills")
+
+    for agent in agents:
+        table.add_row(
+            agent["name"],
+            agent["branch"],
+            "yes" if agent["runtime_ready"] else "no",
+            "yes" if agent["required_for_self_upgrade"] else "no",
+            ", ".join(agent["default_tools"]),
+            ", ".join(agent["owned_skills"]),
+        )
+
+    console.print(table)
+
+
+@app.command("agents-validate")
+def agents_validate_command(
+    as_json: bool = typer.Option(False, "--json", help="Output JSON"),
+):
+    errors = validate_agent_registry()
+    payload = {
+        "status": "failed" if errors else "success",
+        "errors": errors,
+        "agent_count": len(list_agents()),
+    }
+
+    if as_json:
+        print_json(data=payload)
+    elif errors:
+        print("[red]Agent registry validation failed:[/red]")
+        for error in errors:
+            print(f"- {error}")
+    else:
+        print(f"[green]Agent registry validation passed:[/green] {payload['agent_count']} agents")
+
+    if errors:
+        raise typer.Exit(code=1)
 
 
 @app.command("skills-validate")
@@ -1756,6 +1814,13 @@ def self_upgrade_command(
         raise typer.Exit(code=1)
     if check_ci and not create_pr:
         print("[red]--check-ci requires --create-pr.[/red]")
+        raise typer.Exit(code=1)
+
+    readiness_errors = validate_self_upgrade_readiness()
+    if readiness_errors:
+        print("[red]Self-upgrade readiness check failed:[/red]")
+        for error in readiness_errors:
+            print(f"- {error}")
         raise typer.Exit(code=1)
 
     try:

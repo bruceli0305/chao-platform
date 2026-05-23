@@ -73,6 +73,7 @@ branch_prefix = "codex/"
         "llm:deepseek_key": True,
         "repository:config": True,
         "repository:workspace": True,
+        "self_upgrade:agents_and_skills": True,
     }
 
 
@@ -109,3 +110,4 @@ branch_prefix = "codex/"
     assert checks["github:auth"]["summary"] == "gh is not available on PATH"
     assert checks["llm:deepseek_key"]["ready"] is False
     assert checks["repository:config"]["ready"] is False
+    assert checks["self_upgrade:agents_and_skills"]["ready"] is True

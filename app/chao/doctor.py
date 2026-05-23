@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Protocol, TypedDict
 
+from app.chao.agents import validate_self_upgrade_readiness
 from app.chao.repositories import get_repository_config, validate_repository_configs
 from app.chao.repository_sync import inspect_repository_status
 
@@ -62,6 +63,7 @@ def run_chao_doctor(
         _check_deepseek_key(env),
         _check_repository_config(env),
         _check_repository_workspace(environ=env, command_runner=command_runner),
+        _check_self_upgrade_readiness(),
     ]
     ready = all(check["ready"] for check in checks if check["severity"] == "required")
 
@@ -248,6 +250,21 @@ def _check_repository_workspace(*, environ: dict[str, str], command_runner: Any)
         if ready
         else "repository workspace is not runner ready",
         "details": status,
+    }
+
+
+def _check_self_upgrade_readiness() -> DoctorCheck:
+    errors = validate_self_upgrade_readiness()
+    return {
+        "name": "self_upgrade:agents_and_skills",
+        "ready": not errors,
+        "severity": "required",
+        "summary": (
+            "self-upgrade agents and skills are ready"
+            if not errors
+            else "self-upgrade agents and skills are not ready"
+        ),
+        "details": {"errors": errors},
     }
 
 

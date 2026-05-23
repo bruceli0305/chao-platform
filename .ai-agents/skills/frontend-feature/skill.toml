@@ -1,4 +1,5 @@
 name = "frontend-feature"
+owner_agent = "gongbu"
 description = "前端页面、组件、交互、样式和状态管理开发。"
 enabled = true
 default_gates = ["typecheck", "lint", "build", "manual_validation"]

@@ -1,4 +1,5 @@
 name = "security-review"
+owner_agent = "gongbu"
 description = "权限、越权、Secret、敏感字段和安全边界审查。"
 enabled = true
 default_gates = ["secret_scan", "data_boundary_check", "manual_validation"]

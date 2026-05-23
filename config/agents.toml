@@ -1,0 +1,122 @@
+required_self_upgrade_agents = ["zhongshu", "gongbu", "xingbu", "shangshu"]
+
+[agents.shangshu]
+title = "Shangshu Scheduler"
+branch = "three-provinces"
+department = "shangshu"
+role_type = "governance"
+runtime_ready = true
+required_for_self_upgrade = true
+role_doc = ".ai-agents/roles/shangshu.md"
+default_tools = ["cli.new", "cli.bind_github", "cli.create_github_pr"]
+owned_skills = []
+
+[agents.zhongshu]
+title = "Zhongshu Planner"
+branch = "three-provinces"
+department = "zhongshu"
+role_type = "governance"
+runtime_ready = true
+required_for_self_upgrade = true
+role_doc = ".ai-agents/roles/zhongshu-planner.md"
+default_tools = ["llm.chat_completion"]
+owned_skills = []
+
+[agents.menxia]
+title = "Menxia Reviewer"
+branch = "three-provinces"
+department = "menxia"
+role_type = "governance"
+runtime_ready = false
+required_for_self_upgrade = false
+role_doc = ".ai-agents/roles/menxia-reviewer.md"
+default_tools = ["schema_check", "data_boundary_check"]
+owned_skills = []
+
+[agents.gongbu]
+title = "Gongbu Builder"
+branch = "six-ministries"
+department = "gongbu"
+role_type = "execution"
+runtime_ready = true
+required_for_self_upgrade = true
+role_doc = ".ai-agents/roles/gongbu.md"
+default_tools = [
+  "cli.runner_branch",
+  "cli.runner_patch",
+  "cli.runner_preflight",
+  "cli.runner_sandbox",
+  "cli.runner_workspace",
+  "cli.self_upgrade_delivery",
+]
+owned_skills = [
+  "api-development",
+  "bugfix",
+  "database-migration",
+  "docs-generation",
+  "frontend-feature",
+  "release-validation",
+  "security-review",
+]
+
+[agents.xingbu]
+title = "Xingbu Validator"
+branch = "six-ministries"
+department = "xingbu"
+role_type = "validation"
+runtime_ready = true
+required_for_self_upgrade = true
+role_doc = ".ai-agents/roles/xingbu.md"
+default_tools = [
+  "schema_check",
+  "data_boundary_check",
+  "cli.runner_preflight",
+  "cli.runner_validate",
+  "cli.audit_llm_egress_authorizations",
+  "cli.github_ci_check",
+]
+owned_skills = []
+
+[agents.hubu]
+title = "Hubu Resource And Secret Review"
+branch = "six-ministries"
+department = "hubu"
+role_type = "review"
+runtime_ready = false
+required_for_self_upgrade = false
+role_doc = ".ai-agents/modes/hubu-resource-secret.md"
+default_tools = ["data_boundary_check"]
+owned_skills = []
+
+[agents.bingbu]
+title = "Bingbu Deployment Review"
+branch = "six-ministries"
+department = "bingbu"
+role_type = "review"
+runtime_ready = false
+required_for_self_upgrade = false
+role_doc = ".ai-agents/modes/bingbu-deploy.md"
+default_tools = []
+owned_skills = []
+
+[agents.libu-personnel]
+title = "Libu Agent Governance"
+branch = "six-ministries"
+department = "libu-personnel"
+role_type = "governance"
+runtime_ready = false
+required_for_self_upgrade = false
+role_doc = ".ai-agents/modes/libu-agent-governance.md"
+default_tools = []
+owned_skills = []
+
+[agents.libu-rites]
+title = "Libu Docs And Release Ceremony"
+branch = "six-ministries"
+department = "libu-rites"
+role_type = "documentation"
+runtime_ready = false
+required_for_self_upgrade = false
+role_doc = ".ai-agents/modes/libu-docs.md"
+default_tools = []
+owned_skills = []
