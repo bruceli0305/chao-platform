@@ -66,9 +66,16 @@ def resolve_candidate_patch(
     if not source_path.is_file():
         raise FileNotFoundError(f"self-upgrade candidate source not found: {normalized_path}")
 
-    candidate = _find_candidate(source_path, candidate_id)
-    old_text = str(candidate["old_text"])
-    new_text = build_candidate_replacement(old_text, translated_text)
+    content = source_path.read_text(encoding="utf-8")
+    candidate = _find_candidate_from_content(source_path, candidate_id, content)
+    line_number = int(candidate["start_line"])
+    old_line = str(candidate["old_text"])
+    new_line = build_candidate_replacement(old_line, translated_text)
+    old_text, new_text = _build_unique_replacement_block(
+        content,
+        line_number=line_number,
+        new_line=new_line,
+    )
 
     return {
         "path": normalized_path,
@@ -87,7 +94,7 @@ def build_candidate_replacement(old_text: str, translated_text: str) -> str:
         (_ARIA_LABEL_PATTERN, 'aria-label="{}"'),
         (_JS_LABEL_PATTERN, 'label: "{}"'),
     ]
-    for pattern, template in replacements:
+    for pattern, _template in replacements:
         match = pattern.search(old_text)
         if match:
             start, end = match.span(1)
@@ -117,7 +124,44 @@ def build_candidate_replacement(old_text: str, translated_text: str) -> str:
     raise ValueError("candidate old_text does not contain a supported visible text segment")
 
 
+def _build_unique_replacement_block(
+    content: str,
+    *,
+    line_number: int,
+    new_line: str,
+) -> tuple[str, str]:
+    lines = content.splitlines()
+    target_index = line_number - 1
+    if target_index < 0 or target_index >= len(lines):
+        raise ValueError(f"candidate line_number out of range: {line_number}")
+
+    for radius in range(0, len(lines)):
+        start = max(0, target_index - radius)
+        end = min(len(lines), target_index + radius + 1)
+        old_block_lines = lines[start:end]
+        old_block = "\n".join(old_block_lines)
+
+        if content.count(old_block) != 1:
+            continue
+
+        new_block_lines = list(old_block_lines)
+        new_block_lines[target_index - start] = new_line
+        new_block = "\n".join(new_block_lines)
+        return old_block, new_block
+
+    raise ValueError(f"candidate context is not unique around line {line_number}")
+
+
 def _find_candidate(source_path: Path, candidate_id: str) -> dict[str, object]:
+    content = source_path.read_text(encoding="utf-8")
+    return _find_candidate_from_content(source_path, candidate_id, content)
+
+
+def _find_candidate_from_content(
+    source_path: Path,
+    candidate_id: str,
+    content: str,
+) -> dict[str, object]:
     normalized_id = candidate_id.strip().lstrip("#")
     if not normalized_id.isdigit():
         raise ValueError(f"candidate_id must be a number-like value: {candidate_id}")
@@ -126,7 +170,6 @@ def _find_candidate(source_path: Path, candidate_id: str) -> dict[str, object]:
     if index <= 0:
         raise ValueError(f"candidate_id must be positive: {candidate_id}")
 
-    content = source_path.read_text(encoding="utf-8")
     candidates = extract_user_visible_text_candidates(content)
     if index > len(candidates):
         raise ValueError(
