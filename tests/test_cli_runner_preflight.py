@@ -30,7 +30,7 @@ def _task() -> dict[str, object]:
 def test_runner_preflight_outputs_ready_json(monkeypatch):
     calls = {"build": [], "events": [], "tool_calls": []}
 
-    def fake_build_runner_preflight_result(task, repository, gates):
+    def fake_build_runner_preflight_result(task, repository, gates, **_kwargs):
         calls["build"].append((task, repository, gates))
         return {
             "task_code": task["task_code"],
@@ -77,7 +77,7 @@ def test_runner_preflight_outputs_ready_json(monkeypatch):
 def test_runner_preflight_renders_blocked_summary(monkeypatch):
     calls = {"events": [], "tool_calls": []}
 
-    def fake_build_runner_preflight_result(task, repository, gates):
+    def fake_build_runner_preflight_result(task, repository, gates, **_kwargs):
         return {
             "task_code": task["task_code"],
             "task_level": task["task_level"],
@@ -122,7 +122,7 @@ def test_runner_preflight_records_missing_gates_as_blocked(monkeypatch):
     task = _task()
     task["route_result"] = {"required_confirmation": "B"}
 
-    def fake_build_runner_preflight_result(task, repository, gates):
+    def fake_build_runner_preflight_result(task, repository, gates, **_kwargs):
         calls["build"].append((task, repository, gates))
         return {
             "task_code": task["task_code"],
@@ -161,6 +161,52 @@ def test_runner_preflight_records_missing_gates_as_blocked(monkeypatch):
     assert calls["events"][0]["event_type"] == "runner_preflight_blocked"
     assert calls["tool_calls"][0]["result_status"] == "failed"
     assert '"validation_gates": []' in result.output
+
+
+def test_require_runner_repository_preflight_records_block_before_raise(monkeypatch):
+    calls = {"events": [], "tool_calls": []}
+
+    def fake_build_runner_preflight_result(task, repository, gates, **_kwargs):
+        return {
+            "task_code": task["task_code"],
+            "task_level": task["task_level"],
+            "repository": repository.name,
+            "status": "blocked",
+            "runner_allowed": True,
+            "repository_ready": False,
+            "validation_gates": gates,
+            "repository_doctor": {"suggested_action": "review_local_changes"},
+            "errors": ["repository is not runner ready: review_local_changes"],
+        }
+
+    monkeypatch.setattr(cli, "build_runner_preflight_result", fake_build_runner_preflight_result)
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+
+    try:
+        cli._require_runner_repository_preflight(
+            _task(),
+            _repository_config(),
+            ["lint"],
+            by="gongbu",
+        )
+    except PermissionError as exc:
+        assert str(exc) == "repository is not runner ready: review_local_changes"
+    else:
+        raise AssertionError("expected blocked preflight to raise")
+
+    assert calls["events"][0]["event_type"] == "runner_preflight_blocked"
+    assert "review_local_changes" in calls["events"][0]["summary"]
+    assert calls["tool_calls"][0]["tool_name"] == "cli.runner_preflight"
+    assert calls["tool_calls"][0]["result_status"] == "failed"
 
 
 def test_runner_preflight_rejects_missing_task(monkeypatch):

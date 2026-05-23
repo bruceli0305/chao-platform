@@ -47,6 +47,12 @@ from app.chao.runner_preflight import (
 from app.chao.runner_sandbox import DEFAULT_SANDBOX_IMAGE, execute_runner_sandbox_commands
 from app.chao.runner_validation import execute_runner_validation_commands
 from app.chao.runner_workspace import create_runner_workspace
+from app.chao.self_upgrade import (
+    SELF_UPGRADE_SYSTEM_PROMPT,
+    build_self_upgrade_prompt,
+    extract_llm_response_text,
+    parse_self_upgrade_plan,
+)
 from app.chao.services.artifacts import record_artifact
 from app.chao.services.console import (
     get_console_approval_queue,
@@ -125,21 +131,89 @@ def _resolve_task_validation_gates(
     raise ValueError("No validation gates provided or recorded for this task.")
 
 
+def _build_runner_preflight_summary(preflight: dict[str, object], repository_name: str) -> str:
+    summary = f"Runner preflight {preflight['status']}: {repository_name}"
+    errors = preflight.get("errors")
+    if errors:
+        summary = f"{summary}; errors={'; '.join(str(error) for error in errors)}"
+
+    return summary
+
+
+def _record_runner_repository_preflight(
+    task: dict[str, object],
+    repository_config,
+    validation_gates: list[str] | None = None,
+    *,
+    require_validation_gates: bool = True,
+    by: str = "gongbu",
+):
+    permission_decision = require_tool_permission(
+        agent_name=by,
+        tool_name="cli.runner_preflight",
+        task_level=task["task_level"],
+        required_confirmation=task.get("route_result", {}).get(
+            "required_confirmation",
+            "none",
+        ),
+        current_status=task["status"],
+    )
+    preflight = build_runner_preflight_result(
+        task,
+        repository_config,
+        validation_gates,
+        require_validation_gates=require_validation_gates,
+    )
+    result_status = "success" if not preflight["errors"] else "failed"
+    event_type = (
+        "runner_preflight_ready" if result_status == "success" else "runner_preflight_blocked"
+    )
+    record_task_event(
+        task_id=task["id"],
+        event_type=event_type,
+        from_status=task["status"],
+        to_status=task["status"],
+        summary=_build_runner_preflight_summary(preflight, repository_config.name),
+        created_by=by,
+    )
+    record_tool_call(
+        task_id=task["id"],
+        agent_name=by,
+        tool_name="cli.runner_preflight",
+        arguments_summary=(
+            f"task_code={task['task_code']}; repository={repository_config.name}; "
+            f"gates={preflight['validation_gates']}"
+        ),
+        permission_policy=permission_decision["permission_policy"],
+        result_status=result_status,
+        permission_decision=permission_decision,
+        output_summary=(
+            f"status={preflight['status']}; "
+            f"suggested_action={preflight['repository_doctor']['suggested_action']}; "
+            f"errors={preflight['errors']}"
+        ),
+        risk_flag=permission_decision["risk_flag"],
+    )
+
+    return preflight
+
+
 def _require_runner_repository_preflight(
     task: dict[str, object],
     repository_config,
     validation_gates: list[str] | None = None,
     *,
     require_validation_gates: bool = True,
+    by: str = "gongbu",
 ):
-    return require_runner_preflight_ready(
-        build_runner_preflight_result(
-            task,
-            repository_config,
-            validation_gates,
-            require_validation_gates=require_validation_gates,
-        )
+    preflight = _record_runner_repository_preflight(
+        task,
+        repository_config,
+        validation_gates,
+        require_validation_gates=require_validation_gates,
+        by=by,
     )
+    return require_runner_preflight_ready(preflight)
 
 
 @app.command()
@@ -1605,6 +1679,286 @@ def llm_chat_command(
         raise typer.Exit(code=1)
 
 
+@app.command("self-upgrade")
+def self_upgrade_command(
+    task_code: str,
+    request: str = typer.Argument("", help="Self-upgrade request. Defaults to task raw_request."),
+    provider: str | None = typer.Option(None, "--provider", help="LLM provider"),
+    repository: str | None = typer.Option(None, "--repository", help="Repository config name"),
+    data_classification: str = typer.Option(
+        "D1",
+        "--data-classification",
+        help="Highest data classification included in the LLM prompt",
+    ),
+    execute: bool = typer.Option(False, "--execute", help="Call the external provider"),
+    apply: bool = typer.Option(False, "--apply", help="Write the generated patch to disk"),
+    validate: bool = typer.Option(
+        True,
+        "--validate/--skip-validation",
+        help="Run validation gates after applying the patch",
+    ),
+    allow_governed_egress: bool = typer.Option(
+        False,
+        "--allow-governed-egress",
+        help="Allow L3/L4 egress only when an A-level approval exists",
+    ),
+    temperature: float = typer.Option(0.1, "--temperature", min=0.0, max=2.0),
+    max_tokens: int = typer.Option(2048, "--max-tokens", min=1),
+    timeout_seconds: int = typer.Option(120, "--timeout", help="Per-command timeout seconds"),
+    llm_by: str = typer.Option("zhongshu", "--llm-by", help="LLM planning agent name"),
+    patch_by: str = typer.Option("gongbu", "--patch-by", help="Patch agent name"),
+    validate_by: str = typer.Option("xingbu", "--validate-by", help="Validation agent name"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    if task["task_level"] == "L4" and apply:
+        print("[red]L4 tasks cannot execute self-upgrade patches.[/red]")
+        raise typer.Exit(code=1)
+
+    try:
+        provider_config = build_llm_provider_config(provider)
+        llm_permission = require_tool_permission(
+            agent_name=llm_by,
+            tool_name="llm.chat_completion",
+            task_level=task["task_level"],
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
+            current_status=task["status"],
+        )
+        llm_prompt = build_self_upgrade_prompt(task, request)
+        resolved_classification = resolve_task_data_classification(task, data_classification)
+        egress_decision = evaluate_llm_egress_policy(
+            task_level=task["task_level"],
+            data_classification=resolved_classification,
+            provider=provider_config.name,
+            model=provider_config.model,
+            execute=execute,
+            governed_egress_approved=(
+                allow_governed_egress
+                and _has_active_llm_egress_authorization(
+                    task,
+                    provider=provider_config.name,
+                    model=provider_config.model,
+                    data_classification=resolved_classification,
+                )
+            ),
+        )
+        if egress_decision.allowed:
+            llm_result = execute_llm_chat_completion(
+                provider_config,
+                llm_prompt,
+                system_prompt=SELF_UPGRADE_SYSTEM_PROMPT,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                dry_run=not execute,
+            )
+            llm_payload = llm_result.to_safe_dict()
+            llm_result_status = (
+                "success" if llm_result.status in {"success", "dry_run"} else "failed"
+            )
+            llm_output_summary = (
+                f"provider={provider_config.name}; model={provider_config.model}; "
+                f"status={llm_result.status}; dry_run={llm_result.dry_run}; "
+                f"data_classification={resolved_classification}; error={llm_result.error}"
+            )
+        else:
+            llm_payload = {
+                "provider": provider_config.name,
+                "model": provider_config.model,
+                "status": "denied",
+                "dry_run": not execute,
+                "request": None,
+                "response": None,
+                "error": egress_decision.reason,
+                "egress_policy": egress_decision.to_dict(),
+            }
+            llm_result_status = "denied"
+            llm_output_summary = (
+                f"provider={provider_config.name}; model={provider_config.model}; "
+                f"status=denied; dry_run={not execute}; "
+                f"data_classification={resolved_classification}; error={egress_decision.reason}"
+            )
+    except (PermissionError, RuntimeError, ValueError) as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    record_tool_call(
+        task_id=task["id"],
+        agent_name=llm_by,
+        tool_name="llm.chat_completion",
+        arguments_summary=(
+            f"task_code={task_code}; provider={provider_config.name}; "
+            f"model={provider_config.model}; user_request_chars={len(request)}; "
+            f"llm_prompt_chars={len(llm_prompt)}; data_classification={resolved_classification}; "
+            f"execute={execute}; apply={apply}; validate={validate}; "
+            f"allow_governed_egress={allow_governed_egress}"
+        ),
+        permission_policy=llm_permission["permission_policy"],
+        result_status=llm_result_status,
+        permission_decision={
+            **llm_permission,
+            "egress_policy": egress_decision.to_dict(),
+        },
+        output_summary=llm_output_summary,
+        risk_flag=llm_permission["risk_flag"] or not egress_decision.allowed,
+    )
+
+    if llm_result_status != "success":
+        print_json(
+            data={
+                "task_code": task_code,
+                "status": llm_payload["status"],
+                "llm_result": llm_payload,
+                "plan": None,
+                "execution_result": None,
+                "validation_result": None,
+            }
+        )
+        raise typer.Exit(code=1)
+
+    if not execute:
+        print_json(
+            data={
+                "task_code": task_code,
+                "status": "dry_run",
+                "llm_result": llm_payload,
+                "plan": None,
+                "execution_result": None,
+                "validation_result": None,
+            }
+        )
+        return
+
+    try:
+        plan = parse_self_upgrade_plan(extract_llm_response_text(llm_payload["response"]))
+        repository_config = get_repository_config(repository)
+        execution_result = None
+        validation_result = None
+
+        if plan["operations"]:
+            patch_permission = require_tool_permission(
+                agent_name=patch_by,
+                tool_name="cli.runner_patch",
+                task_level=task["task_level"],
+                required_confirmation=task.get("route_result", {}).get(
+                    "required_confirmation",
+                    "none",
+                ),
+                current_status=task["status"],
+            )
+            if apply:
+                _require_runner_repository_preflight(
+                    task,
+                    repository_config,
+                    plan["validation_gates"] if validate else None,
+                    require_validation_gates=validate,
+                    by=patch_by,
+                )
+            execution_result = apply_text_patch_operations(
+                plan["operations"],
+                repo_root=repository_config.workspace_path,
+                dry_run=not apply,
+            )
+            record_task_event(
+                task_id=task["id"],
+                event_type="self_upgrade_patch_applied" if apply else "self_upgrade_patch_planned",
+                from_status=task["status"],
+                to_status=task["status"],
+                summary=(
+                    f"Self-upgrade {'applied' if apply else 'planned'} "
+                    f"{len(plan['operations'])} controlled patch operation(s)."
+                ),
+                created_by=patch_by,
+            )
+            record_tool_call(
+                task_id=task["id"],
+                agent_name=patch_by,
+                tool_name="cli.runner_patch",
+                arguments_summary=(
+                    f"task_code={task_code}; repository={repository_config.name}; "
+                    f"paths={execution_result['changed_files']}; apply={apply}"
+                ),
+                permission_policy=patch_permission["permission_policy"],
+                result_status="success",
+                permission_decision=patch_permission,
+                output_summary=(
+                    f"changed_files={execution_result['changed_files']}; "
+                    f"applied={execution_result['applied']}"
+                ),
+                risk_flag=patch_permission["risk_flag"],
+            )
+
+        if plan["operations"] and apply and validate:
+            validation_permission = require_tool_permission(
+                agent_name=validate_by,
+                tool_name="cli.runner_validate",
+                task_level=task["task_level"],
+                required_confirmation=task.get("route_result", {}).get(
+                    "required_confirmation",
+                    "none",
+                ),
+                current_status=task["status"],
+            )
+            validation_result = execute_runner_validation_commands(
+                plan["validation_gates"],
+                repo_root=repository_config.workspace_path,
+                timeout_seconds=timeout_seconds,
+            )
+            record_tool_call(
+                task_id=task["id"],
+                agent_name=validate_by,
+                tool_name="cli.runner_validate",
+                arguments_summary=(
+                    f"task_code={task_code}; repository={repository_config.name}; "
+                    f"gates={plan['validation_gates']}"
+                ),
+                permission_policy=validation_permission["permission_policy"],
+                result_status="success" if validation_result["deliverable"] else "failed",
+                permission_decision=validation_permission,
+                output_summary=f"deliverable={validation_result['deliverable']}",
+                risk_flag=validation_permission["risk_flag"],
+            )
+
+        if not plan["operations"]:
+            record_task_event(
+                task_id=task["id"],
+                event_type="self_upgrade_no_patch",
+                from_status=task["status"],
+                to_status=task["status"],
+                summary=plan["summary"],
+                created_by=patch_by,
+            )
+    except (PermissionError, ValueError, FileNotFoundError) as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    deliverable = validation_result is None or validation_result["deliverable"]
+    status = "no_patch"
+    if plan["operations"]:
+        status = "applied" if apply and deliverable else "validation_failed" if apply else "planned"
+
+    print_json(
+        data={
+            "task_code": task_code,
+            "status": status,
+            "repository": repository_config.to_safe_dict(),
+            "llm_result": llm_payload,
+            "plan": plan,
+            "execution_result": execution_result,
+            "validation_result": validation_result,
+        }
+    )
+
+    if not deliverable:
+        raise typer.Exit(code=1)
+
+
 def _has_approved_a_confirmation(task: dict[str, object]) -> bool:
     for confirmation in task.get("confirmations", []) or []:
         if (
@@ -1679,6 +2033,7 @@ def runner_branch_command(
                 task,
                 repository_config,
                 require_validation_gates=False,
+                by=by,
             )
         resolved_base_ref = base_ref or repository_config.default_branch
         branch_plan = build_runner_branch_plan(
@@ -1759,63 +2114,20 @@ def runner_preflight_command(
         raise typer.Exit(code=1)
 
     try:
-        permission_decision = require_tool_permission(
-            agent_name=by,
-            tool_name="cli.runner_preflight",
-            task_level=task["task_level"],
-            required_confirmation=task.get("route_result", {}).get(
-                "required_confirmation",
-                "none",
-            ),
-            current_status=task["status"],
-        )
         repository_config = get_repository_config(repository)
         try:
             validation_gates = _resolve_task_validation_gates(task, gate)
         except ValueError:
             validation_gates = []
-        preflight = build_runner_preflight_result(
+        preflight = _record_runner_repository_preflight(
             task,
             repository_config,
             validation_gates,
+            by=by,
         )
     except (PermissionError, ValueError) as exc:
         print_json(data={"status": "failed", "error": str(exc)})
         raise typer.Exit(code=1) from exc
-
-    result_status = "success" if not preflight["errors"] else "failed"
-    event_type = (
-        "runner_preflight_ready" if result_status == "success" else "runner_preflight_blocked"
-    )
-    preflight_summary = f"Runner preflight {preflight['status']}: {repository_config.name}"
-    if preflight["errors"]:
-        preflight_summary = f"{preflight_summary}; errors={'; '.join(preflight['errors'])}"
-
-    record_task_event(
-        task_id=task["id"],
-        event_type=event_type,
-        from_status=task["status"],
-        to_status=task["status"],
-        summary=preflight_summary,
-        created_by=by,
-    )
-    record_tool_call(
-        task_id=task["id"],
-        agent_name=by,
-        tool_name="cli.runner_preflight",
-        arguments_summary=(
-            f"task_code={task_code}; repository={repository_config.name}; gates={validation_gates}"
-        ),
-        permission_policy=permission_decision["permission_policy"],
-        result_status=result_status,
-        permission_decision=permission_decision,
-        output_summary=(
-            f"status={preflight['status']}; "
-            f"suggested_action={preflight['repository_doctor']['suggested_action']}; "
-            f"errors={preflight['errors']}"
-        ),
-        risk_flag=permission_decision["risk_flag"],
-    )
 
     if as_json:
         print_json(data=preflight)
@@ -1874,6 +2186,7 @@ def runner_workspace_command(
                 task,
                 repository_config,
                 require_validation_gates=False,
+                by=by,
             )
         resolved_base_ref = base_ref or repository_config.default_branch
         workspace_plan = build_runner_workspace_plan(
@@ -1972,7 +2285,12 @@ def runner_sandbox_command(
         repository_config = get_repository_config(repository)
         sandbox_gates = _resolve_task_validation_gates(task, gate)
         if apply:
-            _require_runner_repository_preflight(task, repository_config, sandbox_gates)
+            _require_runner_repository_preflight(
+                task,
+                repository_config,
+                sandbox_gates,
+                by=by,
+            )
         sandbox_result = execute_runner_sandbox_commands(
             sandbox_gates,
             workspace_path=workspace_path,
@@ -2070,6 +2388,7 @@ def runner_patch_command(
                 task,
                 repository_config,
                 require_validation_gates=False,
+                by=by,
             )
         execution_result = apply_text_patch_operations(
             [
@@ -2153,7 +2472,12 @@ def runner_validate_command(
         )
         repository_config = get_repository_config(repository)
         validation_gates = _resolve_task_validation_gates(task, gate)
-        _require_runner_repository_preflight(task, repository_config, validation_gates)
+        _require_runner_repository_preflight(
+            task,
+            repository_config,
+            validation_gates,
+            by=by,
+        )
         validation_result = execute_runner_validation_commands(
             validation_gates,
             repo_root=repository_config.workspace_path,
@@ -2252,7 +2576,12 @@ def runner_attempt_command(
         )
         repository_config = get_repository_config(repository)
         validation_gates = _resolve_task_validation_gates(task, gate)
-        _require_runner_repository_preflight(task, repository_config, validation_gates)
+        _require_runner_repository_preflight(
+            task,
+            repository_config,
+            validation_gates,
+            by=patch_by,
+        )
         execution_result = apply_text_patch_operations(
             [
                 {
