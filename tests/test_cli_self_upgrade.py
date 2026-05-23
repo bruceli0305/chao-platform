@@ -68,7 +68,8 @@ def _llm_result(*, dry_run: bool, response: dict | None = None):
     return Result()
 
 
-def _plan_response():
+def _plan_response(validation_gates=None):
+    gates = validation_gates or ["lint"]
     return {
         "choices": [
             {
@@ -84,7 +85,7 @@ def _plan_response():
                                     "new_text": "new",
                                 }
                             ],
-                            "validation_gates": ["lint"],
+                            "validation_gates": gates,
                             "commit_message": "self-upgrade: patch demo heading",
                         }
                     ),
@@ -306,7 +307,10 @@ def test_self_upgrade_l3_apply_runs_governance_before_patch(monkeypatch):
     monkeypatch.setattr(
         cli,
         "execute_llm_chat_completion",
-        lambda *_args, **_kwargs: _llm_result(dry_run=False, response=_plan_response()),
+        lambda *_args, **_kwargs: _llm_result(
+            dry_run=False,
+            response=_plan_response(["manual_validation"]),
+        ),
     )
     monkeypatch.setattr(
         cli,

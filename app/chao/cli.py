@@ -2029,7 +2029,10 @@ def self_upgrade_command(
         return
 
     try:
-        plan = parse_self_upgrade_plan(extract_llm_response_text(llm_payload["response"]))
+        plan = parse_self_upgrade_plan(
+            extract_llm_response_text(llm_payload["response"]),
+            allow_unsupported_validation_gates=not validate,
+        )
         repository_config = get_repository_config(repository)
         execution_result = None
         validation_result = None

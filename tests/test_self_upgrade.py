@@ -71,6 +71,20 @@ def test_parse_self_upgrade_plan_rejects_manual_gate():
         )
 
 
+def test_parse_self_upgrade_plan_can_ignore_manual_gate_when_validation_is_skipped():
+    plan = parse_self_upgrade_plan(
+        json.dumps(
+            {
+                "operations": [],
+                "validation_gates": ["manual_validation", "lint"],
+            }
+        ),
+        allow_unsupported_validation_gates=True,
+    )
+
+    assert plan["validation_gates"] == ["lint"]
+
+
 def test_extract_llm_response_text_supports_openai_compatible_shape():
     assert (
         extract_llm_response_text(

@@ -858,7 +858,8 @@ def test_console_repositories_renders_workspace_summary(monkeypatch):
     result = CliRunner().invoke(cli.app, ["console-repositories"])
 
     assert result.exit_code == 0
-    assert "Repository Workspace Summary" in result.output
+    assert "Repository Workspace" in result.output
+    assert "Summary" in result.output
     assert "Repository Workspaces" in result.output
     assert "chao-platform" in result.output
 

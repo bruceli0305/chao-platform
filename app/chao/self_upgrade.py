@@ -96,7 +96,11 @@ def extract_llm_response_text(response: dict[str, Any] | None) -> str:
     raise ValueError("LLM response does not contain text content")
 
 
-def parse_self_upgrade_plan(text: str) -> SelfUpgradePlan:
+def parse_self_upgrade_plan(
+    text: str,
+    *,
+    allow_unsupported_validation_gates: bool = False,
+) -> SelfUpgradePlan:
     raw_plan = _load_json_object(text)
     summary = _optional_string(raw_plan.get("summary"), "Self-upgrade patch plan.")
     commit_message = _optional_string(
@@ -104,7 +108,10 @@ def parse_self_upgrade_plan(text: str) -> SelfUpgradePlan:
         "self-upgrade: apply controlled patch",
     )
     operations = _parse_operations(raw_plan.get("operations"))
-    validation_gates = _parse_validation_gates(raw_plan.get("validation_gates"))
+    validation_gates = _parse_validation_gates(
+        raw_plan.get("validation_gates"),
+        allow_unsupported=allow_unsupported_validation_gates,
+    )
 
     require_change_scope_allowed([operation["path"] for operation in operations])
 
@@ -181,7 +188,11 @@ def _parse_operations(value: object) -> list[SelfUpgradePatchOperation]:
     return operations
 
 
-def _parse_validation_gates(value: object) -> list[str]:
+def _parse_validation_gates(
+    value: object,
+    *,
+    allow_unsupported: bool = False,
+) -> list[str]:
     if value is None:
         return list(DEFAULT_SELF_UPGRADE_GATES)
     if not isinstance(value, list):
@@ -193,6 +204,8 @@ def _parse_validation_gates(value: object) -> list[str]:
             raise ValueError("self-upgrade validation_gates must contain strings")
         normalized_gate = gate.strip()
         if normalized_gate not in EXECUTABLE_SELF_UPGRADE_GATES:
+            if allow_unsupported:
+                continue
             raise ValueError(f"unsupported self-upgrade validation gate: {normalized_gate}")
         if normalized_gate not in gates:
             gates.append(normalized_gate)
