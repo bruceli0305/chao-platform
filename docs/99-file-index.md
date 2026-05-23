@@ -27,6 +27,9 @@ This package uses English filenames to avoid ZIP encoding issues on Windows / Gi
 - `docs/13-next-development-plan-v3.md`
 - `docs/14-codex-handoff-guide.md`
 - `docs/15-pgvector-ingest-policy-v3.md`
+- `docs/16-agent-runner-sandbox-boundary-v3.md`
+- `docs/17-agent-runner-execution-v3.md`
+- `docs/18-first-run-self-upgrade-runbook.md`
 
 ## Agent Rules
 

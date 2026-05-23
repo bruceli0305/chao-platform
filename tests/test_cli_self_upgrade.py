@@ -780,3 +780,118 @@ def test_self_upgrade_status_uses_bound_pr_and_exits_pending(monkeypatch):
     assert calls["events"][0]["event_type"] == "self_upgrade_ci_pending"
     assert calls["tool_calls"][0]["result_status"] == "pending"
     assert '"status": "ci_pending"' in result.output
+
+
+def test_self_upgrade_watch_polls_until_ci_passes(monkeypatch):
+    calls = {"events": [], "tool_calls": [], "github_links": [], "ci": [], "sleeps": []}
+    responses = [
+        {
+            "status": "pending",
+            "deliverable": False,
+            "checks": [{"name": "pytest", "state": "PENDING", "link": None}],
+        },
+        {
+            "status": "passed",
+            "deliverable": True,
+            "checks": [
+                {
+                    "name": "pytest",
+                    "state": "SUCCESS",
+                    "link": "https://github.com/example/repo/actions/runs/99",
+                    "workflow": "CI",
+                    "bucket": "pass",
+                }
+            ],
+        },
+    ]
+
+    def fake_checks(repository, **kwargs):
+        calls["ci"].append((repository, kwargs))
+        response = responses.pop(0)
+        return {
+            "repository": repository.name,
+            "workspace_path": repository.workspace_path,
+            "pr_ref": kwargs["pr_ref"],
+            "dry_run": kwargs["dry_run"],
+            "commands": [],
+            "errors": [],
+            **response,
+        }
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
+    monkeypatch.setattr(cli, "execute_github_pr_checks", fake_checks)
+    monkeypatch.setattr(cli.time, "sleep", lambda seconds: calls["sleeps"].append(seconds))
+    monkeypatch.setattr(
+        cli,
+        "record_github_link",
+        lambda **kwargs: calls["github_links"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        ["self-upgrade-watch", "TASK-1", "--pr-ref", "42", "--interval", "1", "--attempts", "2"],
+    )
+
+    assert result.exit_code == 0
+    assert len(calls["ci"]) == 2
+    assert calls["sleeps"] == [1]
+    assert calls["github_links"][0]["link_type"] == "ci_run"
+    assert calls["events"][0]["event_type"] == "self_upgrade_ci_passed"
+    assert calls["tool_calls"][0]["result_status"] == "success"
+    assert '"attempts": 2' in result.output
+
+
+def test_self_upgrade_watch_exits_pending_after_attempts(monkeypatch):
+    calls = {"events": [], "tool_calls": [], "ci": [], "sleeps": []}
+
+    def fake_checks(repository, **kwargs):
+        calls["ci"].append((repository, kwargs))
+        return {
+            "repository": repository.name,
+            "workspace_path": repository.workspace_path,
+            "pr_ref": kwargs["pr_ref"],
+            "status": "pending",
+            "deliverable": False,
+            "dry_run": kwargs["dry_run"],
+            "checks": [{"name": "pytest", "state": "PENDING", "link": None}],
+            "commands": [],
+            "errors": [],
+        }
+
+    monkeypatch.setattr(cli, "get_task_detail", lambda _task_code: _task())
+    monkeypatch.setattr(cli, "get_repository_config", lambda _name=None: _repository_config())
+    monkeypatch.setattr(cli, "execute_github_pr_checks", fake_checks)
+    monkeypatch.setattr(cli.time, "sleep", lambda seconds: calls["sleeps"].append(seconds))
+    monkeypatch.setattr(
+        cli,
+        "record_task_event",
+        lambda **kwargs: calls["events"].append(kwargs),
+    )
+    monkeypatch.setattr(
+        cli,
+        "record_tool_call",
+        lambda **kwargs: calls["tool_calls"].append(kwargs),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        ["self-upgrade-watch", "TASK-1", "--pr-ref", "42", "--interval", "1", "--attempts", "2"],
+    )
+
+    assert result.exit_code == 1
+    assert len(calls["ci"]) == 2
+    assert calls["sleeps"] == [1]
+    assert calls["events"][0]["event_type"] == "self_upgrade_ci_pending"
+    assert calls["tool_calls"][0]["result_status"] == "pending"
+    assert '"status": "ci_pending"' in result.output

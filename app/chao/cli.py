@@ -1,4 +1,5 @@
 import json
+import time
 import uuid
 from datetime import datetime
 from typing import Annotated
@@ -8,6 +9,7 @@ from rich import print, print_json
 from rich.console import Console
 from rich.table import Table
 
+from app.chao.doctor import run_chao_doctor
 from app.chao.github_ci import execute_github_pr_checks
 from app.chao.github_pr import build_self_upgrade_pr_body, execute_github_pr_create
 from app.chao.graph.main_graph import build_graph
@@ -2275,6 +2277,61 @@ def _resolve_task_pull_request_ref(task: dict[str, object]) -> str:
     raise ValueError("No pull_request github link found for this task. Pass --pr-ref explicitly.")
 
 
+def _record_self_upgrade_ci_result(
+    *,
+    task: dict[str, object],
+    repository_name: str,
+    ci_result: dict[str, object],
+    permission_decision: dict[str, object],
+    by: str,
+    source: str,
+) -> None:
+    for check in ci_result["checks"]:
+        if not check["link"]:
+            continue
+        record_github_link(
+            task_id=task["id"],
+            link_type="ci_run",
+            external_id=f"{ci_result['pr_ref']}:{check['name']}",
+            url=check["link"],
+            title=check["name"],
+            status=check["state"].lower(),
+            metadata={
+                "source": source,
+                "pr_ref": ci_result["pr_ref"],
+                "workflow": check["workflow"],
+                "bucket": check["bucket"],
+            },
+            created_by=by,
+        )
+
+    record_task_event(
+        task_id=task["id"],
+        event_type=f"self_upgrade_ci_{ci_result['status']}",
+        from_status=task["status"],
+        to_status=task["status"],
+        summary=f"Self-upgrade CI {ci_result['status']}: {len(ci_result['checks'])} check(s).",
+        created_by=by,
+    )
+    record_tool_call(
+        task_id=task["id"],
+        agent_name=by,
+        tool_name="cli.github_ci_check",
+        arguments_summary=(
+            f"task_code={task['task_code']}; repository={repository_name}; "
+            f"pr_ref={ci_result['pr_ref']}"
+        ),
+        permission_policy=permission_decision["permission_policy"],
+        result_status="success" if ci_result["deliverable"] else ci_result["status"],
+        permission_decision=permission_decision,
+        output_summary=(
+            f"status={ci_result['status']}; checks={len(ci_result['checks'])}; "
+            f"errors={ci_result['errors']}"
+        ),
+        risk_flag=permission_decision["risk_flag"] or not ci_result["deliverable"],
+    )
+
+
 @app.command("self-upgrade-status")
 def self_upgrade_status_command(
     task_code: str,
@@ -2314,55 +2371,91 @@ def self_upgrade_status_command(
         print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
-    for check in ci_result["checks"]:
-        if not check["link"]:
-            continue
-        record_github_link(
-            task_id=task["id"],
-            link_type="ci_run",
-            external_id=f"{resolved_pr_ref}:{check['name']}",
-            url=check["link"],
-            title=check["name"],
-            status=check["state"].lower(),
-            metadata={
-                "source": "self_upgrade_status",
-                "pr_ref": resolved_pr_ref,
-                "workflow": check["workflow"],
-                "bucket": check["bucket"],
-            },
-            created_by=by,
-        )
-
-    record_task_event(
-        task_id=task["id"],
-        event_type=f"self_upgrade_ci_{ci_result['status']}",
-        from_status=task["status"],
-        to_status=task["status"],
-        summary=f"Self-upgrade CI {ci_result['status']}: {len(ci_result['checks'])} check(s).",
-        created_by=by,
-    )
-    record_tool_call(
-        task_id=task["id"],
-        agent_name=by,
-        tool_name="cli.github_ci_check",
-        arguments_summary=(
-            f"task_code={task_code}; repository={repository_config.name}; "
-            f"pr_ref={ci_result['pr_ref']}"
-        ),
-        permission_policy=permission_decision["permission_policy"],
-        result_status="success" if ci_result["deliverable"] else ci_result["status"],
+    _record_self_upgrade_ci_result(
+        task=task,
+        repository_name=repository_config.name,
+        ci_result=ci_result,
         permission_decision=permission_decision,
-        output_summary=(
-            f"status={ci_result['status']}; checks={len(ci_result['checks'])}; "
-            f"errors={ci_result['errors']}"
-        ),
-        risk_flag=permission_decision["risk_flag"] or not ci_result["deliverable"],
+        by=by,
+        source="self_upgrade_status",
     )
 
     print_json(
         data={
             "task_code": task_code,
             "status": f"ci_{ci_result['status']}",
+            "repository": repository_config.to_safe_dict(),
+            "ci_result": ci_result,
+        }
+    )
+
+    if not ci_result["deliverable"]:
+        raise typer.Exit(code=1)
+
+
+@app.command("self-upgrade-watch")
+def self_upgrade_watch_command(
+    task_code: str,
+    pr_ref: str | None = typer.Option(
+        None,
+        "--pr-ref",
+        help="GitHub PR number or URL. Defaults to the latest bound pull_request link.",
+    ),
+    repository: str | None = typer.Option(None, "--repository", help="Repository config name"),
+    interval_seconds: int = typer.Option(30, "--interval", min=1, help="Seconds between checks"),
+    attempts: int = typer.Option(10, "--attempts", min=1, help="Maximum CI polling attempts"),
+    by: str = typer.Option("xingbu", "--by", help="GitHub CI check agent name"),
+):
+    task = get_task_detail(task_code)
+
+    if not task:
+        print(f"[red]Task not found:[/red] {task_code}")
+        raise typer.Exit(code=1)
+
+    try:
+        repository_config = get_repository_config(repository)
+        resolved_pr_ref = pr_ref or _resolve_task_pull_request_ref(task)
+        permission_decision = require_tool_permission(
+            agent_name=by,
+            tool_name="cli.github_ci_check",
+            task_level=task["task_level"],
+            required_confirmation=task.get("route_result", {}).get(
+                "required_confirmation",
+                "none",
+            ),
+            current_status=task["status"],
+        )
+    except (PermissionError, ValueError) as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    ci_result = None
+    for attempt in range(1, attempts + 1):
+        ci_result = execute_github_pr_checks(
+            repository_config,
+            pr_ref=resolved_pr_ref,
+            dry_run=False,
+        )
+        if ci_result["status"] != "pending":
+            break
+        if attempt < attempts:
+            time.sleep(interval_seconds)
+
+    assert ci_result is not None
+    _record_self_upgrade_ci_result(
+        task=task,
+        repository_name=repository_config.name,
+        ci_result=ci_result,
+        permission_decision=permission_decision,
+        by=by,
+        source="self_upgrade_watch",
+    )
+
+    print_json(
+        data={
+            "task_code": task_code,
+            "status": f"ci_{ci_result['status']}",
+            "attempts": attempt,
             "repository": repository_config.to_safe_dict(),
             "ci_result": ci_result,
         }
@@ -3201,6 +3294,29 @@ def bind_github(
 
     updated_task = get_task_detail(task_code)
     print_json(data=updated_task)
+
+
+@app.command("doctor")
+def doctor_command(as_json: bool = typer.Option(False, "--json", help="Output JSON")):
+    report = run_chao_doctor()
+
+    if as_json:
+        print_json(data=report)
+    else:
+        table = Table(title="Chao First-Run Doctor")
+        table.add_column("Check")
+        table.add_column("Ready")
+        table.add_column("Summary")
+        for check in report["checks"]:
+            table.add_row(
+                check["name"],
+                "yes" if check["ready"] else "no",
+                check["summary"],
+            )
+        console.print(table)
+
+    if not report["ready"]:
+        raise typer.Exit(code=1)
 
 
 @app.command()
