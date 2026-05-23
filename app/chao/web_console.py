@@ -26,11 +26,11 @@ MAX_LIMIT = 100
 
 def build_console_index_html() -> str:
     return """<!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Chao Console</title>
+  <title>Chao 控制台</title>
   <style>
     :root { color-scheme: light; font-family: Inter, Segoe UI, Arial, sans-serif; }
     body { margin: 0; background: #f6f7f9; color: #1f2933; }
@@ -84,96 +84,96 @@ def build_console_index_html() -> str:
 </head>
 <body>
   <header>
-    <h1>Chao Control Center</h1>
-    <div class="muted">Local control plane</div>
-    <nav aria-label="Console sections">
-      <a href="#controls-section">Controls</a>
-      <a href="#overview-section">Overview</a>
-      <a href="#repositories-section">Repositories</a>
-      <a href="#risks-section">Risks</a>
-      <a href="#github-sync-section">GitHub Sync</a>
-      <a href="#gates-section">Gates</a>
-      <a href="#audit-section">Audit</a>
-      <a href="#approvals-section">Approvals</a>
-      <a href="#recent-section">Recent</a>
-      <a href="#task-detail-section">Task Detail</a>
+    <h1>Chao 控制中心</h1>
+    <div class="muted">本地控制平面</div>
+    <nav aria-label="控制台分区">
+      <a href="#controls-section">控制</a>
+      <a href="#overview-section">概览</a>
+      <a href="#repositories-section">仓库</a>
+      <a href="#risks-section">风险</a>
+      <a href="#github-sync-section">GitHub 同步</a>
+      <a href="#gates-section">门槛</a>
+      <a href="#audit-section">审计</a>
+      <a href="#approvals-section">审批</a>
+      <a href="#recent-section">最近</a>
+      <a href="#task-detail-section">任务详情</a>
     </nav>
   </header>
   <main>
     <section id="controls-section">
-      <h2>Controls</h2>
+      <h2>控制</h2>
       <form id="refresh-form" class="controls">
-        <label for="record-limit">Limit</label>
+        <label for="record-limit">限制</label>
         <input id="record-limit" name="record-limit" type="number" min="1" max="100" value="8">
-        <label for="task-search">Search</label>
-        <input id="task-search" name="task-search" type="search" placeholder="Task code or title">
-        <label for="status-filter">Status</label>
+        <label for="task-search">搜索</label>
+        <input id="task-search" name="task-search" type="search" placeholder="任务代码或标题">
+        <label for="status-filter">状态</label>
         <select id="status-filter" name="status-filter">
-          <option value="">All</option>
-          <option value="DELIVERED">DELIVERED</option>
-          <option value="NEED_CONFIRMATION">NEED_CONFIRMATION</option>
-          <option value="DESIGNING">DESIGNING</option>
-          <option value="MILESTONE_PLANNING">MILESTONE_PLANNING</option>
-          <option value="VALIDATION_FAILED">VALIDATION_FAILED</option>
+          <option value="">全部</option>
+          <option value="DELIVERED">已交付</option>
+          <option value="NEED_CONFIRMATION">待确认</option>
+          <option value="DESIGNING">设计中</option>
+          <option value="MILESTONE_PLANNING">里程碑规划</option>
+          <option value="VALIDATION_FAILED">验证失败</option>
         </select>
-        <label for="level-filter">Level</label>
+        <label for="level-filter">等级</label>
         <select id="level-filter" name="level-filter">
-          <option value="">All</option>
+          <option value="">全部</option>
           <option value="L1">L1</option>
           <option value="L2">L2</option>
           <option value="L3">L3</option>
           <option value="L4">L4</option>
         </select>
-        <button type="submit">Refresh</button>
-        <span id="last-updated" class="muted">Not loaded</span>
+        <button type="submit">刷新</button>
+        <span id="last-updated" class="muted">未加载</span>
       </form>
     </section>
     <section id="overview-section">
-      <h2>Overview</h2>
+      <h2>概览</h2>
       <div id="overview" class="grid"></div>
     </section>
     <section id="repositories-section">
-      <h2>Repositories</h2>
+      <h2>仓库</h2>
       <div id="repositories" class="grid"></div>
       <div id="repository-details"></div>
     </section>
     <section id="risks-section">
-      <h2>Risks</h2>
+      <h2>风险</h2>
       <div id="risks" class="grid"></div>
       <div id="risk-details"></div>
     </section>
     <section id="github-sync-section">
-      <h2>GitHub Sync</h2>
+      <h2>GitHub 同步</h2>
       <div id="github-sync" class="grid"></div>
       <div id="github-sync-details"></div>
       <div id="github-link-result"></div>
     </section>
     <section id="gates-section">
-      <h2>Gates</h2>
+      <h2>门槛</h2>
       <div id="gates" class="grid"></div>
       <div id="gate-details"></div>
     </section>
     <section id="audit-section">
-      <h2>Audit Trail</h2>
+      <h2>审计追踪</h2>
       <div id="audit-trail"></div>
     </section>
     <section id="approvals-section">
-      <h2>Approval Queue</h2>
+      <h2>审批队列</h2>
       <div id="approval-queue"></div>
       <div id="approval-result"></div>
     </section>
     <section id="recent-section">
-      <h2>Recent Tasks</h2>
+      <h2>最近任务</h2>
       <div id="recent-tasks"></div>
     </section>
     <section id="task-detail-section">
-      <h2>Task Detail</h2>
+      <h2>任务详情</h2>
       <form id="task-form">
-        <input id="task-code" name="task-code" placeholder="TASK-YYYYMMDD-HHMMSS-ffffff">
-        <button type="submit">Load</button>
+        <input id="task-code" name="task-code" placeholder="任务-YYYYMMDD-HHMMSS-ffffff">
+        <button type="submit">加载</button>
       </form>
       <div id="task-link-row" class="muted">
-        Task link: <a id="task-link" href="#">No task selected</a>
+        任务链接：<a id="task-link" href="#">未选择任务</a>
       </div>
       <div id="task-summary"></div>
       <div id="task-detail-tables"></div>
@@ -181,8 +181,57 @@ def build_console_index_html() -> str:
     </section>
   </main>
   <script>
+    const textLabels = {
+      artifacts: "产物",
+      data_assets: "数据资产",
+      active_llm_egress_authorizations: "活跃 LLM 外发授权",
+      failed_tool_calls: "失败工具调用",
+      recent_tasks: "最近任务",
+      repositories: "仓库",
+      ready: "就绪",
+      dirty: "脏",
+      errors: "错误",
+      DELIVERED: "已交付",
+      NEED_CONFIRMATION: "待确认",
+      DESIGNING: "设计中",
+      MILESTONE_PLANNING: "里程碑规划",
+      VALIDATION_FAILED: "验证失败",
+      success: "成功",
+      failed: "失败",
+      pending: "待处理",
+      blocked: "已阻塞",
+      pull_request: "PR",
+      issue: "议题",
+      commit: "提交",
+      ci_run: "CI 运行",
+      true: "是",
+      false: "否",
+      null: "无",
+      undefined: "无"
+    };
+
+    function labelText(value) {
+      return textLabels[String(value)] ?? String(value ?? "");
+    }
+
+    function displayValue(key, value) {
+      if ([
+        "active",
+        "dirty",
+        "link_type",
+        "result_status",
+        "risk_flag",
+        "status",
+        "workspace_ready"
+      ].includes(key)) {
+        return labelText(value);
+      }
+      return value;
+    }
+
     const asMetric = ([name, value]) =>
-      `<div class="metric"><span>${name}</span><strong>${value}</strong></div>`;
+      `<div class="metric"><span>${escapeHtml(labelText(name))}</span>` +
+      `<strong>${escapeHtml(labelText(value))}</strong></div>`;
 
     function escapeHtml(value) {
       return String(value ?? "")
@@ -201,13 +250,13 @@ def build_console_index_html() -> str:
     }
 
     function renderPanelError(title, payload) {
-      const detail = payload?.message || payload?.detail || payload?.error || "Unknown error";
-      return renderNotice(`${title}: ${detail}`, "error");
+      const detail = payload?.message || payload?.detail || payload?.error || "未知错误";
+      return renderNotice(`${title}：${detail}`, "error");
     }
 
     function renderRecentTasks(tasks) {
       if (!tasks.length) {
-        return '<div class="muted">No recent tasks.</div>';
+        return '<div class="muted">暂无最近任务。</div>';
       }
 
       const rows = tasks.map((task) => `
@@ -218,9 +267,9 @@ def build_console_index_html() -> str:
           <td>${escapeHtml(task.status)}</td>
           <td>${escapeHtml(task.owner)}</td>
           <td>
-            <input name="approval-note" placeholder="Approval note">
+            <input name="approval-note" placeholder="审批备注">
             <button type="button" data-approve-task-code="${escapeHtml(task.task_code)}">
-              Approve
+              批准
             </button>
           </td>
         </tr>
@@ -229,7 +278,7 @@ def build_console_index_html() -> str:
       return `
         <table>
           <thead>
-            <tr><th>Task</th><th>Title</th><th>Level</th><th>Status</th><th>Owner</th></tr>
+            <tr><th>任务</th><th>标题</th><th>等级</th><th>状态</th><th>所有者</th></tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
@@ -238,11 +287,11 @@ def build_console_index_html() -> str:
 
     function renderApprovalQueue(tasks) {
       if (hasError(tasks)) {
-        return renderPanelError("Approval Queue", tasks);
+        return renderPanelError("审批队列", tasks);
       }
 
       if (!tasks.length) {
-        return '<div class="muted">No tasks waiting for confirmation.</div>';
+        return '<div class="muted">暂无等待确认的任务。</div>';
       }
 
       const rows = tasks.map((task) => `
@@ -259,8 +308,8 @@ def build_console_index_html() -> str:
         <table>
           <thead>
             <tr>
-              <th>Task</th><th>Title</th><th>Level</th>
-              <th>Confirm</th><th>Owner</th><th>Action</th>
+              <th>任务</th><th>标题</th><th>等级</th>
+              <th>确认</th><th>所有者</th><th>操作</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -270,14 +319,14 @@ def build_console_index_html() -> str:
 
     function renderRiskTable(title, rows, columns) {
       if (!rows.length) {
-        return `<div class="muted">${title}: none.</div>`;
+        return `<div class="muted">${escapeHtml(title)}：无。</div>`;
       }
 
       const head = columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("");
       const body = rows.map((row) => {
         const taskCode = row.task_code ? ` data-task-code="${escapeHtml(row.task_code)}"` : "";
         const cells = columns.map((column) =>
-          `<td>${escapeHtml(row[column.key])}</td>`
+          `<td>${escapeHtml(displayValue(column.key, row[column.key]))}</td>`
         ).join("");
         return `<tr${taskCode}>${cells}</tr>`;
       }).join("");
@@ -293,7 +342,7 @@ def build_console_index_html() -> str:
 
     function renderGitHubBindTable(rows) {
       if (!rows.length) {
-        return '<div class="muted">Unlinked Delivered Tasks: none.</div>';
+        return '<div class="muted">未关联的已交付任务：无。</div>';
       }
 
       const body = rows.map((task) => `
@@ -305,24 +354,24 @@ def build_console_index_html() -> str:
           <td>
             <select name="github-link-type">
               <option value="pull_request">PR</option>
-              <option value="issue">Issue</option>
-              <option value="commit">Commit</option>
-              <option value="ci_run">CI Run</option>
+              <option value="issue">议题</option>
+              <option value="commit">提交</option>
+              <option value="ci_run">CI 运行</option>
             </select>
-            <input name="github-external-id" placeholder="External ID">
-            <input name="github-url" placeholder="GitHub URL">
+            <input name="github-external-id" placeholder="外部 ID">
+            <input name="github-url" placeholder="GitHub 地址">
             <button type="button" data-bind-github-task-code="${escapeHtml(task.task_code)}">
-              Bind
+              绑定
             </button>
           </td>
         </tr>
       `).join("");
 
       return `
-        <h2>Unlinked Delivered Tasks</h2>
+        <h2>未关联的已交付任务</h2>
         <table>
           <thead>
-            <tr><th>Task</th><th>Title</th><th>Level</th><th>Owner</th><th>Bind</th></tr>
+            <tr><th>任务</th><th>标题</th><th>等级</th><th>所有者</th><th>绑定</th></tr>
           </thead>
           <tbody>${body}</tbody>
         </table>
@@ -331,73 +380,73 @@ def build_console_index_html() -> str:
 
     function renderRiskDetails(risks) {
       if (hasError(risks)) {
-        return renderPanelError("Risk details", risks);
+        return renderPanelError("风险详情", risks);
       }
 
       return [
-        renderRiskTable("Blocked Tasks", risks.blocked_tasks ?? [
+        renderRiskTable("阻塞任务", risks.blocked_tasks ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "title", label: "Title" },
-          { key: "task_level", label: "Level" },
-          { key: "status", label: "Status" }
+          { key: "task_code", label: "任务" },
+          { key: "title", label: "标题" },
+          { key: "task_level", label: "等级" },
+          { key: "status", label: "状态" }
         ]),
-        renderRiskTable("Runner Failures", risks.runner_failures ?? [
+        renderRiskTable("运行器失败", risks.runner_failures ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "artifact_type", label: "Artifact" },
+          { key: "task_code", label: "任务" },
+          { key: "artifact_type", label: "产物" },
           { key: "artifact_uri", label: "URI" }
         ]),
-        renderRiskTable("Runner Preflight Blocks", risks.runner_preflight_blocks ?? [
+        renderRiskTable("运行器预检阻塞", risks.runner_preflight_blocks ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "summary", label: "Summary" },
-          { key: "created_by", label: "By" },
-          { key: "created_at", label: "Created" }
+          { key: "task_code", label: "任务" },
+          { key: "summary", label: "摘要" },
+          { key: "created_by", label: "由" },
+          { key: "created_at", label: "创建时间" }
         ]),
-        renderRiskTable("Failed Gates", risks.failed_gates ?? [
+        renderRiskTable("失败门槛", risks.failed_gates ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "gate_name", label: "Gate" },
-          { key: "status", label: "Status" },
-          { key: "command", label: "Command" }
+          { key: "task_code", label: "任务" },
+          { key: "gate_name", label: "门槛" },
+          { key: "status", label: "状态" },
+          { key: "command", label: "命令" }
         ]),
-        renderRiskTable("Stale Tool Calls", risks.stale_tool_calls ?? [
+        renderRiskTable("过期工具调用", risks.stale_tool_calls ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "agent_name", label: "Agent" },
-          { key: "tool_name", label: "Tool" },
-          { key: "age_minutes", label: "Age Minutes" }
+          { key: "task_code", label: "任务" },
+          { key: "agent_name", label: "代理" },
+          { key: "tool_name", label: "工具" },
+          { key: "age_minutes", label: "历时（分钟）" }
         ]),
-        renderRiskTable("Pending Tool Calls", risks.pending_tool_calls ?? [
+        renderRiskTable("待处理工具调用", risks.pending_tool_calls ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "agent_name", label: "Agent" },
-          { key: "tool_name", label: "Tool" },
-          { key: "started_at", label: "Started" }
+          { key: "task_code", label: "任务" },
+          { key: "agent_name", label: "代理" },
+          { key: "tool_name", label: "工具" },
+          { key: "started_at", label: "开始时间" }
         ]),
-        renderRiskTable("Tool Risks", risks.tool_risks ?? [
+        renderRiskTable("工具风险", risks.tool_risks ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "agent_name", label: "Agent" },
-          { key: "tool_name", label: "Tool" },
-          { key: "result_status", label: "Result" }
+          { key: "task_code", label: "任务" },
+          { key: "agent_name", label: "代理" },
+          { key: "tool_name", label: "工具" },
+          { key: "result_status", label: "结果" }
         ]),
-        renderRiskTable("GitHub Risks", risks.github_risks ?? [
+        renderRiskTable("GitHub 风险", risks.github_risks ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "link_type", label: "Type" },
-          { key: "external_id", label: "External ID" },
-          { key: "status", label: "Status" }
+          { key: "task_code", label: "任务" },
+          { key: "link_type", label: "类型" },
+          { key: "external_id", label: "外部 ID" },
+          { key: "status", label: "状态" }
         ]),
         renderRiskTable(
-          "Expired LLM Egress Authorizations",
+          "已过期 LLM 外发授权",
           risks.expired_llm_egress_authorizations ?? [],
           [
-            { key: "task_code", label: "Task" },
-            { key: "provider", label: "Provider" },
-            { key: "model", label: "Model" },
-            { key: "expires_at", label: "Expires" }
+            { key: "task_code", label: "任务" },
+            { key: "provider", label: "提供商" },
+            { key: "model", label: "模型" },
+            { key: "expires_at", label: "过期时间" }
           ]
         )
       ].join("");
@@ -405,7 +454,7 @@ def build_console_index_html() -> str:
 
     function renderGateDetails(gates) {
       if (hasError(gates)) {
-        return renderPanelError("Gate details", gates);
+        return renderPanelError("门槛详情", gates);
       }
 
       const permissionMetrics = Object.entries(gates.tool_permission_audit ?? {});
@@ -413,139 +462,139 @@ def build_console_index_html() -> str:
       const gateRows = gates.recent_gate_results ?? [];
 
       return `
-        <h2>Tool Permission Audit</h2>
+        <h2>工具权限审计</h2>
         <div class="grid">${permissionMetrics.map(asMetric).join("")}</div>
-        <h2>Data Boundary Audit</h2>
+        <h2>数据边界审计</h2>
         <div class="grid">${boundaryMetrics.map(asMetric).join("")}</div>
-        ${renderRiskTable("Recent Gate Results", gateRows, [
-          { key: "task_code", label: "Task" },
-          { key: "gate_name", label: "Gate" },
-          { key: "status", label: "Status" },
-          { key: "command", label: "Command" }
+        ${renderRiskTable("最近门槛结果", gateRows, [
+          { key: "task_code", label: "任务" },
+          { key: "gate_name", label: "门槛" },
+          { key: "status", label: "状态" },
+          { key: "command", label: "命令" }
         ])}
       `;
     }
 
     function renderGitHubSyncDetails(githubSync) {
       if (hasError(githubSync)) {
-        return renderPanelError("GitHub Sync", githubSync);
+        return renderPanelError("GitHub 同步", githubSync);
       }
 
       const typeMetrics = Object.entries(githubSync.link_type_counts ?? {});
       const statusMetrics = Object.entries(githubSync.status_counts ?? {});
 
       return `
-        <h2>GitHub Link Types</h2>
+        <h2>GitHub 链接类型</h2>
         <div class="grid">${typeMetrics.map(asMetric).join("")}</div>
-        <h2>GitHub Link Status</h2>
+        <h2>GitHub 链接状态</h2>
         <div class="grid">${statusMetrics.map(asMetric).join("")}</div>
-        ${renderRiskTable("Recent GitHub Sync Links", githubSync.recent_links ?? [
+        ${renderRiskTable("最近 GitHub 同步链接", githubSync.recent_links ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "link_type", label: "Type" },
-          { key: "external_id", label: "External ID" },
-          { key: "status", label: "Status" },
-          { key: "created_by", label: "By" }
+          { key: "task_code", label: "任务" },
+          { key: "link_type", label: "类型" },
+          { key: "external_id", label: "外部 ID" },
+          { key: "status", label: "状态" },
+          { key: "created_by", label: "由" }
         ])}
-        ${renderRiskTable("Recent GitHub Delivery Events", githubSync.recent_delivery_events ?? [
+        ${renderRiskTable("最近 GitHub 交付事件", githubSync.recent_delivery_events ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "summary", label: "Summary" },
-          { key: "created_by", label: "By" },
-          { key: "created_at", label: "Created" }
+          { key: "task_code", label: "任务" },
+          { key: "summary", label: "摘要" },
+          { key: "created_by", label: "由" },
+          { key: "created_at", label: "创建时间" }
         ])}
         ${renderGitHubBindTable(githubSync.recent_unlinked_delivered_tasks ?? [])}
-        ${renderRiskTable("Failed GitHub Sync Links", githubSync.failed_links ?? [
+        ${renderRiskTable("失败 GitHub 同步链接", githubSync.failed_links ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "link_type", label: "Type" },
-          { key: "external_id", label: "External ID" },
-          { key: "status", label: "Status" }
+          { key: "task_code", label: "任务" },
+          { key: "link_type", label: "类型" },
+          { key: "external_id", label: "外部 ID" },
+          { key: "status", label: "状态" }
         ])}
       `;
     }
 
     function renderRepositoryDetails(repositoryStatus) {
       if (hasError(repositoryStatus)) {
-        return renderPanelError("Repositories", repositoryStatus);
+        return renderPanelError("仓库", repositoryStatus);
       }
 
-      return renderRiskTable("Repository Workspaces", repositoryStatus.repositories ?? [], [
-        { key: "name", label: "Name" },
-        { key: "default_branch", label: "Default Branch" },
-        { key: "current_branch", label: "Current Branch" },
-        { key: "workspace_path", label: "Workspace" },
-        { key: "workspace_ready", label: "Ready" },
-        { key: "dirty", label: "Dirty" },
-        { key: "ahead", label: "Ahead" },
-        { key: "behind", label: "Behind" },
-        { key: "errors", label: "Errors" }
+      return renderRiskTable("仓库工作区", repositoryStatus.repositories ?? [], [
+        { key: "name", label: "名称" },
+        { key: "default_branch", label: "默认分支" },
+        { key: "current_branch", label: "当前分支" },
+        { key: "workspace_path", label: "工作区" },
+        { key: "workspace_ready", label: "就绪" },
+        { key: "dirty", label: "脏" },
+        { key: "ahead", label: "领先" },
+        { key: "behind", label: "落后" },
+        { key: "errors", label: "错误" }
       ]);
     }
 
     function renderAuditTrail(audit) {
       if (hasError(audit)) {
-        return renderPanelError("Audit Trail", audit);
+        return renderPanelError("审计追踪", audit);
       }
 
       return [
-        renderRiskTable("Recent Events", audit.events ?? [
+        renderRiskTable("最近事件", audit.events ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "event_type", label: "Event" },
-          { key: "from_status", label: "From" },
-          { key: "to_status", label: "To" }
+          { key: "task_code", label: "任务" },
+          { key: "event_type", label: "事件" },
+          { key: "from_status", label: "从" },
+          { key: "to_status", label: "至" }
         ]),
-        renderRiskTable("Recent Tool Calls", audit.tool_calls ?? [
+        renderRiskTable("最近工具调用", audit.tool_calls ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "agent_name", label: "Agent" },
-          { key: "tool_name", label: "Tool" },
-          { key: "result_status", label: "Result" }
+          { key: "task_code", label: "任务" },
+          { key: "agent_name", label: "代理" },
+          { key: "tool_name", label: "工具" },
+          { key: "result_status", label: "结果" }
         ]),
-        renderRiskTable("Recent Artifacts", audit.artifacts ?? [
+        renderRiskTable("最近产物", audit.artifacts ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "artifact_type", label: "Type" },
+          { key: "task_code", label: "任务" },
+          { key: "artifact_type", label: "类型" },
           { key: "artifact_uri", label: "URI" }
         ]),
-        renderRiskTable("Recent Data Assets", audit.data_assets ?? [
+        renderRiskTable("最近数据资产", audit.data_assets ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "asset_type", label: "Type" },
-          { key: "classification", label: "Class" },
-          { key: "owner", label: "Owner" }
+          { key: "task_code", label: "任务" },
+          { key: "asset_type", label: "类型" },
+          { key: "classification", label: "类别" },
+          { key: "owner", label: "所有者" }
         ]),
-        renderRiskTable("Recent GitHub Links", audit.github_links ?? [
+        renderRiskTable("最近 GitHub 链接", audit.github_links ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "link_type", label: "Type" },
-          { key: "external_id", label: "External ID" },
-          { key: "status", label: "Status" }
+          { key: "task_code", label: "任务" },
+          { key: "link_type", label: "类型" },
+          { key: "external_id", label: "外部 ID" },
+          { key: "status", label: "状态" }
         ]),
-        renderRiskTable("Recent LLM Egress Authorizations", audit.llm_egress_authorizations ?? [
+        renderRiskTable("最近 LLM 外发授权", audit.llm_egress_authorizations ?? [
         ], [
-          { key: "task_code", label: "Task" },
-          { key: "provider", label: "Provider" },
-          { key: "model", label: "Model" },
-          { key: "active", label: "Active" }
+          { key: "task_code", label: "任务" },
+          { key: "provider", label: "提供商" },
+          { key: "model", label: "模型" },
+          { key: "active", label: "活跃" }
         ])
       ].join("");
     }
 
     function renderTaskSummary(task) {
       if (task.error) {
-        return renderPanelError("Task Detail", task);
+        return renderPanelError("任务详情", task);
       }
 
       const fields = [
-        ["Task", task.task_code],
-        ["Title", task.title],
-        ["Level", task.task_level],
-        ["Status", task.status],
-        ["Owner", task.owner],
-        ["Created", task.created_at],
-        ["Updated", task.updated_at]
+        ["任务", task.task_code],
+        ["标题", task.title],
+        ["等级", task.task_level],
+        ["状态", labelText(task.status)],
+        ["所有者", task.owner],
+        ["创建时间", task.created_at],
+        ["更新时间", task.updated_at]
       ];
       const counts = {
         events: (task.events ?? []).length,
@@ -575,66 +624,66 @@ def build_console_index_html() -> str:
       }
 
       return [
-        renderRiskTable("Task Events", task.events ?? [
+        renderRiskTable("任务事件", task.events ?? [
         ], [
-          { key: "event_type", label: "Event" },
-          { key: "from_status", label: "From" },
-          { key: "to_status", label: "To" },
-          { key: "created_by", label: "By" }
+          { key: "event_type", label: "事件" },
+          { key: "from_status", label: "从" },
+          { key: "to_status", label: "至" },
+          { key: "created_by", label: "由" }
         ]),
-        renderRiskTable("Task Tool Calls", task.tool_calls ?? [
+        renderRiskTable("任务工具调用", task.tool_calls ?? [
         ], [
-          { key: "agent_name", label: "Agent" },
-          { key: "tool_name", label: "Tool" },
-          { key: "result_status", label: "Result" },
-          { key: "risk_flag", label: "Risk" }
+          { key: "agent_name", label: "代理" },
+          { key: "tool_name", label: "工具" },
+          { key: "result_status", label: "结果" },
+          { key: "risk_flag", label: "风险" }
         ]),
-        renderRiskTable("Task Artifacts", task.artifacts ?? [
+        renderRiskTable("任务产物", task.artifacts ?? [
         ], [
-          { key: "artifact_type", label: "Type" },
+          { key: "artifact_type", label: "类型" },
           { key: "artifact_uri", label: "URI" },
-          { key: "access_level", label: "Access" }
+          { key: "access_level", label: "访问权限" }
         ]),
-        renderRiskTable("Task Data Assets", task.data_assets ?? [
+        renderRiskTable("任务数据资产", task.data_assets ?? [
         ], [
-          { key: "asset_type", label: "Type" },
-          { key: "classification", label: "Class" },
-          { key: "owner", label: "Owner" },
-          { key: "primary_storage", label: "Storage" }
+          { key: "asset_type", label: "类型" },
+          { key: "classification", label: "类别" },
+          { key: "owner", label: "所有者" },
+          { key: "primary_storage", label: "存储" }
         ]),
-        renderRiskTable("Task Skill Usage", task.skill_usage ?? [
+        renderRiskTable("任务技能使用", task.skill_usage ?? [
         ], [
-          { key: "name", label: "Skill" },
-          { key: "path", label: "Path" },
-          { key: "status", label: "Status" },
+          { key: "name", label: "技能" },
+          { key: "path", label: "路径" },
+          { key: "status", label: "状态" },
           { key: "content_sha256", label: "SHA256" }
         ]),
-        renderRiskTable("Task Skill Execution Plan", task.skill_execution_plan?.skills ?? [
+        renderRiskTable("任务技能执行计划", task.skill_execution_plan?.skills ?? [
         ], [
-          { key: "name", label: "Skill" },
-          { key: "status", label: "Status" },
-          { key: "path", label: "Path" },
+          { key: "name", label: "技能" },
+          { key: "status", label: "状态" },
+          { key: "path", label: "路径" },
           { key: "content_sha256", label: "SHA256" }
         ]),
-        renderRiskTable("Task GitHub Links", task.github_links ?? [
+        renderRiskTable("任务 GitHub 链接", task.github_links ?? [
         ], [
-          { key: "link_type", label: "Type" },
-          { key: "external_id", label: "External ID" },
-          { key: "status", label: "Status" },
-          { key: "url", label: "URL" }
+          { key: "link_type", label: "类型" },
+          { key: "external_id", label: "外部 ID" },
+          { key: "status", label: "状态" },
+          { key: "url", label: "地址" }
         ]),
-        renderRiskTable("Task LLM Egress Authorizations", task.llm_egress_authorizations ?? [
+        renderRiskTable("任务 LLM 外发授权", task.llm_egress_authorizations ?? [
         ], [
-          { key: "provider", label: "Provider" },
-          { key: "model", label: "Model" },
-          { key: "data_classification", label: "Class" },
-          { key: "active", label: "Active" }
+          { key: "provider", label: "提供商" },
+          { key: "model", label: "模型" },
+          { key: "data_classification", label: "类别" },
+          { key: "active", label: "活跃" }
         ]),
-        renderRiskTable("Task Gate Results", task.gate_results ?? [
+        renderRiskTable("任务门槛结果", task.gate_results ?? [
         ], [
-          { key: "gate_name", label: "Gate" },
-          { key: "status", label: "Status" },
-          { key: "command", label: "Command" }
+          { key: "gate_name", label: "门槛" },
+          { key: "status", label: "状态" },
+          { key: "command", label: "命令" }
         ])
       ].join("");
     }
@@ -752,9 +801,9 @@ def build_console_index_html() -> str:
       const approvals = await loadJson(`/api/console/approvals?limit=${limit}`);
       updateFilterUrl(limit, filters);
       if (hasError(overview)) {
-        document.querySelector("#overview").innerHTML = renderPanelError("Overview", overview);
+        document.querySelector("#overview").innerHTML = renderPanelError("概览", overview);
         document.querySelector("#recent-tasks").innerHTML = renderPanelError(
-          "Recent Tasks",
+          "最近任务",
           overview
         );
       } else {
@@ -771,28 +820,28 @@ def build_console_index_html() -> str:
           renderRecentTasks(overview.recent_tasks ?? []);
       }
       document.querySelector("#repositories").innerHTML = hasError(repositories)
-        ? renderPanelError("Repositories", repositories)
+        ? renderPanelError("仓库", repositories)
         : Object.entries(repositories.summary ?? {}).map(asMetric).join("");
       document.querySelector("#repository-details").innerHTML =
         renderRepositoryDetails(repositories);
       document.querySelector("#risks").innerHTML = hasError(risks)
-        ? renderPanelError("Risks", risks)
+        ? renderPanelError("风险", risks)
         : Object.entries(risks.summary ?? {}).map(asMetric).join("");
       document.querySelector("#risk-details").innerHTML = renderRiskDetails(risks);
       document.querySelector("#github-sync").innerHTML = hasError(githubSync)
-        ? renderPanelError("GitHub Sync", githubSync)
+        ? renderPanelError("GitHub 同步", githubSync)
         : Object.entries(githubSync.summary ?? {}).map(asMetric).join("");
       document.querySelector("#github-sync-details").innerHTML =
         renderGitHubSyncDetails(githubSync);
       document.querySelector("#gates").innerHTML = hasError(gates)
-        ? renderPanelError("Gates", gates)
+        ? renderPanelError("门槛", gates)
         : Object.entries(gates.gate_status_counts ?? {}).map(asMetric).join("");
       document.querySelector("#gate-details").innerHTML = renderGateDetails(gates);
       document.querySelector("#audit-trail").innerHTML = renderAuditTrail(audit);
       document.querySelector("#approval-queue").innerHTML =
         renderApprovalQueue(approvals.error ? approvals : (approvals.approvals ?? []));
       document.querySelector("#last-updated").textContent =
-        `Last updated ${new Date().toLocaleTimeString()}`;
+        `最后更新 ${new Date().toLocaleTimeString()}`;
     }
 
     document.querySelector("#refresh-form").addEventListener("submit", async (event) => {
@@ -826,8 +875,8 @@ def build_console_index_html() -> str:
           note
         });
         document.querySelector("#approval-result").innerHTML = hasError(result)
-          ? renderPanelError("Approval", result)
-          : renderNotice(`Approved ${taskCode}`);
+          ? renderPanelError("审批", result)
+          : renderNotice(`已批准 ${taskCode}`);
         await refresh();
         if (!hasError(result) && result.task?.task_code) {
           await loadTaskDetail(result.task.task_code);
@@ -863,8 +912,8 @@ def build_console_index_html() -> str:
           by: "shangshu"
         });
         document.querySelector("#github-link-result").innerHTML = hasError(result)
-          ? renderPanelError("GitHub link", result)
-          : renderNotice(`Bound GitHub link for ${taskCode}`);
+          ? renderPanelError("GitHub 链接", result)
+          : renderNotice(`已为 ${taskCode} 绑定 GitHub 链接`);
         await refresh();
         if (!hasError(result) && result.task?.task_code) {
           await loadTaskDetail(result.task.task_code);
@@ -900,7 +949,7 @@ def build_console_index_html() -> str:
 
     boot().catch((error) => {
       document.querySelector("#overview").innerHTML =
-        renderNotice(`Console load failed: ${error}`, "error");
+        renderNotice(`控制台加载失败：${error}`, "error");
     });
   </script>
 </body>
@@ -936,7 +985,7 @@ def _parse_optional_filter(query: dict[str, list[str]], name: str) -> str | None
 def _build_service_error(path: str, exc: Exception) -> dict[str, Any]:
     return {
         "error": "service_unavailable",
-        "message": "Console data unavailable.",
+        "message": "控制台数据不可用。",
         "path": path,
         "detail": str(exc),
     }
@@ -967,7 +1016,7 @@ def _invalid_request(message: str) -> tuple[int, dict[str, Any]]:
 def _build_approval_write_response(payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     task_code = str(payload.get("task_code") or "").strip()
     if not task_code:
-        return _invalid_request("task_code is required.")
+        return _invalid_request("task_code 为必填项。")
 
     confirmed_by = str(payload.get("by") or "emperor").strip() or "emperor"
     note = str(payload.get("note") or "")
@@ -995,13 +1044,13 @@ def _build_github_bind_write_response(payload: dict[str, Any]) -> tuple[int, dic
     url = str(payload.get("url") or "").strip()
 
     if not task_code:
-        return _invalid_request("task_code is required.")
+        return _invalid_request("task_code 为必填项。")
     if not link_type:
-        return _invalid_request("link_type is required.")
+        return _invalid_request("link_type 为必填项。")
     if not external_id:
-        return _invalid_request("external_id is required.")
+        return _invalid_request("external_id 为必填项。")
     if not url:
-        return _invalid_request("url is required.")
+        return _invalid_request("url 为必填项。")
 
     task = get_task_detail(task_code)
     if task is None:
@@ -1073,12 +1122,12 @@ def build_console_write_response(path: str, payload: Any) -> tuple[int, dict[str
     if path != "/api/console/approvals/approve":
         if path == "/api/console/github-links/bind":
             if not isinstance(payload, dict):
-                return _invalid_request("JSON request body must be an object.")
+                return _invalid_request("JSON 请求体必须是对象。")
             return _build_github_bind_write_response(payload)
         return _write_not_found(path)
 
     if not isinstance(payload, dict):
-        return _invalid_request("JSON request body must be an object.")
+        return _invalid_request("JSON 请求体必须是对象。")
 
     return _build_approval_write_response(payload)
 
@@ -1181,7 +1230,7 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
                 HTTPStatus.BAD_REQUEST,
                 {
                     "error": "invalid_json",
-                    "message": "Request body must be valid JSON.",
+                    "message": "请求体必须是有效 JSON。",
                 },
             )
         else:

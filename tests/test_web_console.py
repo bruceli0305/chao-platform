@@ -7,10 +7,10 @@ from app.chao.repositories import RepositoryConfig
 def test_build_console_index_html_contains_read_only_ui():
     html = web_console.build_console_index_html()
 
-    assert "<title>Chao Console</title>" in html
+    assert "<title>Chao 控制台</title>" in html
     assert "record-limit" in html
-    assert "Refresh" in html
-    assert "Console sections" in html
+    assert "刷新" in html
+    assert "控制台分区" in html
     assert "#overview-section" in html
     assert "#repositories-section" in html
     assert "#task-detail-section" in html
@@ -24,7 +24,7 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "hydrateFiltersFromUrl" in html
     assert "renderNotice" in html
     assert "renderPanelError" in html
-    assert "Console load failed" in html
+    assert "控制台加载失败" in html
     assert "/api/console?${buildOverviewQuery(limit, filters)}" in html
     assert 'loadJson("/api/console/repositories")' in html
     assert "/api/console/approvals?limit=${limit}" in html
@@ -33,38 +33,38 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "/api/console/gates?limit=${limit}" in html
     assert "/api/console/risks?limit=${limit}" in html
     assert "/api/console/tasks/" in html
-    assert "Approval Queue" in html
+    assert "审批队列" in html
     assert "approval-result" in html
     assert "data-approve-task-code" in html
     assert "approval-note" in html
     assert "postJson" in html
     assert "/api/console/approvals/approve" in html
-    assert "GitHub Sync" in html
-    assert "Data Boundary Audit" in html
-    assert "Audit Trail" in html
-    assert "Recent Tool Calls" in html
-    assert "Recent Artifacts" in html
-    assert "Recent Gate Results" in html
-    assert "Recent Tasks" in html
+    assert "GitHub 同步" in html
+    assert "数据边界审计" in html
+    assert "审计追踪" in html
+    assert "最近工具调用" in html
+    assert "最近产物" in html
+    assert "最近门槛结果" in html
+    assert "最近任务" in html
     assert "risk-details" in html
     assert "gate-details" in html
     assert "renderRiskDetails" in html
     assert "renderGateDetails" in html
     assert "renderGitHubSyncDetails" in html
     assert "renderRepositoryDetails" in html
-    assert "Repository Workspaces" in html
+    assert "仓库工作区" in html
     assert "renderAuditTrail" in html
     assert "task-summary" in html
     assert "renderTaskSummary" in html
     assert "task-detail-tables" in html
     assert "renderTaskDetailTables" in html
-    assert "Task Tool Calls" in html
-    assert "Task Gate Results" in html
-    assert "Task Skill Usage" in html
-    assert "Task Skill Execution Plan" in html
-    assert "Task LLM Egress Authorizations" in html
-    assert "Recent LLM Egress Authorizations" in html
-    assert "Expired LLM Egress Authorizations" in html
+    assert "任务工具调用" in html
+    assert "任务门槛结果" in html
+    assert "任务技能使用" in html
+    assert "任务技能执行计划" in html
+    assert "任务 LLM 外发授权" in html
+    assert "最近 LLM 外发授权" in html
+    assert "已过期 LLM 外发授权" in html
     assert "llm_egress_authorizations" in html
     assert "URLSearchParams(window.location.search)" in html
     assert "history.replaceState" in html
@@ -73,23 +73,23 @@ def test_build_console_index_html_contains_read_only_ui():
     assert "updateTaskLink" in html
     assert "buildTaskUrl" in html
     assert "gate_results" in html
-    assert "Runner Failures" in html
-    assert "Runner Preflight Blocks" in html
-    assert "Stale Tool Calls" in html
-    assert "Pending Tool Calls" in html
-    assert "Recent GitHub Sync Links" in html
-    assert "Recent GitHub Delivery Events" in html
-    assert "Unlinked Delivered Tasks" in html
+    assert "运行器失败" in html
+    assert "运行器预检阻塞" in html
+    assert "过期工具调用" in html
+    assert "待处理工具调用" in html
+    assert "最近 GitHub 同步链接" in html
+    assert "最近 GitHub 交付事件" in html
+    assert "未关联的已交付任务" in html
     assert "github-link-result" in html
     assert "renderGitHubBindTable" in html
     assert "data-bind-github-task-code" in html
     assert "github-external-id" in html
     assert "github-url" in html
     assert "/api/console/github-links/bind" in html
-    assert "Failed GitHub Sync Links" in html
+    assert "失败 GitHub 同步链接" in html
     assert "github-sync-details" in html
     assert "data-task-code" in html
-    assert "Task Detail" in html
+    assert "任务详情" in html
 
 
 def test_build_console_response_returns_overview(monkeypatch):
@@ -277,7 +277,7 @@ def test_build_console_response_returns_service_unavailable_on_data_error(monkey
 
     assert status_code == HTTPStatus.SERVICE_UNAVAILABLE
     assert payload["error"] == "service_unavailable"
-    assert payload["message"] == "Console data unavailable."
+    assert payload["message"] == "控制台数据不可用。"
     assert payload["path"] == "/api/console"
     assert payload["detail"] == "database unavailable"
 
@@ -336,7 +336,7 @@ def test_build_console_write_response_rejects_missing_task_code():
 
     assert status_code == HTTPStatus.BAD_REQUEST
     assert payload["error"] == "invalid_request"
-    assert payload["message"] == "task_code is required."
+    assert payload["message"] == "task_code 为必填项。"
 
 
 def test_build_console_write_response_returns_approval_failure(monkeypatch):
@@ -437,7 +437,7 @@ def test_build_console_write_response_rejects_missing_github_url():
     assert status_code == HTTPStatus.BAD_REQUEST
     assert payload == {
         "error": "invalid_request",
-        "message": "url is required.",
+        "message": "url 为必填项。",
     }
 
 
