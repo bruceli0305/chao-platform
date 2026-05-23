@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from typing import Any, TypedDict
 
 from app.chao.llm_context import build_llm_task_prompt, redact_sensitive_text
@@ -54,9 +55,16 @@ SELF_UPGRADE_REPOSITORY_HINTS = """Repository patch hints:
 - The old_text must be exact text from that file.
 """
 
+SELF_UPGRADE_SOURCE_CONTEXT_PATHS = [
+    "app/chao/web_console.py",
+]
+
+MAX_SELF_UPGRADE_SOURCE_CONTEXT_CHARS = 60000
+
 
 def build_self_upgrade_prompt(task: dict[str, Any], user_request: str) -> str:
     request = user_request.strip() or str(task.get("raw_request") or "")
+    source_context = _build_source_file_context(request)
     plan_contract = (
         "Produce a controlled patch plan for this task.\n"
         "Return only JSON with this exact shape:\n"
@@ -73,7 +81,7 @@ def build_self_upgrade_prompt(task: dict[str, Any], user_request: str) -> str:
     )
     return build_llm_task_prompt(
         task,
-        f"{request}\n\n{SELF_UPGRADE_REPOSITORY_HINTS}\n{plan_contract}",
+        f"{request}\n\n{SELF_UPGRADE_REPOSITORY_HINTS}\n{source_context}\n\n{plan_contract}",
     )
 
 
@@ -131,6 +139,42 @@ def parse_self_upgrade_plan(
         "validation_gates": validation_gates,
         "commit_message": commit_message,
     }
+
+
+def _build_source_file_context(user_request: str) -> str:
+    blocks: list[str] = []
+
+    for path in SELF_UPGRADE_SOURCE_CONTEXT_PATHS:
+        if path not in user_request:
+            continue
+
+        normalized_path = normalize_repo_path(path)
+        source_path = Path(normalized_path)
+        if not source_path.is_file():
+            blocks.append(
+                "## Source File Context\n"
+                f"### {normalized_path}\n"
+                "Source file was requested but could not be found in the workspace."
+            )
+            continue
+
+        content = source_path.read_text(encoding="utf-8")
+        if len(content) > MAX_SELF_UPGRADE_SOURCE_CONTEXT_CHARS:
+            content = (
+                content[:MAX_SELF_UPGRADE_SOURCE_CONTEXT_CHARS].rstrip()
+                + "\n[Source file context truncated]"
+            )
+
+        blocks.append(
+            "## Source File Context\n"
+            f"### {normalized_path}\n"
+            "The following source file content is provided so old_text values can be exact.\n"
+            "```python\n"
+            f"{content}\n"
+            "```"
+        )
+
+    return "\n\n".join(blocks)
 
 
 def _load_json_object(text: str) -> dict[str, Any]:
