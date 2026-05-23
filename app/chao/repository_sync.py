@@ -38,6 +38,7 @@ class RepositoryStatusResult(TypedDict):
     remote_url: str | None
     dirty: bool
     status_lines: list[str]
+    ignored_status_lines: list[str]
     ahead: int | None
     behind: int | None
     errors: list[str]
@@ -173,6 +174,7 @@ def inspect_repository_status(
     is_git_repository = (workspace / ".git").exists()
     errors: list[str] = []
     status_lines: list[str] = []
+    ignored_status_lines: list[str] = []
     current_branch = None
     head_commit = None
     remote_url = None
@@ -220,7 +222,17 @@ def inspect_repository_status(
             elif key == "remote_url":
                 remote_url = output or None
             elif key == "status":
-                status_lines = output.splitlines() if output else []
+                raw_status_lines = output.splitlines() if output else []
+                status_lines = [
+                    line
+                    for line in raw_status_lines
+                    if not _is_non_blocking_generated_record_status_line(line)
+                ]
+                ignored_status_lines = [
+                    line
+                    for line in raw_status_lines
+                    if _is_non_blocking_generated_record_status_line(line)
+                ]
             elif key == "divergence":
                 parts = output.split()
                 if len(parts) == 2:
@@ -238,10 +250,15 @@ def inspect_repository_status(
         "remote_url": remote_url,
         "dirty": bool(status_lines),
         "status_lines": status_lines,
+        "ignored_status_lines": ignored_status_lines,
         "ahead": ahead,
         "behind": behind,
         "errors": errors,
     }
+
+
+def _is_non_blocking_generated_record_status_line(status_line: str) -> bool:
+    return status_line.startswith("?? .ai-agents/records/")
 
 
 def build_repository_status_report(

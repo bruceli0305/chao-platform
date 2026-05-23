@@ -280,3 +280,42 @@ def test_build_repository_doctor_report_blocks_dirty_workspace(tmp_path):
 
     assert report["runner_ready"] is False
     assert report["suggested_action"] == "review_local_changes"
+
+
+def test_build_repository_doctor_report_allows_generated_record_files(tmp_path):
+    workspace = tmp_path / "demo"
+    (workspace / ".git").mkdir(parents=True)
+    repository = _repository_config(workspace_path=str(workspace))
+
+    class Completed:
+        def __init__(self, stdout: str, returncode: int = 0, stderr: str = ""):
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = stderr
+
+    def fake_runner(command, **_kwargs):
+        if command[-2:] == ["branch", "--show-current"]:
+            return Completed("main\n")
+        if command[-2:] == ["rev-parse", "HEAD"]:
+            return Completed("abc123\n")
+        if command[-3:] == ["config", "--get", "remote.origin.url"]:
+            return Completed("git@github.com:example/demo.git\n")
+        if command[-2:] == ["status", "--short"]:
+            return Completed(
+                "?? .ai-agents/records/tasks/TASK-20260523-120000-000001.md\n"
+                "?? .ai-agents/records/patches/TASK-20260523-120000-000001-patch.md\n"
+            )
+        if command[-4:] == ["rev-list", "--left-right", "--count", "HEAD...origin/main"]:
+            return Completed("0\t0\n")
+        raise AssertionError(command)
+
+    report = build_repository_doctor_report(repository, command_runner=fake_runner)
+
+    assert report["runner_ready"] is True
+    assert report["suggested_action"] == "ready"
+    assert report["workspace_status"]["dirty"] is False
+    assert report["workspace_status"]["status_lines"] == []
+    assert report["workspace_status"]["ignored_status_lines"] == [
+        "?? .ai-agents/records/tasks/TASK-20260523-120000-000001.md",
+        "?? .ai-agents/records/patches/TASK-20260523-120000-000001-patch.md",
+    ]
